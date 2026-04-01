@@ -6,7 +6,10 @@ import type {
   PathRequest,
 } from './types';
 
-const BASE = '/api';
+// In dev, BASE_URL is '/' so this resolves to '/api' (caught by the Vite proxy).
+// In production, BASE_URL is './' so fetch('./api/...') resolves relative to
+// the page URL — works correctly whether the app is at '/' or '/traingraph/'.
+const BASE = (import.meta.env.BASE_URL ?? '/').replace(/\/+$/, '') + '/api';
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
