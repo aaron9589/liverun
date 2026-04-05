@@ -42,13 +42,6 @@ Data is persisted in a Docker volume (`train-graph-data`).
 4. **Edit** — click any station or train to open its editor
 5. **Hover the graph** — mouse over any train line to see its details in a tooltip
 
-## JMRI Integration
-
-The app is a standalone HTTP server. To expose it from JMRI:
-
-- Set the `PORT` environment variable to the port JMRI routes traffic to, or
-- Use JMRI's built-in web server proxy to forward `/train-graph/` to this server
-
 ## Project Structure
 
 ```
@@ -59,18 +52,116 @@ train-graph/
 └── docker-compose.yml
 ```
 
-## API
+## Live / Public Timetable API
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/timetables` | List all timetables |
-| POST | `/api/timetables` | Create timetable |
-| GET | `/api/timetables/:id` | Get timetable with stations & trains |
-| PUT | `/api/timetables/:id` | Update timetable settings |
-| DELETE | `/api/timetables/:id` | Delete timetable |
-| POST | `/api/timetables/:id/stations` | Add station |
-| PUT | `/api/timetables/:id/stations/:sid` | Update station |
-| DELETE | `/api/timetables/:id/stations/:sid` | Delete station |
-| POST | `/api/timetables/:id/trains` | Add train |
-| PUT | `/api/timetables/:id/trains/:tid` | Update train |
-| DELETE | `/api/timetables/:id/trains/:tid` | Delete train |
+A read-only API designed for external systems (e.g. guard panels, operator displays). All times are formatted as `H:MM` with no leading zero (e.g. `9:05`, not `09:05`), matching JMRI's clock format.
+
+### Active timetable
+
+External consumers should resolve the active timetable ID before calling train endpoints.
+
+**`GET /api/active-timetable`**
+
+Returns the ID of the timetable currently marked as active.
+
+```json
+{ "id": "abc123" }
+```
+
+`id` is `null` if no timetable has been marked active. In that case, fall back to the first entry from `GET /api/timetables`.
+
+---
+
+### List trains
+
+**`GET /api/timetables/:id/live/trains`**
+
+Returns all trains in the timetable, sorted by start time.
+
+```json
+{
+  "trains": [
+    {
+      "name": "K351",
+      "trainType": "L",
+      "trainId": "CityRail 51L",
+      "direction": "Down",
+      "notes": "Stops on request at Minnamurra",
+      "nextCrewService": "K352"
+    },
+    {
+      "name": "K352",
+      "trainType": "L",
+      "trainId": "CityRail 52L",
+      "direction": "Up",
+      "notes": "",
+      "nextCrewService": ""
+    }
+  ]
+}
+```
+
+| Field | Description |
+|---|---|
+| `name` | Train number / display name |
+| `trainType` | Short type code (e.g. `L`, `T`, `V`, `E`) — empty string if not set |
+| `trainId` | Roster/JMRI name (e.g. `CityRail 51L`) — empty string if not set |
+| `direction` | Direction of travel (e.g. `Up`, `Down`, `FWD`) — empty string if not set |
+| `notes` | Free-text train notes — empty string if not set |
+| `nextCrewService` | Name of the next train the same crew member works, if assigned — empty string otherwise |
+
+Only trains with a non-empty `trainId` are meaningful to operator displays that drive JMRI roster lookups. Filter client-side as needed.
+
+---
+
+### Single train timetable
+
+**`GET /api/timetables/:id/live/trains/:trainName`**
+
+Returns the full stop-by-stop timetable for one train, looked up by its `name`.
+
+```json
+{
+  "name": "K351",
+  "trainType": "L",
+  "trainId": "CityRail 51L",
+  "direction": "Down",
+  "notes": "Stops on request at Minnamurra",
+  "nextCrewService": "K352",
+  "stops": [
+    {
+      "stopName": "Kiama",
+      "arrival": null,
+      "departure": "9:05",
+      "specialInstructions": null
+    },
+    {
+      "stopName": "Minnamurra",
+      "arrival": "9:10",
+      "departure": "9:10",
+      "specialInstructions": "Request stop only"
+    },
+    {
+      "stopName": "Shellharbour Junction",
+      "arrival": "9:20",
+      "departure": null,
+      "specialInstructions": null
+    }
+  ]
+}
+```
+
+#### Stop fields
+
+| Field | Description |
+|---|---|
+| `stopName` | Station display name |
+| `arrival` | Arrival time as `H:MM`, or `null` if not set |
+| `departure` | Departure time as `H:MM`, or `null` if not set |
+| `specialInstructions` | Free-text instruction for this stop, or `null` if not set |
+
+#### Notes on times
+
+- A stop where `arrival === departure` is a pass-through — the departure time is the only meaningful value
+- The last stop of a train that **forms a next service** will have `departure` set to the next train's name (e.g. `"K352"`) rather than a time. Use `nextCrewService` to detect this case programmatically
+- Stops are returned in the order they are stored; sort by time client-side if needed
