@@ -35,6 +35,13 @@ export default function App() {
   const [hiddenTrainIds, setHiddenTrainIds] = useState<Set<string>>(new Set());
   useEffect(() => { setHiddenTrainIds(new Set()); }, [selectedId]);
 
+  // ── Crew filter (show only one operator's trains on graph) ────
+  const [crewFilter, setCrewFilter] = useState<string | null>(null);
+  useEffect(() => { setCrewFilter(null); }, [selectedId]);
+
+  // ── Crew train hover (highlights train in graph from Sidebar) ──
+  const [hoveredCrewTrainId, setHoveredCrewTrainId] = useState<string | null>(null);
+
   function handleToggleTrainVisibility(trainId: string) {
     setHiddenTrainIds((prev) => {
       const next = new Set(prev);
@@ -128,8 +135,9 @@ export default function App() {
         : [...trains, draftTrain];
     }
     trains = trains.filter((t) => !hiddenTrainIds.has(t.id));
+    if (crewFilter) trains = trains.filter((t) => t.crew_id === crewFilter);
     return { ...timetable, trains };
-  }, [timetable, draftTrain, hiddenTrainIds]);
+  }, [timetable, draftTrain, hiddenTrainIds, crewFilter]);
 
   // ── Timetable CRUD ───────────────────────────────────────────
 
@@ -172,6 +180,11 @@ export default function App() {
     if (selectedId === id) {
       setSelectedId(list.length > 0 ? list[0].id : null);
     }
+  }
+
+  async function handleSetActiveTimetable(id: string | null) {
+    await api.setActiveTimetable(id);
+    await refreshList();
   }
 
   // ── Station CRUD ─────────────────────────────────────────────
@@ -221,6 +234,7 @@ export default function App() {
     if (!selectedId) return;
     const updated = await api.deleteTrain(selectedId, trainId);
     recordAndSet(updated);
+    setDraftTrain(null);
     if (modal.type === 'editTrain') setModal({ type: 'none' });
   }
 
@@ -243,6 +257,62 @@ export default function App() {
     const updated = await api.deletePath(selectedId, pathId);
     recordAndSet(updated);
     if (modal.type === 'editPath') setModal({ type: 'none' });
+  }
+
+  // ── Crew CRUD ────────────────────────────────────────────────
+
+  async function handleAddCrew(data: { name: string; color: string }) {
+    if (!selectedId) return;
+    const updated = await api.addCrew(selectedId, data);
+    recordAndSet(updated);
+  }
+
+  async function handleUpdateCrew(crewId: string, data: { name: string; color: string }) {
+    if (!selectedId) return;
+    const updated = await api.updateCrew(selectedId, crewId, data);
+    recordAndSet(updated);
+  }
+
+  async function handleDeleteCrew(crewId: string) {
+    if (!selectedId) return;
+    const updated = await api.deleteCrew(selectedId, crewId);
+    recordAndSet(updated);
+  }
+
+  async function handleReorderCrews(order: string[]) {
+    if (!selectedId) return;
+    const updated = await api.reorderCrews(selectedId, order);
+    recordAndSet(updated);
+  }
+
+  async function handleAutoAssignCrews(data: { crewIds: string[]; trainIds: string[]; onlyUnassigned: boolean }): Promise<string[]> {
+    if (!selectedId) return [];
+    const result = await api.autoAssignCrews(selectedId, data);
+    const { unassigned = [], ...timetable } = result as any;
+    recordAndSet(timetable);
+    return unassigned;
+  }
+
+  async function handleUnassignTrain(trainId: string) {
+    if (!selectedId || !timetable) return;
+    const train = timetable.trains.find((t) => t.id === trainId);
+    if (!train) return;
+    const updated = await api.updateTrain(selectedId, trainId, {
+      name: train.name,
+      color: train.color,
+      notes: train.notes,
+      trainType: train.train_type,
+      trainId: train.train_id,
+      direction: train.direction,
+      crewId: undefined,
+      stops: train.stops.map((s) => ({
+        stationId: s.station_id,
+        arrival: s.arrival,
+        departure: s.departure,
+        specialInstructions: s.special_instructions,
+      })),
+    });
+    recordAndSet(updated);
   }
 
   // ── Undo / Redo ──────────────────────────────────────────────
@@ -354,6 +424,7 @@ export default function App() {
         }
         onDeleteTimetable={handleDeleteTimetable}
         onDuplicateTimetable={handleDuplicateTimetable}
+        onSetActiveTimetable={handleSetActiveTimetable}
         onAddStation={handleAddStation}
         onUpdateStation={handleUpdateStation}
         onDeleteStation={handleDeleteStation}
@@ -367,6 +438,13 @@ export default function App() {
         onToggleTrainVisibility={handleToggleTrainVisibility}
         onExportTimetable={handleExportTimetable}
         onImportTimetable={handleImportTimetable}
+        onAddCrew={handleAddCrew}
+        onUpdateCrew={handleUpdateCrew}
+        onDeleteCrew={handleDeleteCrew}
+        onReorderCrews={handleReorderCrews}
+        onAutoAssignCrews={handleAutoAssignCrews}
+        onUnassignTrain={handleUnassignTrain}
+        onCrewTrainHover={setHoveredCrewTrainId}
       />
 
       {/* ── MAIN GRAPH AREA ── */}
@@ -415,6 +493,30 @@ export default function App() {
                   title="Zoom in"
                   className="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800 text-lg leading-none"
                 >+</button>
+                <span className="text-slate-700 mx-1">|</span>
+                {/* Crew filter */}
+                {timetable.crews && timetable.crews.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={crewFilter ?? ''}
+                      onChange={(e) => setCrewFilter(e.target.value || null)}
+                      className="text-xs bg-slate-800 border border-slate-700 text-slate-300 rounded px-2 py-1 focus:outline-none focus:border-blue-500 cursor-pointer"
+                      title="Filter graph by operator"
+                    >
+                      <option value="">All operators</option>
+                      {timetable.crews.map((crew) => (
+                        <option key={crew.id} value={crew.id}>{crew.name}</option>
+                      ))}
+                    </select>
+                    {crewFilter && (
+                      <button
+                        onClick={() => setCrewFilter(null)}
+                        className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                        title="Clear filter"
+                      >✕</button>
+                    )}
+                  </div>
+                )}
                 <span className="text-slate-700 mx-1">|</span>
                 {/* Fast clock indicator */}
                 {timetable.settings?.clock_enabled && (
@@ -481,6 +583,7 @@ export default function App() {
               viewEnd={viewEnd}
               clockTime={clockTime}
               onPan={handlePan}
+              externalHoveredId={hoveredCrewTrainId}
             />
           )}
         </div>
@@ -500,6 +603,7 @@ export default function App() {
           train={modal.type === 'editTrain' ? modal.train : undefined}
           stations={timetable.stations}
           paths={timetable.paths}
+          crews={timetable.crews}
           existingColors={timetable.trains.map((t) => t.color)}
           onDraftChange={setDraftTrain}
           onSave={handleSaveTrain}

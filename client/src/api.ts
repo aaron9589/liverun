@@ -29,6 +29,12 @@ export const api = {
   listTimetables: () =>
     req<TimetableSummary[]>('/timetables'),
 
+  setActiveTimetable: (id: string | null) =>
+    req<{ id: string | null }>('/active-timetable', {
+      method: 'PUT',
+      body: JSON.stringify({ id }),
+    }),
+
   createTimetable: (data: {
     name: string;
     description: string;
@@ -64,10 +70,10 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  restoreTimetable: (id: string, data: { stations: unknown[]; trains: unknown[]; paths: unknown[] }) =>
+  restoreTimetable: (id: string, data: { stations: unknown[]; trains: unknown[]; paths: unknown[]; crews: unknown[] }) =>
     req<Timetable>(`/timetables/${id}/restore`, {
       method: 'POST',
-      body: JSON.stringify({ stations: data.stations, trains: data.trains, paths: data.paths }),
+      body: JSON.stringify({ stations: data.stations, trains: data.trains, paths: data.paths, crews: data.crews }),
     }),
 
   updateTimetableSettings: (id: string, settings: TimetableSettings) =>
@@ -138,5 +144,36 @@ export const api = {
   deletePath: (timetableId: string, pathId: string) =>
     req<Timetable>(`/timetables/${timetableId}/paths/${pathId}`, {
       method: 'DELETE',
+    }),
+
+  // ── Crews ──────────────────────────────────────────────────
+
+  addCrew: (timetableId: string, data: { name: string; color: string }) =>
+    req<Timetable>(`/timetables/${timetableId}/crews`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCrew: (timetableId: string, crewId: string, data: { name: string; color: string }) =>
+    req<Timetable>(`/timetables/${timetableId}/crews/${crewId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCrew: (timetableId: string, crewId: string) =>
+    req<Timetable>(`/timetables/${timetableId}/crews/${crewId}`, {
+      method: 'DELETE',
+    }),
+
+  reorderCrews: (timetableId: string, order: string[]) =>
+    req<Timetable>(`/timetables/${timetableId}/crews/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify({ order }),
+    }),
+
+  autoAssignCrews: (timetableId: string, data: { crewIds: string[]; trainIds: string[]; onlyUnassigned: boolean }) =>
+    req<Timetable & { unassigned?: string[] }>(`/timetables/${timetableId}/trains/auto-assign`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 };

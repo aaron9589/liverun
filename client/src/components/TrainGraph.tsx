@@ -61,6 +61,10 @@ interface TooltipData {
   lastTime: string;
   screenX: number;
   screenY: number;
+  crewName?: string;
+  hasSpecialInstructions: boolean;
+  trainId?: string;
+  direction?: string;
 }
 
 function GraphTooltip({ data }: { data: TooltipData }) {
@@ -92,10 +96,39 @@ function GraphTooltip({ data }: { data: TooltipData }) {
           <span className="ml-auto text-slate-300 font-mono text-xs">{data.lastTime}</span>
         </div>
       </div>
+      {(data.trainId || data.direction) && (
+        <div className="mt-2 pt-2 border-t border-slate-700 space-y-0.5">
+          {data.trainId && (
+            <div className="flex justify-between gap-3">
+              <span className="text-slate-500 text-xs">Train ID</span>
+              <span className="text-slate-300 text-xs font-mono">{data.trainId}</span>
+            </div>
+          )}
+          {data.direction && (
+            <div className="flex justify-between gap-3">
+              <span className="text-slate-500 text-xs">Direction</span>
+              <span className="text-slate-300 text-xs">{data.direction}</span>
+            </div>
+          )}
+        </div>
+      )}
       {data.train.notes && (
-        <p className="mt-2 pt-2 border-t border-slate-700 text-slate-500 text-xs">
-          {data.train.notes}
-        </p>
+        <div className="mt-2 pt-2 border-t border-slate-700 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+          <span className="text-slate-400 text-xs">{data.train.notes}</span>
+        </div>
+      )}
+      {data.hasSpecialInstructions && (
+        <div className="mt-2 pt-2 border-t border-slate-700 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+          <span className="text-slate-400 text-xs">Has special instructions</span>
+        </div>
+      )}
+      {data.crewName && (
+        <div className="mt-2 pt-2 border-t border-slate-700 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+          <span className="text-slate-400 text-xs">{data.crewName}</span>
+        </div>
       )}
     </div>
   );
@@ -111,12 +144,13 @@ interface Props {
   viewEnd?: number;
   clockTime?: number | null;
   onPan?: (newViewStart: number) => void;
+  externalHoveredId?: string | null;
 }
 
 export function TrainGraph({
   timetable, onTrainClick, labelMode = 'code',
   viewStart: viewStartProp, viewEnd: viewEndProp,
-  clockTime, onPan,
+  clockTime, onPan, externalHoveredId,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -125,6 +159,8 @@ export function TrainGraph({
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // Ref to stable layout values used in external-hover effect (avoids stale closures)
+  const layoutRef = useRef({ stationMap: new Map<string, { graph_pos: number; name: string }>(), viewStart: 0, viewEnd: 0, maxPos: 1, gw: 0, gh: 0, timetable });
 
   // Responsive sizing
   useEffect(() => {
@@ -166,6 +202,8 @@ export function TrainGraph({
   const stations = [...timetable.stations].sort((a, b) => (a.graph_pos ?? 0) - (b.graph_pos ?? 0));
   const maxPos = stations.length > 0 ? Math.max(...stations.map((s) => s.graph_pos ?? 0)) : 1;
   const stationMap = new Map(stations.map((s) => [s.id, { graph_pos: s.graph_pos ?? 0, name: s.name }]));
+  // Keep layoutRef current for use in the external-hover effect
+  layoutRef.current = { stationMap, viewStart, viewEnd, maxPos, gw, gh, timetable };
 
   // Ticks within view window
   const minorTicks: number[] = [];
@@ -184,6 +222,37 @@ export function TrainGraph({
 
   const handleMouseLeave = () => { setTooltip(null); setHoveredId(null); };
 
+  // Highlight from external source (e.g. Sidebar crew panel hover)
+  useEffect(() => {
+    if (hoveredId || !externalHoveredId) {
+      if (!hoveredId) setTooltip(null);
+      return;
+    }
+    const { stationMap, viewStart, viewEnd, maxPos, gw, gh, timetable } = layoutRef.current;
+    const train = timetable.trains.find((t) => t.id === externalHoveredId);
+    if (!train || !svgRef.current) return;
+    const points = buildTrainPoints(train, stationMap, viewStart, viewEnd, maxPos, gw, gh);
+    const inView = points.filter((p) => p.minutes >= viewStart && p.minutes <= viewEnd);
+    if (inView.length === 0) return;
+    const svgRect = svgRef.current.getBoundingClientRect();
+    const mid = inView[Math.floor(inView.length / 2)];
+    setTooltip({
+      train,
+      firstStation: inView[0].stationName,
+      lastStation: inView[inView.length - 1].stationName,
+      firstTime: minutesToTime(inView[0].minutes),
+      lastTime: minutesToTime(inView[inView.length - 1].minutes),
+      screenX: svgRect.left + mid.x,
+      screenY: svgRect.top + mid.y,
+      crewName: train.crew_id ? timetable.crews.find((c) => c.id === train.crew_id)?.name : undefined,
+      hasSpecialInstructions: train.stops.some((s) => !!s.special_instructions),
+      trainId: train.train_id || undefined,
+      direction: train.direction || undefined,
+    });
+  }, [externalHoveredId, hoveredId]);
+
+  const effectiveHoveredId = hoveredId ?? externalHoveredId ?? null;
+
   const handleTrainHover = useCallback(
     (train: Train, points: PlotPoint[], e: React.MouseEvent) => {
       const inView = points.filter((p) => p.minutes >= viewStart && p.minutes <= viewEnd);
@@ -197,9 +266,15 @@ export function TrainGraph({
         lastTime: minutesToTime(inView[inView.length - 1].minutes),
         screenX: e.clientX,
         screenY: e.clientY,
+        crewName: train.crew_id
+          ? (timetable.crews.find((c) => c.id === train.crew_id)?.name)
+          : undefined,
+        hasSpecialInstructions: train.stops.some((s) => !!s.special_instructions),
+        trainId: train.train_id || undefined,
+        direction: train.direction || undefined,
       });
     },
-    [viewStart, viewEnd]
+    [viewStart, viewEnd, timetable]
   );
 
   const handleMouseMove = useCallback(
@@ -312,7 +387,7 @@ export function TrainGraph({
               const points = buildTrainPoints(train, stationMap, viewStart, viewEnd, maxPos, gw, gh);
               if (points.length < 2) return null;
               const ptStr = points.map((p) => `${p.x},${p.y}`).join(' ');
-              const isHovered = hoveredId === train.id;
+              const isHovered = effectiveHoveredId === train.id;
               return (
                 <g
                   key={train.id}

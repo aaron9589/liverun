@@ -33,11 +33,12 @@ const DEFAULT_SETTINGS = {
 };
 
 app.get('/api/timetables', (_req, res) => {
-  const { timetables } = readDB();
-  const summaries = [...timetables]
+  const db = readDB();
+  const summaries = [...db.timetables]
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     .map(({ id, name, description, start_time, end_time, created_at, updated_at }) => ({
       id, name, description, start_time, end_time, created_at, updated_at,
+      active: id === (db.active_timetable_id || null),
     }));
   res.json(summaries);
 });
@@ -82,6 +83,25 @@ app.delete('/api/timetables/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Active timetable (guard panel flag) ───────────────────────
+
+app.get('/api/active-timetable', (_req, res) => {
+  const db = readDB();
+  const id = db.active_timetable_id || null;
+  res.json({ id });
+});
+
+app.put('/api/active-timetable', (req, res) => {
+  const { id } = req.body;
+  const db = readDB();
+  if (id && !db.timetables.find((t) => t.id === id)) {
+    return res.status(404).json({ error: 'Timetable not found' });
+  }
+  db.active_timetable_id = id || null;
+  writeDB(db);
+  res.json({ id: db.active_timetable_id });
+});
+
 // Must be defined before /:id routes to avoid 'import' being matched as an id
 app.post('/api/timetables/import', (req, res) => {
   const data = req.body;
@@ -93,6 +113,8 @@ app.post('/api/timetables/import', (req, res) => {
   (data.stations || []).forEach((s) => { stationIdMap[s.id] = uuidv4(); });
   const pathIdMap = {};
   (data.paths || []).forEach((p) => { pathIdMap[p.id] = uuidv4(); });
+  const crewIdMap = {};
+  (data.crews || []).forEach((c) => { crewIdMap[c.id] = uuidv4(); });
   const imported = {
     id: newId,
     name: data.name,
@@ -107,6 +129,7 @@ app.post('/api/timetables/import', (req, res) => {
       const trainId = uuidv4();
       return {
         ...tr, id: trainId, timetable_id: newId,
+        crew_id: tr.crew_id ? (crewIdMap[tr.crew_id] || null) : null,
         stops: (tr.stops || []).map((stop) => ({
           ...stop, id: uuidv4(), train_id: trainId,
           station_id: stationIdMap[stop.station_id] || stop.station_id,
@@ -123,6 +146,7 @@ app.post('/api/timetables/import', (req, res) => {
         })),
       };
     }),
+    crews: (data.crews || []).map((c) => ({ ...c, id: crewIdMap[c.id], timetable_id: newId })),
   };
   db.timetables.push(imported);
   writeDB(db);
@@ -139,6 +163,8 @@ app.post('/api/timetables/:id/duplicate', (req, res) => {
   (original.stations || []).forEach((s) => { stationIdMap[s.id] = uuidv4(); });
   const pathIdMap = {};
   (original.paths || []).forEach((p) => { pathIdMap[p.id] = uuidv4(); });
+  const crewIdMap = {};
+  (original.crews || []).forEach((c) => { crewIdMap[c.id] = uuidv4(); });
   const duplicate = {
     ...original,
     id: newId,
@@ -150,6 +176,7 @@ app.post('/api/timetables/:id/duplicate', (req, res) => {
       const trainId = uuidv4();
       return {
         ...tr, id: trainId, timetable_id: newId,
+        crew_id: tr.crew_id ? (crewIdMap[tr.crew_id] || null) : null,
         stops: (tr.stops || []).map((stop) => ({
           ...stop, id: uuidv4(), train_id: trainId,
           station_id: stationIdMap[stop.station_id] || stop.station_id,
@@ -166,6 +193,7 @@ app.post('/api/timetables/:id/duplicate', (req, res) => {
         })),
       };
     }),
+    crews: (original.crews || []).map((c) => ({ ...c, id: crewIdMap[c.id], timetable_id: newId })),
   };
   db.timetables.push(duplicate);
   writeDB(db);
@@ -173,11 +201,12 @@ app.post('/api/timetables/:id/duplicate', (req, res) => {
 });
 
 app.post('/api/timetables/:id/restore', (req, res) => {
-  const { stations, trains, paths } = req.body;
+  const { stations, trains, paths, crews } = req.body;
   const updated = mutateTimetable(req.params.id, (tt) => {
     if (Array.isArray(stations)) tt.stations = stations;
     if (Array.isArray(trains)) tt.trains = trains;
     if (Array.isArray(paths)) tt.paths = paths;
+    if (Array.isArray(crews)) tt.crews = crews;
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.json(normalise(updated));
@@ -285,13 +314,16 @@ app.delete('/api/timetables/:id/paths/:pathId', (req, res) => {
 });
 
 app.post('/api/timetables/:id/trains', (req, res) => {
-  const { name, color, notes, stops } = req.body;
+  const { name, color, notes, trainType, trainId: trainIdField, direction, crewId, stops } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const trainId = uuidv4();
   const updated = mutateTimetable(req.params.id, (tt) => {
     tt.trains.push({
       id: trainId, timetable_id: req.params.id, name: name.trim(),
-      color: color || '#3b82f6', notes: notes || '', stops: buildStops(trainId, stops || []),
+      color: color || '#3b82f6', notes: notes || '',
+      train_type: trainType || '', train_id: trainIdField || '', direction: direction || '',
+      crew_id: crewId || null,
+      stops: buildStops(trainId, stops || []),
     });
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -299,12 +331,14 @@ app.post('/api/timetables/:id/trains', (req, res) => {
 });
 
 app.put('/api/timetables/:id/trains/:trainId', (req, res) => {
-  const { name, color, notes, stops } = req.body;
+  const { name, color, notes, trainType, trainId: trainIdField, direction, crewId, stops } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const updated = mutateTimetable(req.params.id, (tt) => {
     const tr = tt.trains.find((t) => t.id === req.params.trainId);
     if (tr) {
       tr.name = name.trim(); tr.color = color || '#3b82f6'; tr.notes = notes || '';
+      tr.train_type = trainType || ''; tr.train_id = trainIdField || ''; tr.direction = direction || '';
+      tr.crew_id = crewId || null;
       tr.stops = buildStops(req.params.trainId, stops || []);
     }
   });
@@ -315,6 +349,59 @@ app.put('/api/timetables/:id/trains/:trainId', (req, res) => {
 app.delete('/api/timetables/:id/trains/:trainId', (req, res) => {
   const updated = mutateTimetable(req.params.id, (tt) => {
     tt.trains = tt.trains.filter((t) => t.id !== req.params.trainId);
+  });
+  if (!updated) return res.status(404).json({ error: 'Not found' });
+  res.json(normalise(updated));
+});
+
+// ── Crews ─────────────────────────────────────────────────────
+
+app.post('/api/timetables/:id/crews', (req, res) => {
+  const { name, color } = req.body;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  const updated = mutateTimetable(req.params.id, (tt) => {
+    if (!tt.crews) tt.crews = [];
+    tt.crews.push({ id: uuidv4(), timetable_id: req.params.id, name: name.trim(), color: color || '#94a3b8' });
+  });
+  if (!updated) return res.status(404).json({ error: 'Not found' });
+  res.status(201).json(normalise(updated));
+});
+
+// Must be defined before /:crewId to avoid 'reorder' being matched as an ID
+app.put('/api/timetables/:id/crews/reorder', (req, res) => {
+  const { order } = req.body; // array of crew IDs in new order
+  if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be an array' });
+  const updated = mutateTimetable(req.params.id, (tt) => {
+    if (!tt.crews) tt.crews = [];
+    const map = new Map(tt.crews.map((c) => [c.id, c]));
+    const reordered = order.map((id) => map.get(id)).filter(Boolean);
+    // Append any crews not mentioned in order (safety net)
+    const mentioned = new Set(order);
+    tt.crews.filter((c) => !mentioned.has(c.id)).forEach((c) => reordered.push(c));
+    tt.crews = reordered;
+  });
+  if (!updated) return res.status(404).json({ error: 'Not found' });
+  res.json(normalise(updated));
+});
+
+app.put('/api/timetables/:id/crews/:crewId', (req, res) => {
+  const { name, color } = req.body;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  const updated = mutateTimetable(req.params.id, (tt) => {
+    if (!tt.crews) tt.crews = [];
+    const crew = tt.crews.find((c) => c.id === req.params.crewId);
+    if (crew) { crew.name = name.trim(); crew.color = color || crew.color; }
+  });
+  if (!updated) return res.status(404).json({ error: 'Not found' });
+  res.json(normalise(updated));
+});
+
+app.delete('/api/timetables/:id/crews/:crewId', (req, res) => {
+  const updated = mutateTimetable(req.params.id, (tt) => {
+    if (!tt.crews) tt.crews = [];
+    tt.crews = tt.crews.filter((c) => c.id !== req.params.crewId);
+    // Clear crew assignment from all trains
+    tt.trains.forEach((tr) => { if (tr.crew_id === req.params.crewId) tr.crew_id = null; });
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.json(normalise(updated));
@@ -335,6 +422,7 @@ function buildStops(trainId, stops) {
     .map((s) => ({
       id: uuidv4(), train_id: trainId, station_id: s.stationId,
       arrival: s.arrival || null, departure: s.departure || null,
+      special_instructions: s.specialInstructions || null,
     }));
 }
 
@@ -342,6 +430,7 @@ function normalise(tt) {
   return {
     ...tt,
     paths: tt.paths ?? [],
+    crews: tt.crews ?? [],
     settings: { ...DEFAULT_SETTINGS, ...(tt.settings ?? {}) },
     stations: [...tt.stations].sort(
       (a, b) =>
@@ -350,6 +439,159 @@ function normalise(tt) {
     ),
   };
 }
+
+// ── Auto-assign trains to crews ───────────────────────────────
+
+app.post('/api/timetables/:id/trains/auto-assign', (req, res) => {
+  const { crewIds, trainIds, onlyUnassigned } = req.body;
+  if (!Array.isArray(crewIds) || crewIds.length === 0) {
+    return res.status(400).json({ error: 'crewIds must be a non-empty array' });
+  }
+
+  function trainMinutes(tr) {
+    let start = Infinity, end = -Infinity;
+    for (const s of (tr.stops || [])) {
+      const times = [s.arrival, s.departure].filter(Boolean);
+      for (const t of times) {
+        const [h, m] = t.split(':').map(Number);
+        const min = h * 60 + m;
+        if (min < start) start = min;
+        if (min > end) end = min;
+      }
+    }
+    return { start: start === Infinity ? 0 : start, end: end === -Infinity ? 0 : end };
+  }
+
+  const unassignedNames = [];
+
+  const updated = mutateTimetable(req.params.id, (tt) => {
+    // Which trains to consider — filter by explicit trainIds list if provided, then by onlyUnassigned
+    const trainIdSet = Array.isArray(trainIds) && trainIds.length > 0 ? new Set(trainIds) : null;
+    const candidates = tt.trains.filter((t) => {
+      if (trainIdSet && !trainIdSet.has(t.id)) return false;
+      if (onlyUnassigned && t.crew_id) return false;
+      return true;
+    });
+
+    // Sort by start time
+    const sorted = [...candidates].sort((a, b) => trainMinutes(a).start - trainMinutes(b).start);
+
+    // Track the latest end minute and job count per crew.
+    // Pre-seed with any jobs those crews already hold (so existing assignments
+    // act as hard constraints and aren't overlapped).
+    const crewEnds = {};
+    const crewCounts = {};
+    const crewIdSet = new Set(crewIds);
+    crewIds.forEach((id) => { crewEnds[id] = -1; crewCounts[id] = 0; });
+    for (const tr of tt.trains) {
+      if (!tr.crew_id || !crewIdSet.has(tr.crew_id)) continue;
+      const { end } = trainMinutes(tr);
+      if (end > crewEnds[tr.crew_id]) crewEnds[tr.crew_id] = end;
+      crewCounts[tr.crew_id]++;
+    }
+
+    for (const train of sorted) {
+      const { start, end } = trainMinutes(train);
+      // Collect all crews who are free (no overlap with this train's start)
+      const available = crewIds.filter((id) => crewEnds[id] < start);
+      if (!available.length) {
+        unassignedNames.push(train.name);
+        continue;
+      }
+      // Pick the crew with the fewest jobs; break ties by who finished earliest
+      available.sort((a, b) =>
+        crewCounts[a] !== crewCounts[b]
+          ? crewCounts[a] - crewCounts[b]
+          : crewEnds[a] - crewEnds[b]
+      );
+      const chosen = available[0];
+      train.crew_id = chosen;
+      crewEnds[chosen] = end;
+      crewCounts[chosen]++;
+    }
+  });
+  if (!updated) return res.status(404).json({ error: 'Not found' });
+  res.json({ ...normalise(updated), unassigned: unassignedNames });
+});
+
+// ── Live API (external system integration) ────────────────────────────────────
+
+// Derive the next service a crew member is assigned to after this train
+function computeNextCrewService(tt, train) {
+  if (!train.crew_id) return '';
+  const crewTrains = (tt.trains || []).filter((t) => t.crew_id === train.crew_id);
+  if (crewTrains.length < 2) return '';
+  function trainStartMinute(tr) {
+    let earliest = Infinity;
+    for (const s of (tr.stops || [])) {
+      const t = s.arrival || s.departure;
+      if (t) {
+        const [h, m] = t.split(':').map(Number);
+        const min = h * 60 + m;
+        if (min < earliest) earliest = min;
+      }
+    }
+    return earliest === Infinity ? 0 : earliest;
+  }
+  const sorted = [...crewTrains].sort((a, b) => trainStartMinute(a) - trainStartMinute(b));
+  const idx = sorted.findIndex((t) => t.id === train.id);
+  if (idx === -1 || idx === sorted.length - 1) return '';
+  return sorted[idx + 1].name;
+}
+
+app.get('/api/timetables/:id/live/trains', (req, res) => {
+  const tt = getTimetable(req.params.id);
+  if (!tt) return res.status(404).json({ error: 'Not found' });
+  function trainStartMinute(tr) {
+    let earliest = Infinity;
+    for (const s of (tr.stops || [])) {
+      const t = s.arrival || s.departure;
+      if (t) {
+        const [h, m] = t.split(':').map(Number);
+        const min = h * 60 + m;
+        if (min < earliest) earliest = min;
+      }
+    }
+    return earliest === Infinity ? 0 : earliest;
+  }
+  const trains = [...(tt.trains || [])]
+    .sort((a, b) => trainStartMinute(a) - trainStartMinute(b))
+    .map((tr) => ({
+      name: tr.name,
+      trainType: tr.train_type || '',
+      trainId: tr.train_id || '',
+      direction: tr.direction || '',
+      notes: tr.notes || '',
+      nextCrewService: computeNextCrewService(tt, tr),
+    }));
+  res.json({ trains });
+});
+
+app.get('/api/timetables/:id/live/trains/:trainName', (req, res) => {
+  const tt = getTimetable(req.params.id);
+  if (!tt) return res.status(404).json({ error: 'Not found' });
+  const train = (tt.trains || []).find((tr) => tr.name === req.params.trainName);
+  if (!train) return res.status(404).json({ error: 'Train not found' });
+  const stationMap = new Map((tt.stations || []).map((s) => [s.id, s]));
+  const stops = (train.stops || []).map((stop) => {
+    const station = stationMap.get(stop.station_id);
+    return {
+      stopName: station ? station.name : stop.station_id,
+      arrival: stop.arrival || null,
+      departure: stop.departure || null,
+      specialInstructions: stop.special_instructions || null,
+    };
+  });
+  res.json({
+    name: train.name,
+    trainType: train.train_type || '',
+    trainId: train.train_id || '',
+    direction: train.direction || '',
+    notes: train.notes || '',
+    nextCrewService: computeNextCrewService(tt, train),
+    stops,
+  });
+});
 
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (_req, res) => {
