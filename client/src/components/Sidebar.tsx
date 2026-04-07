@@ -27,6 +27,7 @@ interface Props {
   hiddenTrainIds: Set<string>;
   onToggleTrainVisibility: (trainId: string) => void;
   onExportTimetable: () => void;
+  onExportCatsXml: () => void;
   onImportTimetable: (file: File) => void;
   onAddCrew: (data: { name: string; color: string }) => void;
   onUpdateCrew: (crewId: string, data: { name: string; color: string }) => void;
@@ -61,6 +62,7 @@ export function Sidebar({
   hiddenTrainIds,
   onToggleTrainVisibility,
   onExportTimetable,
+  onExportCatsXml,
   onImportTimetable,
   onAddCrew,
   onUpdateCrew,
@@ -178,6 +180,13 @@ export function Sidebar({
               <span className="flex-1 text-sm font-medium truncate">{tt.name}</span>
               {tt.id === selectedId && (
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onExportCatsXml(); }}
+                    title="Export timetable as CATS XML"
+                    className="p-1 text-slate-400 hover:text-slate-200 rounded"
+                  >
+                    <CatsIcon />
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onExportTimetable(); }}
                     title="Export timetable as JSON"
@@ -925,6 +934,15 @@ function DownloadIcon() {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
+function CatsIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
     </svg>
   );
 }
