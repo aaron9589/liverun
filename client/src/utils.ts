@@ -73,7 +73,15 @@ export function exportCatsXml(timetable: import('./types').Timetable): string {
       <EDITRECORD FIELD_KEY="LABELBACKGROUND" FIELD_VISIBLE="false" FIELDLABEL="LABELBACKGROUND" FIELD_EDIT="true" FIELD_MANDATORY="true" FIELD_WIDTH="50" ALIGNMENT="CENTER" FIELD_DEFAULT="false" FIELD_CLASS="Boolean" />
     </TRAINEDIT>`;
 
-  const dataRecords = timetable.trains.map((train) => {
+  const sortedTrains = [...timetable.trains].sort((a, b) => {
+    const depA = a.stops[0]?.departure ?? a.stops[0]?.arrival ?? '';
+    const depB = b.stops[0]?.departure ?? b.stops[0]?.arrival ?? '';
+    if (!depA) return 1;
+    if (!depB) return -1;
+    return timeToMinutes(depA) - timeToMinutes(depB);
+  });
+
+  const dataRecords = sortedTrains.map((train) => {
     const stops = train.stops;
     const firstStop = stops[0];
     const lastStop = stops[stops.length - 1];
