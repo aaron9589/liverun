@@ -92,7 +92,7 @@ export function StationPanel({ stations, open, onToggle, onAdd, onUpdate, onDele
 
   return (
     <div className="px-4 py-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-1">
         {onToggle ? (
           <button
             onClick={onToggle}
@@ -113,6 +113,7 @@ export function StationPanel({ stations, open, onToggle, onAdd, onUpdate, onDele
           + Add
         </button>
       </div>
+      <p className="text-xs text-slate-600 mb-2">Define the stops on the line. Graph position controls vertical order on the train graph.</p>
 
       {open === false ? null : (
         <>

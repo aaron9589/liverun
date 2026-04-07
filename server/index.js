@@ -29,7 +29,7 @@ if (process.env.NODE_ENV === 'production') {
 const DEFAULT_SETTINGS = {
   clock_enabled: false,
   clock_broker_url: '',
-  clock_topic: 'jmri/memory/currentTime',
+  clock_topic: 'trains/jmri/memory/currentTime',
 };
 
 app.get('/api/timetables', (_req, res) => {

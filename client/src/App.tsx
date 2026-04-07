@@ -69,8 +69,8 @@ export default function App() {
   }, [timetable, zoomLevel, viewOffset]);
 
   // ── Fast clock ───────────────────────────────────────
-  const clockSettings = timetable?.settings ?? { clock_enabled: false, clock_broker_url: '', clock_topic: 'jmri/memory/currentTime' };
-  const { clockTime, status: clockStatus } = useFastClock(
+  const clockSettings = timetable?.settings ?? { clock_enabled: false, clock_broker_url: '', clock_topic: 'trains/jmri/memory/currentTime' };
+  const { clockTime, status: clockStatus, errorMessage: clockError } = useFastClock(
     clockSettings.clock_broker_url,
     clockSettings.clock_topic,
     clockSettings.clock_enabled
@@ -510,11 +510,12 @@ export default function App() {
                 {/* Crew filter */}
                 {timetable.crews && timetable.crews.length > 0 && (
                   <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-500">Filter by crew:</span>
                     <select
                       value={crewFilter ?? ''}
                       onChange={(e) => setCrewFilter(e.target.value || null)}
                       className="text-xs bg-slate-800 border border-slate-700 text-slate-300 rounded px-2 py-1 focus:outline-none focus:border-blue-500 cursor-pointer"
-                      title="Filter graph by operator"
+                      title="Filter graph to show only trains assigned to this crew member"
                     >
                       <option value="">All operators</option>
                       {timetable.crews.map((crew) => (
@@ -533,12 +534,15 @@ export default function App() {
                 <span className="text-slate-700 mx-1">|</span>
                 {/* Fast clock indicator */}
                 {timetable.settings?.clock_enabled && (
-                  <span className="flex items-center gap-1 mr-1" title="Fast clock">
-                    <span className={`w-2 h-2 rounded-full ${
+                  <span className="flex items-center gap-1.5 mr-1" title={`Fast clock — MQTT topic: ${timetable.settings.clock_topic}`}>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${
                       clockStatus === 'connected' ? 'bg-emerald-400' :
                       clockStatus === 'connecting' ? 'bg-amber-400 animate-pulse' :
                       'bg-slate-600'
                     }`} />
+                    {timetable.settings.clock_topic && (
+                      <span className="text-xs text-slate-500 font-mono">{timetable.settings.clock_topic}</span>
+                    )}
                   </span>
                 )}
                 {/* Settings cog */}
@@ -559,6 +563,7 @@ export default function App() {
                       settings={timetable.settings}
                       onSettingsSave={handleSettingsSave}
                       clockStatus={clockStatus}
+                      clockError={clockError}
                       onClose={() => setSettingsOpen(false)}
                     />
                   )}
