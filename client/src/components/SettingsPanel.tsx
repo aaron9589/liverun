@@ -8,11 +8,12 @@ interface Props {
   settings: TimetableSettings;
   onSettingsSave: (s: TimetableSettings) => Promise<void>;
   clockStatus: ClockStatus;
+  clockError: string | null;
   onClose: () => void;
 }
 
 export function SettingsPanel({
-  labelMode, onLabelModeChange, settings, onSettingsSave, clockStatus, onClose,
+  labelMode, onLabelModeChange, settings, onSettingsSave, clockStatus, clockError, onClose,
 }: Props) {
   const [local, setLocal] = useState<TimetableSettings>(settings);
   const [saving, setSaving] = useState(false);
@@ -81,6 +82,9 @@ export function SettingsPanel({
             <span className="text-xs text-slate-500">{statusLabel[clockStatus]}</span>
           </div>
         </div>
+        {clockError && (
+          <p className="text-xs text-red-400 bg-red-950/40 border border-red-700/40 rounded px-2 py-1.5 mb-3 break-all">{clockError}</p>
+        )}
 
         <label className="flex items-center justify-between mb-3 cursor-pointer">
           <span className="text-slate-300">Enable</span>
@@ -111,7 +115,7 @@ export function SettingsPanel({
             type="text"
             value={local.clock_topic}
             onChange={(e) => setLocal((p) => ({ ...p, clock_topic: e.target.value }))}
-            placeholder="jmri/memory/currentTime"
+            placeholder="trains/jmri/memory/currentTime"
             className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-600"
           />
         </label>

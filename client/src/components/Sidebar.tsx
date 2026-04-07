@@ -108,9 +108,9 @@ export function Sidebar({
     <aside className="w-72 shrink-0 flex flex-col bg-slate-900 border-r border-slate-800 overflow-y-auto">
       {/* Header */}
       <div className="px-4 pt-5 pb-3 shrink-0">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-1">
           <span className="text-2xl">🚂</span>
-          <span className="font-bold text-white tracking-tight text-lg flex-1">Train Graph</span>
+          <span className="font-bold text-white tracking-tight text-lg flex-1">LiveRun</span>
           <button
             onClick={onToggleCollapse}
             className="p-1 text-slate-500 hover:text-slate-300 rounded transition-colors"
@@ -119,6 +119,7 @@ export function Sidebar({
             <ChevronLeftIcon />
           </button>
         </div>
+        <p className="text-xs text-slate-500 mb-3 pl-9">Operating Session Resource Planner</p>
 
         {/* Timetable section */}
         <div className="flex items-center justify-between mb-2">
@@ -149,6 +150,8 @@ export function Sidebar({
             </button>
           </div>
         </div>
+
+        <p className="text-xs text-slate-600 mb-2">Click a timetable to open it. Use the <span className="text-green-400">●</span> flag to mark it active for the live API.</p>
 
         {/* Timetable list */}
         <div className="space-y-1">
@@ -227,7 +230,7 @@ export function Sidebar({
         <>
           <div className="border-t border-slate-800 mx-4" />
           <div className="px-4 py-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <button
                 onClick={() => toggleSection('trains')}
                 className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-400 transition-colors"
@@ -254,6 +257,7 @@ export function Sidebar({
                 </button>
               </div>
             </div>
+            <p className="text-xs text-slate-600 mb-2">Add and manage trains on the graph. Dots indicate: <span className="text-blue-400">●</span> notes &nbsp;<span className="text-amber-400">●</span> special instructions &nbsp;<span className="text-green-400">●</span> crew assigned.</p>
             {openSections.trains && (
               <>
                 {timetable.trains.length === 0 && (
@@ -336,7 +340,7 @@ export function Sidebar({
         <>
           <div className="border-t border-slate-800 mx-4" />
           <div className="px-4 py-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <button
                 onClick={() => toggleSection('crews')}
                 className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-400 transition-colors"
@@ -366,6 +370,7 @@ export function Sidebar({
                 </button>
               </div>
             </div>
+            <p className="text-xs text-slate-600 mb-2">Define operators for this session. Assign trains to crew in the train editor or use auto-assign.</p>
             {autoAssignWarning && autoAssignWarning.length > 0 && (
               <div className="mb-3 rounded-lg border border-amber-600/50 bg-amber-950/30 p-3 flex items-start gap-2">
                 <span className="text-amber-400 text-xs mt-0.5">⚠</span>
@@ -619,42 +624,46 @@ export function Sidebar({
 
                 {/* New crew inline form */}
                 {newCrew && (
-                  <div className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-2 flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={newCrew.color}
-                      onChange={(e) => setNewCrew((prev) => prev ? { ...prev, color: e.target.value } : prev)}
-                      className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent shrink-0"
-                      title="Crew colour"
-                    />
-                    <input
-                      autoFocus
-                      value={newCrew.name}
-                      placeholder="Crew name"
-                      onChange={(e) => setNewCrew((prev) => prev ? { ...prev, name: e.target.value } : prev)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newCrew.name.trim()) {
-                          onAddCrew({ name: newCrew.name.trim(), color: newCrew.color });
+                  <div className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-2 flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={newCrew.color}
+                        onChange={(e) => setNewCrew((prev) => prev ? { ...prev, color: e.target.value } : prev)}
+                        className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent shrink-0"
+                        title="Crew colour"
+                      />
+                      <input
+                        autoFocus
+                        value={newCrew.name}
+                        placeholder="Crew name"
+                        onChange={(e) => setNewCrew((prev) => prev ? { ...prev, name: e.target.value } : prev)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newCrew.name.trim()) {
+                            onAddCrew({ name: newCrew.name.trim(), color: newCrew.color });
+                            setNewCrew(null);
+                          }
+                          if (e.key === 'Escape') setNewCrew(null);
+                        }}
+                        className="flex-1 min-w-0 rounded bg-slate-700 border border-slate-600 px-2 py-1 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        onClick={() => {
+                          if (newCrew.name.trim()) {
+                            onAddCrew({ name: newCrew.name.trim(), color: newCrew.color });
+                          }
                           setNewCrew(null);
-                        }
-                        if (e.key === 'Escape') setNewCrew(null);
-                      }}
-                      className="flex-1 rounded bg-slate-700 border border-slate-600 px-2 py-1 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
-                    />
-                    <button
-                      onClick={() => {
-                        if (newCrew.name.trim()) {
-                          onAddCrew({ name: newCrew.name.trim(), color: newCrew.color });
-                        }
-                        setNewCrew(null);
-                      }}
-                      className="text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium"
-                    >
-                      Add
-                    </button>
-                    <button onClick={() => setNewCrew(null)} className="text-xs px-2 py-1 rounded text-slate-400 hover:bg-slate-700">
-                      ✕
-                    </button>
+                        }}
+                        className="text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium"
+                      >
+                        Add
+                      </button>
+                      <button onClick={() => setNewCrew(null)} className="text-xs px-2 py-1 rounded text-slate-400 hover:bg-slate-700">
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -683,7 +692,7 @@ export function Sidebar({
         <>
           <div className="border-t border-slate-800 mx-4" />
           <div className="px-4 py-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <button
                 onClick={() => toggleSection('paths')}
                 className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-400 transition-colors"
@@ -698,6 +707,7 @@ export function Sidebar({
                 + Add
               </button>
             </div>
+            <p className="text-xs text-slate-600 mb-2">Reusable route templates with timing. Apply a path when adding a new train to pre-fill its stops.</p>
             {openSections.paths && (
               <>
                 {timetable.paths.length === 0 && (
