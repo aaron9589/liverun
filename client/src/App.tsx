@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Timetable, TimetableSummary, TimetableSettings, Train, ModalState, TrainRequest, Path, PathRequest } from './types';
 import { api } from './api';
-import { useLocalStorage, timeToMinutes } from './utils';
+import { useLocalStorage, timeToMinutes, exportCatsXml } from './utils';
 import { useFastClock } from './hooks/useFastClock';
 import { Sidebar } from './components/Sidebar';
 import { TrainGraph } from './components/TrainGraph';
@@ -392,6 +392,18 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  function handleExportCatsXml() {
+    if (!timetable) return;
+    const xml = exportCatsXml(timetable);
+    const blob = new Blob([xml], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${timetable.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.xml`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleImportTimetable(file: File) {
     try {
       const text = await file.text();
@@ -437,6 +449,7 @@ export default function App() {
         hiddenTrainIds={hiddenTrainIds}
         onToggleTrainVisibility={handleToggleTrainVisibility}
         onExportTimetable={handleExportTimetable}
+        onExportCatsXml={handleExportCatsXml}
         onImportTimetable={handleImportTimetable}
         onAddCrew={handleAddCrew}
         onUpdateCrew={handleUpdateCrew}
