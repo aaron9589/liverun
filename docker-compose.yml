@@ -1,19 +1,19 @@
 services:
-  train-graph:
+  liverun:
     build: .
-    image: train-graph:latest
-    container_name: train-graph
+    image: ghcr.io/aaron9589/liverun:latest
+    container_name: liverun
     restart: unless-stopped
     ports:
       - "3001:3001"
     volumes:
-      - train-graph-data:/app/server/data
+      - liverun-data:/app/server/data
     environment:
       - NODE_ENV=production
       - PORT=3001
-      # Set BASE_PATH if serving under a sub-path e.g. /traingraph
+      # Set BASE_PATH if serving under a sub-path e.g. /liverun
       # Leave unset (or empty) for root / subdomain deployments
-      # - BASE_PATH=/traingraph
+      # - BASE_PATH=/liverun
 
 volumes:
-  train-graph-data:
+  liverun-data:

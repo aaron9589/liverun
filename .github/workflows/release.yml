@@ -48,10 +48,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Create GitHub Release
+      - name: Update GitHub Release with Docker info
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
           body: |
             ## Docker image
 
@@ -60,3 +60,5 @@ jobs:
             ```
 
             See [docker-compose.yml](docker-compose.yml) for a ready-to-run example.
+          append_body: true
+          make_latest: true
