@@ -69,7 +69,7 @@ npm run dev
 docker compose up -d
 ```
 
-Access at **http://localhost:3001**. Data is persisted in a Docker volume (`train-graph-data`).
+Access at **http://localhost:3001**. Data is persisted in a Docker volume (`liverun-data`).
 
 ---
 
