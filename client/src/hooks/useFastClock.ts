@@ -63,7 +63,7 @@ export function useFastClock(
       });
     });
 
-    client.on('message', (t, message) => {
+    client.on('message', (_t, message) => {
       const raw = message.toString();
       const parsed = parseClockTime(raw);
       if (parsed !== null) {
