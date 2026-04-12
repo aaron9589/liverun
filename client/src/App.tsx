@@ -9,6 +9,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { TimetableForm } from './components/TimetableForm';
 import { TrainEditor } from './components/TrainEditor';
 import { PathEditor } from './components/PathEditor';
+import { StationReport } from './components/StationReport';
 
 export default function App() {
   const [timetables, setTimetables] = useState<TimetableSummary[]>([]);
@@ -532,6 +533,15 @@ export default function App() {
                   </div>
                 )}
                 <span className="text-slate-700 mx-1">|</span>
+                {/* Station report */}
+                <button
+                  onClick={() => setModal({ type: 'stationReport', stationId: timetable.stations[0]?.id ?? null })}
+                  title="Station report"
+                  className="p-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                >
+                  <ReportIcon />
+                </button>
+                <span className="text-slate-700 mx-1">|</span>
                 {/* Fast clock indicator */}
                 {timetable.settings?.clock_enabled && (
                   <span className="flex items-center gap-1.5 mr-1" title={`Fast clock — MQTT topic: ${timetable.settings.clock_topic}`}>
@@ -644,6 +654,14 @@ export default function App() {
           onClose={() => setModal({ type: 'none' })}
         />
       )}
+
+      {modal.type === 'stationReport' && timetable && (
+        <StationReport
+          timetable={timetable}
+          initialStationId={modal.stationId}
+          onClose={() => setModal({ type: 'none' })}
+        />
+      )}
     </div>
   );
 }
@@ -662,6 +680,17 @@ function RedoIcon() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 7v6h-6" />
       <path d="M21 13C18.5 6.5 11 4 6 8s-5 12 0 16" />
+    </svg>
+  );
+}
+
+function ReportIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="2" width="14" height="20" rx="2" />
+      <line x1="9" y1="7" x2="15" y2="7" />
+      <line x1="9" y1="11" x2="15" y2="11" />
+      <line x1="9" y1="15" x2="12" y2="15" />
     </svg>
   );
 }
