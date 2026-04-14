@@ -116,6 +116,43 @@ export function exportCatsXml(timetable: import('./types').Timetable): string {
   ].join('\n');
 }
 
+/**
+ * Export crew list to CATS crews XML format.
+ * Only crews that are assigned to at least one train are included.
+ */
+export function exportCrewsXml(timetable: import('./types').Timetable): string {
+  const assignedCrewIds = new Set(
+    timetable.trains.map((t) => t.crew_id).filter(Boolean)
+  );
+  const assignedCrews = timetable.crews.filter((c) => assignedCrewIds.has(c.id));
+
+  const crewedit = `    <CREWEDIT>
+      <EDITRECORD FIELD_KEY="CREW_NAME" FIELD_VISIBLE="true" FIELDLABEL="CREW_NAME" FIELD_EDIT="true" FIELD_MANDATORY="true" FIELD_WIDTH="213" ALIGNMENT="CENTER" FIELD_DEFAULT="" FIELD_CLASS="String" />
+      <EDITRECORD FIELD_KEY="TIME_ON" FIELD_VISIBLE="true" FIELDLABEL="TIME_ON" FIELD_EDIT="true" FIELD_MANDATORY="true" FIELD_WIDTH="188" ALIGNMENT="CENTER" FIELD_DEFAULT="" FIELD_CLASS="TimeSpec" />
+      <EDITRECORD FIELD_KEY="TIME_LEFT" FIELD_VISIBLE="true" FIELDLABEL="TIME_LEFT" FIELD_EDIT="true" FIELD_MANDATORY="true" FIELD_WIDTH="187" ALIGNMENT="CENTER" FIELD_DEFAULT="" FIELD_CLASS="TimeSpec" />
+      <EDITRECORD FIELD_KEY="EXPIRES" FIELD_VISIBLE="true" FIELDLABEL="EXPIRES" FIELD_EDIT="true" FIELD_MANDATORY="true" FIELD_WIDTH="191" ALIGNMENT="CENTER" FIELD_DEFAULT="" FIELD_CLASS="TimeSpec" />
+      <EDITRECORD FIELD_KEY="TRAIN_ID" FIELD_VISIBLE="true" FIELDLABEL="TRAIN_ID" FIELD_EDIT="true" FIELD_MANDATORY="true" FIELD_WIDTH="212" ALIGNMENT="CENTER" FIELD_DEFAULT="" FIELD_CLASS="TrainList" />
+      <EDITRECORD FIELD_KEY="FONT" FIELD_VISIBLE="false" FIELDLABEL="FONT" FIELD_EDIT="true" FIELD_MANDATORY="true" FIELD_WIDTH="75" ALIGNMENT="CENTER" FIELD_DEFAULT="FONT_LABEL" FIELD_CLASS="FontSpec" />
+    </CREWEDIT>`;
+
+  const dataRecords = assignedCrews.map(
+    (crew) =>
+      `      <DATARECORD CREW_NAME="${escapeXml(crew.name)}" TIME_ON="" TIME_LEFT="" EXPIRES="" TRAIN_ID="" FONT="FONT_LABEL" />`
+  );
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<DOCUMENT VERSION="3.0">',
+    '  <CREWSTORE>',
+    crewedit,
+    '    <CREWDATA>',
+    ...dataRecords,
+    '    </CREWDATA>',
+    '  </CREWSTORE>',
+    '</DOCUMENT>',
+  ].join('\n');
+}
+
 /** Generate tick marks between startTime and endTime at the given interval (minutes). */
 export function generateTicks(
   startTime: string,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Timetable, TimetableSummary, TimetableSettings, Train, ModalState, TrainRequest, Path, PathRequest } from './types';
 import { api } from './api';
-import { useLocalStorage, timeToMinutes, exportCatsXml } from './utils';
+import { useLocalStorage, timeToMinutes, exportCatsXml, exportCrewsXml } from './utils';
 import { useFastClock } from './hooks/useFastClock';
 import { Sidebar } from './components/Sidebar';
 import { TrainGraph } from './components/TrainGraph';
@@ -395,14 +395,25 @@ export default function App() {
 
   function handleExportCatsXml() {
     if (!timetable) return;
+    const baseName = `${timetable.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}`;
+
     const xml = exportCatsXml(timetable);
-    const blob = new Blob([xml], { type: 'application/xml' });
-    const url = URL.createObjectURL(blob);
+    const xmlBlob = new Blob([xml], { type: 'application/xml' });
+    const xmlUrl = URL.createObjectURL(xmlBlob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `${timetable.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.xml`;
+    a.href = xmlUrl;
+    a.download = `${baseName}.xml`;
     a.click();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(xmlUrl);
+
+    const crewXml = exportCrewsXml(timetable);
+    const crewBlob = new Blob([crewXml], { type: 'application/xml' });
+    const crewUrl = URL.createObjectURL(crewBlob);
+    const b = document.createElement('a');
+    b.href = crewUrl;
+    b.download = `${baseName}-crews.xml`;
+    b.click();
+    URL.revokeObjectURL(crewUrl);
   }
 
   async function handleImportTimetable(file: File) {
