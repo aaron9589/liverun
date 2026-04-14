@@ -43,16 +43,17 @@ function buildPrintHtml(
   rows: ReportRow[],
 ): string {
   const tableRows = rows.length === 0
-    ? `<tr><td colspan="5" style="padding:4px 8px;">No trains scheduled at this location.</td></tr>`
-    : rows.map((row) => {
+    ? `<tr><td colspan="5">No trains scheduled at this location.</td></tr>`
+    : rows.map((row, i) => {
         const name = `${row.trainName} ${serviceTag(row.serviceType)}`;
         const instr = row.specialInstructions ? `! ${row.specialInstructions}` : '';
-        return `<tr>
-          <td style="padding:2px 8px;border:1px solid black;">${name}</td>
-          <td style="padding:2px 8px;border:1px solid black;text-align:center;">${timeLabel(row.arrival)}</td>
-          <td style="padding:2px 8px;border:1px solid black;text-align:center;">${timeLabel(row.departure)}</td>
-          <td style="padding:2px 8px;border:1px solid black;">${row.trainNotes || ''}</td>
-          <td style="padding:2px 8px;border:1px solid black;">${instr}</td>
+        const rowStyle = i % 2 === 0 ? 'background-color:#f7f7e6;' : 'background-color:#ffffff;';
+        return `<tr style="${rowStyle}">
+          <td>${name}</td>
+          <td style="text-align:center;">${timeLabel(row.arrival)}</td>
+          <td style="text-align:center;">${timeLabel(row.departure)}</td>
+          <td>${row.trainNotes || ''}</td>
+          <td>${instr}</td>
         </tr>`;
       }).join('');
 
@@ -61,56 +62,52 @@ function buildPrintHtml(
 <head>
   <meta charset="utf-8"/>
   <title>Register of Train Arrivals/Departures by Location</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;700&display=swap" rel="stylesheet">
   <style>
     @page {
       size: A5 landscape;
-      margin: 1cm;
-      @bottom-right {
-        content: "Page " counter(page) " of " counter(pages);
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 7pt;
-      }
+      margin: 0.25in;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Courier New', Courier, monospace; font-size: 9pt; color: black; background: white; padding: 1cm; }
-    @media print { body { padding: 0; zoom: 0.75; } }
-    table { width: 100%; border-collapse: collapse; }
+    body { font-family: 'Courier New', Courier, monospace; font-size: 6pt; color: #000; background: white; }
+    h2 { font-family: 'Courier New', Courier, monospace; font-size: 7pt; font-weight: normal; }
+    h3 { font-family: 'Courier New', Courier, monospace; font-size: 6pt; font-weight: normal; }
+    small { font-family: 'Courier New', Courier, monospace; font-size: 5pt; }
+    .page-header { padding-bottom: 6px; }
+    .page-header-rule { border-top: 1px dashed #000; margin: 4px 0; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; word-wrap: break-word; }
     thead { display: table-header-group; }
-    th { border: 1px solid black; padding: 2px 8px; text-align: left; font-weight: bold; background: black; color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .rule { border-top: 1px solid black; margin: 6px 0; }
-    .page-header { padding-bottom: 8px; }
-    .page-header-rule { border-top: 1px solid black; margin-bottom: 4px; }
+    th { font-family: Lexend, Arial, sans-serif; font-size: 6pt; font-weight: bold; letter-spacing: 0.02em; border: 1px solid #000; padding: 2px 3px; text-align: left; position: static; background: white; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    td { font-family: Lexend, Arial, sans-serif; font-size: 6pt; font-weight: normal; letter-spacing: 0.01em; border: 1px solid #000; padding: 2px 3px; word-wrap: break-word; }
+    tr { page-break-inside: avoid; }
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   </style>
 </head>
 <body>
+  <div class="page-header">
+    <h2>${timetable.name}</h2>
+    <h3>Register of Train Arrivals/Departures by Location</h3>
+    <h3>${station?.name ?? 'Station'}</h3>
+    <div class="page-header-rule"></div>
+    <small>Session: ${timetable.start_time}&#8211;${timetable.end_time}</small>
+  </div>
   <table>
     <thead>
       <tr>
-        <td colspan="5" style="padding-bottom:6px;">
-          <div style="font-size:6pt;text-transform:uppercase;letter-spacing:0.15em;">Register of Train Arrivals/Departures by Location</div>
-          <div style="font-size:16pt;font-weight:bold;text-transform:uppercase;letter-spacing:0.05em;line-height:1.1;">${station?.name ?? 'Station'}</div>
-          <div style="font-size:8pt;margin-top:2px;">${timetable.name} &nbsp;|&nbsp; Session: ${timetable.start_time}&#8211;${timetable.end_time}</div>
-          <div style="border-top:1px solid black;margin-top:6px;"></div>
-        </td>
-      </tr>
-      <tr>
-        <th style="width:38%;">TRAIN</th>
-        <th style="width:10%;text-align:center;">ARR</th>
-        <th style="width:10%;text-align:center;">DEP</th>
-        <th style="width:22%;">NOTES</th>
-        <th>INSTRUCTIONS</th>
+        <th style="width:14%;">TRAIN</th>
+        <th style="width:7%;text-align:center;">ARR</th>
+        <th style="width:7%;text-align:center;">DEP</th>
+        <th style="width:33%;">NOTES</th>
+        <th style="width:39%;">INSTRUCTIONS</th>
       </tr>
     </thead>
     <tbody>${tableRows}</tbody>
-    <tfoot>
-      <tr>
-        <td colspan="5" style="padding-top:6px;">
-          <div style="border-top:1px solid black;margin-bottom:4px;"></div>
-          <div style="font-size:8pt;">${rows.length} train${rows.length !== 1 ? 's' : ''} scheduled</div>
-        </td>
-      </tr>
-    </tfoot>
   </table>
+  <div style="margin-top:4px;">
+    <small>${rows.length} train${rows.length !== 1 ? 's' : ''} scheduled</small>
+  </div>
 </body>
 </html>`;
 }
