@@ -74,15 +74,22 @@ export function exportCatsXml(timetable: import('./types').Timetable): string {
     </TRAINEDIT>`;
 
   const sortedTrains = [...timetable.trains].sort((a, b) => {
-    const depA = a.stops[0]?.departure ?? a.stops[0]?.arrival ?? '';
-    const depB = b.stops[0]?.departure ?? b.stops[0]?.arrival ?? '';
+    const timesA = a.stops.map(s => s.departure ?? s.arrival ?? '').filter(Boolean);
+    const timesB = b.stops.map(s => s.departure ?? s.arrival ?? '').filter(Boolean);
+    const depA = timesA.length ? timesA.reduce((min, t) => timeToMinutes(t) < timeToMinutes(min) ? t : min) : '';
+    const depB = timesB.length ? timesB.reduce((min, t) => timeToMinutes(t) < timeToMinutes(min) ? t : min) : '';
     if (!depA) return 1;
     if (!depB) return -1;
     return timeToMinutes(depA) - timeToMinutes(depB);
   });
 
   const dataRecords = sortedTrains.map((train) => {
-    const stops = train.stops;
+    // Sort stops chronologically so first/last are correct regardless of direction
+    const stops = [...train.stops].sort((a, b) => {
+      const tA = a.departure ?? a.arrival ?? '';
+      const tB = b.departure ?? b.arrival ?? '';
+      return timeToMinutes(tA) - timeToMinutes(tB);
+    });
     const firstStop = stops[0];
     const lastStop = stops[stops.length - 1];
 
@@ -93,7 +100,7 @@ export function exportCatsXml(timetable: import('./types').Timetable): string {
     const engine = escapeXml(train.train_id ?? '');
     const trainName = escapeXml(train.notes && train.notes.length < 50 ? train.notes : '');
 
-    return `      <DATARECORD TRAIN_NAME="${trainName}" TRAIN_SYMBOL="${trainSymbol}" ENGINE="${engine}" CREW="" TRANSPONDING="" CABOOSE="" ONDUTY="" DEPARTURE="${escapeXml(departure)}" FONT="FONT_LABEL" LENGTH="0" WEIGHT="0" CARS="0" AUTOTERMINATE="false" LABELBACKGROUND="false" f3="${escapeXml(origin)}" f4="${escapeXml(destination)}" />`;
+    return `      <DATARECORD TRAIN_NAME="${trainName}" TRAIN_SYMBOL="${trainSymbol}" ENGINE="${engine}" CREW="" TRANSPONDING="" CABOOSE="" ONDUTY="" DEPARTURE="${escapeXml(departure)}" FONT="FONT_LABEL" LENGTH="0" WEIGHT="0" CARS="0" AUTOTERMINATE="false" LABELBACKGROUND="false" f3="${escapeXml(destination)}" f4="${escapeXml(origin)}" />`;
   });
 
   return [
