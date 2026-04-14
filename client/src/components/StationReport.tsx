@@ -31,10 +31,10 @@ function minutesOf(t: string | null | undefined): number {
   return h * 60 + m;
 }
 
-function badgeStyle(type: ServiceType): string {
-  if (type === 'originates') return 'display:inline-block;font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:1px 5px;border-radius:3px;border:1pt solid #15803d;color:#15803d;margin-left:5px;vertical-align:middle;';
-  if (type === 'terminates') return 'display:inline-block;font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:1px 5px;border-radius:3px;border:1pt solid #1d4ed8;color:#1d4ed8;margin-left:5px;vertical-align:middle;';
-  return 'display:inline-block;font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:1px 5px;border-radius:3px;border:1pt solid #94a3b8;color:#64748b;margin-left:5px;vertical-align:middle;';
+function serviceTag(type: ServiceType): string {
+  if (type === 'originates') return '[ORG]';
+  if (type === 'terminates') return '[TRM]';
+  return '[CAL]';
 }
 
 function buildPrintHtml(
@@ -42,75 +42,75 @@ function buildPrintHtml(
   timetable: Timetable,
   rows: ReportRow[],
 ): string {
-  const dateStr = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
-
-  const tableRows = rows.map((row, i) => {
-    const bg = i % 2 === 1 ? 'background:#f1f5f9;' : '';
-    const dot = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${row.color};margin-right:5px;vertical-align:middle;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>`;
-    const badge = `<span style="${badgeStyle(row.serviceType)}">${row.serviceType}</span>`;
-    const ref = row.trainRef ? `<div style="font-size:6.5pt;color:#64748b;margin-top:2px;padding-left:12px;">${row.trainRef}</div>` : '';
-    const instr = row.specialInstructions
-      ? `<span style="color:#92400e;">⚠ ${row.specialInstructions}</span>`
-      : '<span style="color:#94a3b8;">—</span>';
-    const notes = row.trainNotes
-      ? `<span>${row.trainNotes}</span>`
-      : '<span style="color:#94a3b8;">—</span>';
-    return `<tr style="${bg}">
-      <td style="padding:4px 8px;border-bottom:0.5pt solid #e2e8f0;vertical-align:middle;">${dot}<strong>${row.trainName}</strong>${badge}${ref}</td>
-      <td style="padding:4px 8px;border-bottom:0.5pt solid #e2e8f0;font-family:'Courier New',monospace;vertical-align:middle;">${timeLabel(row.arrival)}</td>
-      <td style="padding:4px 8px;border-bottom:0.5pt solid #e2e8f0;font-family:'Courier New',monospace;vertical-align:middle;">${timeLabel(row.departure)}</td>
-      <td style="padding:4px 8px;border-bottom:0.5pt solid #e2e8f0;font-size:7.5pt;vertical-align:middle;">${notes}</td>
-      <td style="padding:4px 8px;border-bottom:0.5pt solid #e2e8f0;font-size:7.5pt;vertical-align:middle;">${instr}</td>
-    </tr>`;
-  }).join('');
+  const tableRows = rows.length === 0
+    ? `<tr><td colspan="5" style="padding:4px 8px;">No trains scheduled at this location.</td></tr>`
+    : rows.map((row) => {
+        const name = `${row.trainName} ${serviceTag(row.serviceType)}`;
+        const instr = row.specialInstructions ? `! ${row.specialInstructions}` : '';
+        return `<tr>
+          <td style="padding:2px 8px;border:1px solid black;">${name}</td>
+          <td style="padding:2px 8px;border:1px solid black;text-align:center;">${timeLabel(row.arrival)}</td>
+          <td style="padding:2px 8px;border:1px solid black;text-align:center;">${timeLabel(row.departure)}</td>
+          <td style="padding:2px 8px;border:1px solid black;">${row.trainNotes || ''}</td>
+          <td style="padding:2px 8px;border:1px solid black;">${instr}</td>
+        </tr>`;
+      }).join('');
 
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>${station?.name ?? 'Station'} — Train Schedule</title>
+  <title>Register of Train Arrivals/Departures by Location</title>
   <style>
-    @page { size: A5 landscape; margin: 0; }
+    @page {
+      size: A5 landscape;
+      margin: 1cm;
+      @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 7pt;
+      }
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Inter, system-ui, -apple-system, sans-serif; font-size: 8pt; color: black; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { font-family: 'Courier New', Courier, monospace; font-size: 9pt; color: black; background: white; padding: 1cm; }
+    @media print { body { padding: 0; zoom: 0.75; } }
     table { width: 100%; border-collapse: collapse; }
-    th { background: #1e293b; color: white; font-size: 6.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; padding: 5px 8px; text-align: left; }
+    thead { display: table-header-group; }
+    th { border: 1px solid black; padding: 2px 8px; text-align: left; font-weight: bold; background: black; color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .rule { border-top: 1px solid black; margin: 6px 0; }
+    .page-header { padding-bottom: 8px; }
+    .page-header-rule { border-top: 1px solid black; margin-bottom: 4px; }
   </style>
 </head>
 <body>
-  <!-- Header bar -->
-  <div style="display:flex;background:#0f172a;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-    <div style="width:6px;background:#3b82f6;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
-    <div style="flex:1;display:flex;align-items:flex-end;justify-content:space-between;padding:8px 14px;">
-      <div>
-        <div style="font-size:5.5pt;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#64748b;margin-bottom:3px;">Working Timetable Notice</div>
-        <div style="font-size:16pt;font-weight:900;text-transform:uppercase;letter-spacing:0.03em;color:white;line-height:1;">${station?.name ?? 'Station'}</div>
-      </div>
-      <div style="text-align:right;color:#94a3b8;font-size:7pt;line-height:1.7;">
-        <div style="color:white;font-size:8.5pt;font-weight:700;">${timetable.name}</div>
-        <div>Session ${timetable.start_time}–${timetable.end_time}</div>
-        <div>${dateStr}</div>
-      </div>
-    </div>
-  </div>
-  <!-- Table -->
   <table>
     <thead>
       <tr>
-        <th style="width:40%;">Train</th>
-        <th style="width:11%;">Arrives</th>
-        <th style="width:11%;">Departs</th>
-        <th style="width:20%;">Notes</th>
-        <th>Instructions</th>
+        <td colspan="5" style="padding-bottom:6px;">
+          <div style="font-size:6pt;text-transform:uppercase;letter-spacing:0.15em;">Register of Train Arrivals/Departures by Location</div>
+          <div style="font-size:16pt;font-weight:bold;text-transform:uppercase;letter-spacing:0.05em;line-height:1.1;">${station?.name ?? 'Station'}</div>
+          <div style="font-size:8pt;margin-top:2px;">${timetable.name} &nbsp;|&nbsp; Session: ${timetable.start_time}&#8211;${timetable.end_time}</div>
+          <div style="border-top:1px solid black;margin-top:6px;"></div>
+        </td>
+      </tr>
+      <tr>
+        <th style="width:38%;">TRAIN</th>
+        <th style="width:10%;text-align:center;">ARR</th>
+        <th style="width:10%;text-align:center;">DEP</th>
+        <th style="width:22%;">NOTES</th>
+        <th>INSTRUCTIONS</th>
       </tr>
     </thead>
-    <tbody>${tableRows || '<tr><td colspan="5" style="padding:12px 8px;color:#64748b;">No trains scheduled at this location.</td></tr>'}</tbody>
+    <tbody>${tableRows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5" style="padding-top:6px;">
+          <div style="border-top:1px solid black;margin-bottom:4px;"></div>
+          <div style="font-size:8pt;">${rows.length} train${rows.length !== 1 ? 's' : ''} scheduled</div>
+        </td>
+      </tr>
+    </tfoot>
   </table>
-  <!-- Footer -->
-  <div style="margin-top:6px;border-top:1pt solid #334155;padding:3px 8px;display:flex;justify-content:space-between;font-size:6.5pt;color:#475569;">
-    <span>${rows.length} train${rows.length !== 1 ? 's' : ''} scheduled</span>
-    <span>Generated ${dateStr}</span>
-  </div>
 </body>
 </html>`;
 }
@@ -144,16 +144,11 @@ export function StationReport({ timetable, initialStationId, onClose }: Props) {
     .sort((a, b) => minutesOf(a.arrival ?? a.departure) - minutesOf(b.arrival ?? b.departure));
 
   function handlePrint() {
-    const win = window.open('', '_blank', 'width=900,height=650');
+    const win = window.open('', '_blank', 'width=1100,height=700');
     if (!win) return;
     win.document.write(buildPrintHtml(station, timetable, rows));
     win.document.close();
     win.focus();
-    // slight delay so browser finishes rendering before print dialog opens
-    setTimeout(() => {
-      win.print();
-      win.close();
-    }, 250);
   }
 
   return (
@@ -220,9 +215,7 @@ export function StationReport({ timetable, initialStationId, onClose }: Props) {
                           <span className="text-white font-medium">{row.trainName}</span>
                           <ServiceBadge type={row.serviceType} />
                         </div>
-                        {row.trainRef && (
-                          <div className="text-xs text-slate-500 mt-0.5 pl-4">{row.trainRef}</div>
-                        )}
+
                       </td>
                       <td className="py-3 pr-4 font-mono text-slate-300 whitespace-nowrap">
                         {timeLabel(row.arrival)}
