@@ -65,6 +65,30 @@ interface TooltipData {
   hasSpecialInstructions: boolean;
   trainId?: string;
   direction?: string;
+  nextService?: { name: string; time: string };
+}
+
+function findNextService(train: Train, allTrains: Train[]): { name: string; time: string } | undefined {
+  if (!train.train_id) return undefined;
+  const lastMin = train.stops.reduce((max, s) => {
+    const t = s.arrival ?? s.departure;
+    return t ? Math.max(max, timeToMinutes(t)) : max;
+  }, -Infinity);
+  if (!isFinite(lastMin)) return undefined;
+  let best: { name: string; time: string } | undefined;
+  let bestMin = Infinity;
+  for (const other of allTrains) {
+    if (other.id === train.id || other.train_id !== train.train_id) continue;
+    const firstMin = other.stops.reduce((min, s) => {
+      const t = s.departure ?? s.arrival;
+      return t ? Math.min(min, timeToMinutes(t)) : min;
+    }, Infinity);
+    if (firstMin > lastMin && firstMin < bestMin) {
+      bestMin = firstMin;
+      best = { name: other.name, time: minutesToTime(firstMin) };
+    }
+  }
+  return best;
 }
 
 function GraphTooltip({ data }: { data: TooltipData }) {
@@ -128,6 +152,12 @@ function GraphTooltip({ data }: { data: TooltipData }) {
         <div className="mt-2 pt-2 border-t border-slate-700 flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
           <span className="text-slate-400 text-xs">{data.crewName}</span>
+        </div>
+      )}
+      {data.nextService && (
+        <div className="mt-2 pt-2 border-t border-slate-700 flex justify-between gap-3">
+          <span className="text-slate-500 text-xs">Next working</span>
+          <span className="text-slate-300 text-xs text-right">{data.nextService.name} <span className="font-mono">{data.nextService.time}</span></span>
         </div>
       )}
     </div>
@@ -248,6 +278,7 @@ export function TrainGraph({
       hasSpecialInstructions: train.stops.some((s) => !!s.special_instructions),
       trainId: train.train_id || undefined,
       direction: train.direction || undefined,
+      nextService: findNextService(train, timetable.trains),
     });
   }, [externalHoveredId, hoveredId]);
 
@@ -272,6 +303,7 @@ export function TrainGraph({
         hasSpecialInstructions: train.stops.some((s) => !!s.special_instructions),
         trainId: train.train_id || undefined,
         direction: train.direction || undefined,
+        nextService: findNextService(train, timetable.trains),
       });
     },
     [viewStart, viewEnd, timetable]
