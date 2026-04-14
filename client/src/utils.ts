@@ -100,7 +100,7 @@ export function exportCatsXml(timetable: import('./types').Timetable): string {
     const engine = escapeXml(train.train_id ?? '');
     const trainName = escapeXml(train.notes && train.notes.length < 50 ? train.notes : '');
 
-    return `      <DATARECORD TRAIN_NAME="${trainName}" TRAIN_SYMBOL="${trainSymbol}" ENGINE="${engine}" CREW="" TRANSPONDING="" CABOOSE="" ONDUTY="" DEPARTURE="${escapeXml(departure)}" FONT="FONT_LABEL" LENGTH="0" WEIGHT="0" CARS="0" AUTOTERMINATE="false" LABELBACKGROUND="false" f3="${escapeXml(destination)}" f4="${escapeXml(origin)}" />`;
+    return `      <DATARECORD TRAIN_NAME="${trainName}" TRAIN_SYMBOL="${trainSymbol}" ENGINE="${engine}" CREW="" TRANSPONDING="" CABOOSE="" ONDUTY="" DEPARTURE="${escapeXml(departure)}" FONT="FONT_LABEL" LENGTH="0" WEIGHT="0" CARS="0" AUTOTERMINATE="false" LABELBACKGROUND="false" f3="${escapeXml(origin)}" f4="${escapeXml(destination)}" />`;
   });
 
   return [
