@@ -19,6 +19,13 @@ A web app for planning and running model railway operating sessions. Features: v
 | `server/db.js` | DB layer: `readDB()`, `writeDB()`, `getTimetable(id)`, `mutateTimetable(id, fn)` |
 | `server/openapi.js` | OpenAPI 3.0 spec (served at `/api/schema`, UI at `/api/docs`) |
 | `server/layout.js` | Layout-wide config routes: `GET/PUT /api/layout` (validation, see `register()`) |
+| `server/sync.js` | `/api/live/sync` WebSocket: `hello`/`completions`/`timetable-updated`/`timetable-deleted`/`active-changed`, per-timetable coalescer, heartbeat |
+| `client/src/hooks/useLiveTimetable.ts` | Holds a timetable live: sync WS, rev checks, re-fetch on change/reconnect/wake. Used by CrewMobile and the guard panel |
+| `client/src/lib/jobDiff.ts` | `diffJobs()` (added/removed/reassigned/retimed/renamed per crew) + `describeJobChange()` |
+| `client/src/lib/mode.ts` | Entry routing: `resolveMode()` (planner / crew / guard / mode picker), saved mode, `switchMode()` |
+| `client/src/lib/stops.ts` | `sequenceStops()` (chronological, midnight-safe), `currentStop()`, run-order helpers |
+| `client/src/components/guard/` | Guard panel at `/guard` (`GuardPanel.tsx`, `StopTable.tsx`, `CrewPicker.tsx`) |
+| `client/src/components/ChangeToasts.tsx` | Reusable toast stack + `useToasts()` (with history) |
 | `server/migrations.js` | Pure startup migrations (e.g. `stripTrainType`), called from `server/index.js` |
 | `client/src/App.tsx` | Root component — single source of truth for all UI state (~1100 lines) |
 | `client/src/types.ts` | All TypeScript domain types |
@@ -78,7 +85,7 @@ GET  /api/timetables/:id/live/trains
 GET  /api/timetables/:id/live/trains/:trainName
 GET  /api/timetables/:id/live/stations/:stationName  [?direction=up|down&trainId=%pat%]
 WS   /api/live/station-feed?id=&station=[&direction][&trainId][&futureCount]
-WS   /api/live/sync?id=                                       — broadcasts train completion state to all clients
+WS   /api/live/sync?id=                                       — live notices: hello (rev, activeId), completions, timetable-updated (coalesced), timetable-deleted, active-changed
 ```
 
 All mutation endpoints return the full updated Timetable.
@@ -94,7 +101,9 @@ All mutation endpoints return the full updated Timetable.
 - **`graph_pos` vs `distance`:** `graph_pos` is the Y-axis layout unit (integer); `distance` is an optional display label. Independent fields.
 - **`BASE_PATH` env var:** For reverse proxy sub-path deployments (e.g. `/liverun/`). Vite base is `./` (relative URLs).
 - **Train status is ephemeral:** `status` ('running'|'completed') lives on Train objects in the DB but is stripped from undo/redo history stacks (`stripStatus()` in App.tsx) so undoing edits never restores stale run state.
-- **Sync WS broadcasts completions:** `/api/live/sync` keeps a `Map<timetableId, Set<WebSocket>>`; any status mutation calls `broadcastCompletions()` to push `{type:'completions', statuses}` to all subscribers.
+- **Live sync (`server/sync.js`):** `mutateTimetable` bumps `tt.rev` and notifies `onTimetableChange` listeners; sync coalesces these (~300 ms) into `timetable-updated` notices that carry no data — clients re-fetch. Status-only mutations (`complete`, `reset-complete`) pass `{ notify: false }` and send `completions` with `rev` instead, so crew taps don't make every screen re-fetch. Clients compare `rev` in `hello` to catch anything missed while disconnected.
+- **Entry routing:** `main.tsx` uses `resolveMode()`: `…/guard` → guard panel, `…/mobile` → crew view, `?desktop` → planner, `?choose` → mode picker; otherwise the saved mode (`localStorage['liverun.mode']`) or, with none, mobile UA → picker / desktop → planner. `/guard/` and `/mobile/` redirect to the slash-less path with a relative `Location` (works under `BASE_PATH`).
+- **Guard panel never renders `special_instructions`** — on the owner's layout that field holds hidden scripted events (to be replaced by `guard_events`, spec §10).
 - **Station name style defaults:** `stationNameStyle()` in utils.ts returns `bold:true` when none of the three flags are set — preserving legacy bold appearance for existing stations.
 - **`reset-complete` route ordering:** The `POST /trains/reset-complete` route is registered before `/:trainId` routes so Express doesn't match the literal string "reset-complete" as a train ID.
 - **Feature modules:** New server features live in their own module exporting `register(app, deps)`, called from `server/index.js` (routes themselves are still flat Express handlers, no router framework). See `server/layout.js`.
@@ -109,6 +118,7 @@ npm run build     # tsc + vite build → client/dist/
 npm run start     # Express serving client/dist/ (production)
 docker compose up -d  # production; UI at localhost:3001
 npm test          # server node:test + client Vitest
+LIVERUN_API=http://localhost:3011 npm run dev --workspace=client   # point the Vite dev proxy at another server
 ```
 
 **Local build on macOS arm64:** the committed lockfile lacks the Rollup/esbuild native packages (npm optional-deps bug; CI deletes the lockfile). Before `npm run build` locally, run `npm install --no-save @rollup/rollup-darwin-arm64@<rollup version> @esbuild/darwin-arm64@<esbuild version>`, using the versions in `node_modules/rollup/package.json` and `node_modules/esbuild/package.json` (currently rollup 4.60.1, esbuild 0.21.5).
