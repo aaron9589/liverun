@@ -96,6 +96,8 @@ export interface Crew {
   timetable_id: string;
   name: string;
   color: string;
+  /** Offered in the guard panel's crew picker. Opt-in per crew; default false. */
+  guard_visible?: boolean;
 }
 
 export interface Train {

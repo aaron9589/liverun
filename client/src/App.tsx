@@ -473,7 +473,7 @@ export default function App() {
     recordAndSet(updated);
   }
 
-  async function handleUpdateCrew(crewId: string, data: { name: string; color: string }) {
+  async function handleUpdateCrew(crewId: string, data: { name: string; color: string; guardVisible?: boolean }) {
     if (!selectedId) return;
     const updated = await api.updateCrew(selectedId, crewId, data);
     recordAndSet(updated);

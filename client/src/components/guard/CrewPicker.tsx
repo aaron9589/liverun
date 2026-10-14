@@ -12,6 +12,11 @@ export function CrewPicker({ crews, onPick }: Props) {
       <div className="max-w-md mx-auto flex flex-col gap-3">
         <h2 className="text-xl font-semibold text-center">Who are you?</h2>
         <p className="text-sm text-slate-400 text-center mb-2">Pick your crew to see only your trains.</p>
+        {crews.length === 0 && (
+          <p className="text-sm text-amber-300/90 text-center">
+            No crews are set up for the guard panel. In the planner, tick <span className="font-semibold">Guard</span> next to a crew.
+          </p>
+        )}
         {crews.map((c) => (
           <button
             key={c.id}

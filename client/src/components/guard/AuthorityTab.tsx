@@ -19,6 +19,10 @@ const BADGE: Record<SectionPhase, { text: string; cls: string }> = {
 export function AuthorityTab({ sections }: { sections: SectionView[] }) {
   return (
     <div data-testid="authority-tab" className="flex flex-col gap-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 px-1">Limit of authority</h3>
+      {sections.length === 0 && (
+        <p className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-3 text-sm text-slate-500">No sections apply to this train.</p>
+      )}
       {sections.map((s) => {
         const badge = BADGE[s.phase];
         const done = s.phase === 'complete';

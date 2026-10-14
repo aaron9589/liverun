@@ -44,8 +44,9 @@ export function StopTable({ seq, stations, clock, pinnedStopId, onTogglePin, for
             className={`w-full grid grid-cols-[1fr_5rem_5rem] items-center min-h-[52px] px-4 py-1.5 text-left border-b border-slate-800/70 ${rowCls}${changed}`}
           >
             <span className="min-w-0">
-              <span className="block truncate font-medium">{name(stop.station_id)}</span>
-              {stop.location_alias && <span className="block truncate text-xs text-slate-400">{stop.location_alias}</span>}
+              {/* An aliased stop (e.g. a staging road standing in for "Sydney Terminal") leads with the alias; the real location goes underneath. */}
+              <span className="block truncate font-medium">{stop.location_alias || name(stop.station_id)}</span>
+              {stop.location_alias && <span className="block truncate text-xs text-slate-400">{name(stop.station_id)}</span>}
               {state === 'pinned' && <span className="block text-xs text-amber-300">At platform</span>}
               {state === 'next' && <span className="block text-xs text-slate-400">Next</span>}
             </span>

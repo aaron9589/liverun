@@ -252,6 +252,7 @@ app.post('/api/timetables/import', (req, res) => {
       timetable_id: newId,
       name: String(c.name || '').trim(),
       color: /^#[0-9a-fA-F]{3,8}$/.test(c.color) ? c.color : '#94a3b8',
+      guard_visible: c.guard_visible === true,
     })),
   };
   db.timetables.push(imported);
@@ -365,6 +366,7 @@ app.post('/api/timetables/:id/restore', (req, res) => {
       timetable_id: ttId,
       name: String(c.name || '').trim(),
       color: /^#[0-9a-fA-F]{3,8}$/.test(c.color) ? c.color : '#94a3b8',
+      guard_visible: c.guard_visible === true,
     }));
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -606,11 +608,11 @@ app.patch('/api/timetables/:id/trains/:trainId/complete', (req, res) => {
 // ── Crews ─────────────────────────────────────────────────────
 
 app.post('/api/timetables/:id/crews', (req, res) => {
-  const { name, color } = req.body;
+  const { name, color, guardVisible } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const updated = mutateTimetable(req.params.id, (tt) => {
     if (!tt.crews) tt.crews = [];
-    tt.crews.push({ id: uuidv4(), timetable_id: req.params.id, name: name.trim(), color: color || '#94a3b8' });
+    tt.crews.push({ id: uuidv4(), timetable_id: req.params.id, name: name.trim(), color: color || '#94a3b8', guard_visible: guardVisible === true });
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.status(201).json(normalise(updated));
@@ -634,12 +636,17 @@ app.put('/api/timetables/:id/crews/reorder', (req, res) => {
 });
 
 app.put('/api/timetables/:id/crews/:crewId', (req, res) => {
-  const { name, color } = req.body;
+  const { name, color, guardVisible } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const updated = mutateTimetable(req.params.id, (tt) => {
     if (!tt.crews) tt.crews = [];
     const crew = tt.crews.find((c) => c.id === req.params.crewId);
-    if (crew) { crew.name = name.trim(); crew.color = color || crew.color; }
+    if (crew) {
+      crew.name = name.trim();
+      crew.color = color || crew.color;
+      // Omitted = unchanged, so the planner's name/colour edit doesn't clear it.
+      if (typeof guardVisible === 'boolean') crew.guard_visible = guardVisible;
+    }
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.json(normalise(updated));

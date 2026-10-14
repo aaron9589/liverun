@@ -206,13 +206,13 @@ export const api = {
 
   // ── Crews ──────────────────────────────────────────────────
 
-  addCrew: (timetableId: string, data: { name: string; color: string }) =>
+  addCrew: (timetableId: string, data: { name: string; color: string; guardVisible?: boolean }) =>
     req<Timetable>(`/timetables/${timetableId}/crews`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateCrew: (timetableId: string, crewId: string, data: { name: string; color: string }) =>
+  updateCrew: (timetableId: string, crewId: string, data: { name: string; color: string; guardVisible?: boolean }) =>
     req<Timetable>(`/timetables/${timetableId}/crews/${crewId}`, {
       method: 'PUT',
       body: JSON.stringify(data),

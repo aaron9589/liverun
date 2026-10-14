@@ -10,7 +10,35 @@ export interface SeqStop {
 }
 
 /**
- * Timed stops in route order with minutes unwrapped across midnight
+ * A train's stops in running order. The planner stores stops in station
+ * (graph) order, so a train running the other way comes out backwards. Picks
+ * whichever of stored / reversed order moves forward in time with the least
+ * total wrap (midnight-safe); ties keep the stored order. Untimed stops move
+ * with their neighbours. Returns the same array when it is already in order.
+ */
+export function runningOrder<S extends Pick<TrainStop, 'arrival' | 'departure'>>(stops: S[]): S[] {
+  const cost = (list: S[]): number => {
+    const pts: number[] = [];
+    for (const st of list) {
+      if (st.arrival) pts.push(timeToMinutes(st.arrival));
+      if (st.departure) pts.push(timeToMinutes(st.departure));
+    }
+    let c = 0;
+    for (let i = 1; i < pts.length; i++) c += (((pts[i] - pts[i - 1]) % 1440) + 1440) % 1440;
+    return c;
+  };
+  const reversed = [...stops].reverse();
+  return cost(reversed) < cost(stops) ? reversed : stops;
+}
+
+/** The train with its stops in running order (see runningOrder); the same object when already in order. */
+export function inRunningOrder(train: Train): Train {
+  const stops = runningOrder(train.stops);
+  return stops === train.stops ? train : { ...train, stops };
+}
+
+/**
+ * Timed stops in running order (runningOrder) with minutes unwrapped across midnight
  * (anchored on the first timed stop). Stops with neither time are skipped.
  */
 export function sequenceStops(train: Train): SeqStop[] {
@@ -23,7 +51,7 @@ export function sequenceStops(train: Train): SeqStop[] {
     while (v < prev) v += 1440;
     return v;
   };
-  for (const stop of train.stops) {
+  for (const stop of runningOrder(train.stops)) {
     if (!stop.arrival && !stop.departure) continue;
     const arrRaw = stop.arrival ? timeToMinutes(stop.arrival) : null;
     const depRaw = stop.departure ? timeToMinutes(stop.departure) : null;

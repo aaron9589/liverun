@@ -30,7 +30,7 @@ interface Props {
   onExportCatsXml: () => void;
   onImportTimetable: (file: File) => void;
   onAddCrew: (data: { name: string; color: string }) => void;
-  onUpdateCrew: (crewId: string, data: { name: string; color: string }) => void;
+  onUpdateCrew: (crewId: string, data: { name: string; color: string; guardVisible?: boolean }) => void;
   onDeleteCrew: (crewId: string) => void;
   onReorderCrews: (order: string[]) => void;
   onAutoAssignCrews: (data: { crewIds: string[]; trainIds: string[]; onlyUnassigned: boolean; minBreakMins: number }) => Promise<string[]>;
@@ -595,6 +595,19 @@ export function Sidebar({
                           </span>
                           <span className="w-3 h-3 rounded-full shrink-0 ring-1 ring-black/20" style={{ background: crew!.color }} />
                           <span className="flex-1 text-sm font-medium text-slate-200 truncate">{crew!.name}</span>
+                          <label
+                            className="flex items-center gap-1 text-[11px] text-slate-400 shrink-0 cursor-pointer select-none"
+                            title="Offer this crew in the guard panel's crew picker"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={crew!.guard_visible === true}
+                              onChange={(e) => onUpdateCrew(crew!.id, { name: crew!.name, color: crew!.color, guardVisible: e.target.checked })}
+                              className="accent-blue-500"
+                            />
+                            Guard
+                          </label>
                           {overlaps.size > 0 && (
                             <span
                               className="text-xs font-semibold text-red-400 shrink-0"

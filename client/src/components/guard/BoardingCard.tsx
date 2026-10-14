@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import {
   alightingCount, createBoardingRun, demandAt, sampleCount,
   type BoardingPhase, type BoardingRun,
@@ -15,6 +15,12 @@ interface Props {
   config: BoardingConfig;
   /** Latest door event; each press carries a new `n` so repeats restart cleanly. */
   event: BoardingEvent | null;
+  /**
+   * Highest event `n` already acted on, owned by the caller so it survives this
+   * card remounting (train change, lost train). Without it a fresh card would
+   * replay the last Doors Open and start counting again.
+   */
+  handledN: MutableRefObject<number>;
   /** Called with the trigger and the record; the caller decides whether stats are enabled. */
   onStats: (trigger: 'boarding_start' | 'door_close', record: StatsRecord) => void;
   /** Set when stats are enabled but the broker connection is not up. */
@@ -33,7 +39,7 @@ type View =
 const fmtClock = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 
 /** Passenger counter (spec §8). Rendered with a key that changes with the train, so unmount clears any run. */
-export function BoardingCard({ config, event, onStats, statsDown, onBoardingDone }: Props) {
+export function BoardingCard({ config, event, handledN, onStats, statsDown, onBoardingDone }: Props) {
   const [view, setView] = useState<View>({ k: 'idle' });
   const cfgRef = useRef(config);
   cfgRef.current = config;
@@ -99,7 +105,8 @@ export function BoardingCard({ config, event, onStats, statsDown, onBoardingDone
 
   const eventN = event?.n;
   useEffect(() => {
-    if (!event) return;
+    if (!event || event.n <= handledN.current) return;
+    handledN.current = event.n;
     clearTimers();
     if (event.type === 'start') {
       boardingRun.current = null;

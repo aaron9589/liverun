@@ -6,7 +6,7 @@ import { requestWakeLock, unlockAudio } from '../../lib/audio';
 import { playSound } from '../../lib/sound';
 import { resolveProfile } from '../../lib/profiles';
 import { switchMode } from '../../lib/mode';
-import { autoSelectTrain, currentStop, formsNext as findFormsNext, sequenceStops, sortByRun } from '../../lib/stops';
+import { autoSelectTrain, currentStop, formsNext as findFormsNext, inRunningOrder, sequenceStops, sortByRun } from '../../lib/stops';
 import { describeJobChange, diffJobs } from '../../lib/jobDiff';
 import type { Timetable, Train } from '../../types';
 import { ChangeToasts, useToasts } from '../ChangeToasts';
@@ -30,7 +30,6 @@ import { LoaStrip } from './LoaStrip';
 import { AuthorityTab } from './AuthorityTab';
 
 const CREW_KEY = 'guard:crew';
-const TAB_KEY = 'guard:rightTab';
 const trainKey = (ttId: string) => `guard:train:${ttId}`;
 
 function readStore(key: string): string | null {
@@ -99,7 +98,8 @@ export function GuardPanel() {
   const [crewId, setCrewId] = useState<string | null>(() => readStore(CREW_KEY));
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickingCrew, setPickingCrew] = useState(false);
-  const crew = timetable?.crews.find((c) => c.id === crewId) ?? null;
+  // Only crews ticked for the guard panel in the planner count; a stored crew that isn't reopens the picker.
+  const crew = timetable?.crews.find((c) => c.id === crewId && c.guard_visible === true) ?? null;
   const crewValid = crewId === '*' || crew !== null;
   const showPicker = !!timetable && (pickingCrew || !crewValid);
 
@@ -131,7 +131,10 @@ export function GuardPanel() {
   const lostRef = useRef<{ train: Train; message: string } | null>(null);
 
 
-  const train = lost ? lost.train : trains.find((t) => t.id === selectedId) ?? null;
+  const rawTrain = lost ? lost.train : trains.find((t) => t.id === selectedId) ?? null;
+  // Stops in running order: the planner stores them in station order, so Up trains
+  // arrive backwards. Everything below (stop list, boarding, events, LOA) uses this.
+  const train = useMemo(() => (rawTrain ? inRunningOrder(rawTrain) : null), [rawTrain]);
   const select = useCallback((id: string, push: boolean) => {
     if (!timetable) return;
     actionsRef.current.stopAll();
@@ -198,6 +201,7 @@ export function GuardPanel() {
   // Context is read from refs at that moment, so the stop is the one at the time of opening.
   const [boardingEvent, setBoardingEvent] = useState<BoardingEvent | null>(null);
   const boardingSeqN = useRef(0);
+  const boardingHandledN = useRef(0);
   const liveRef = useRef({ train, seq, timetable, clockShown, pinnedStopId });
   liveRef.current = { train, seq, timetable, clockShown, pinnedStopId };
   // Guard events (spec §10): door events go to the engine at the stop the doors opened at.
@@ -267,9 +271,6 @@ export function GuardPanel() {
     config: layout.loa,
     values: live.loaValues,
   });
-  const hasLoa = loa.matches.length > 0;
-  const [rightTab, setRightTab] = useState<'stops' | 'authority'>(() => (readStore(TAB_KEY) === 'authority' ? 'authority' : 'stops'));
-  const pickTab = (t: 'stops' | 'authority') => { setRightTab(t); writeStore(TAB_KEY, t); };
 
   guardDoorRef.current = (type) => {
     const l = liveRef.current;
@@ -470,7 +471,7 @@ export function GuardPanel() {
       </div>
     );
   } else if (showPicker) {
-    body = <CrewPicker crews={timetable.crews} onPick={pickCrew} />;
+    body = <CrewPicker crews={timetable.crews.filter((c) => c.guard_visible === true)} onPick={pickCrew} />;
   } else if (!train) {
     body = <div className="flex-1 flex items-center justify-center text-slate-400 px-6 text-center">No trains for this crew.</div>;
   } else {
@@ -507,26 +508,14 @@ export function GuardPanel() {
             key={`boarding:${train.id}${lost ? ':lost' : ''}`}
             config={layout.boarding}
             event={boardingEvent}
+            handledN={boardingHandledN}
             onStats={onStats}
             statsDown={statsActive && mqttPub.status !== 'connected'}
             onBoardingDone={onBoardingDone}
           />
         </section>
         <section className="flex flex-col gap-3">
-          {hasLoa && (
-            <div role="tablist" className="grid grid-cols-2 gap-1 rounded-xl bg-slate-900 border border-slate-800 p-1">
-              {(['stops', 'authority'] as const).map((t) => (
-                <button
-                  key={t}
-                  role="tab"
-                  aria-selected={rightTab === t}
-                  onClick={() => pickTab(t)}
-                  className={`min-h-[48px] rounded-lg font-semibold ${rightTab === t ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
-                >{t === 'stops' ? 'Stops' : 'Authority'}</button>
-              ))}
-            </div>
-          )}
-          {hasLoa && rightTab === 'authority' ? <AuthorityTab sections={loa.sections} /> : <StopTable
+          <StopTable
             seq={seq}
             stations={timetable.stations}
             clock={clockShown}
@@ -535,7 +524,9 @@ export function GuardPanel() {
             highlightStopIds={flash}
             formsNext={forms}
             onForms={(id) => select(id, true)}
-          />}
+          />
+          {/* LOA is always on screen (not behind a tab), even when no section applies. */}
+          <AuthorityTab sections={loa.sections} />
         </section>
       </main>
     );
@@ -544,7 +535,7 @@ export function GuardPanel() {
   return (
     <div className="h-[100dvh] flex flex-col bg-slate-950 text-slate-100">
       {header}
-      {hasLoa && <LoaStrip sections={loa.sections} current={loa.current} />}
+      {train && <LoaStrip sections={loa.sections} current={loa.current} />}
       {lost && (
         <div role="alert" className="flex items-center gap-3 px-4 py-3 bg-red-900/60 border-b border-red-700 text-red-100">
           <span className="flex-1 font-medium">{lost.message}. Close doors if open, then acknowledge.</span>
