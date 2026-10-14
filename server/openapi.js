@@ -68,6 +68,45 @@ const spec = {
                         url: { type: 'string', example: 'wss://jmri.example.net/json/', description: "JMRI JSON WebSocket URL ('' = not configured)" },
                       },
                     },
+                    loa: {
+                      type: 'object',
+                      description: 'Limit of Authority: directional sections between stations, each with signal/token/condition/selector elements watching MQTT topics.',
+                      properties: {
+                        warn_on_depart: { type: 'boolean', description: "Warn (not block) when doors close at a section's start without authority" },
+                        sections: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            required: ['id', 'name', 'from', 'to', 'only', 'except', 'elements'],
+                            properties: {
+                              id: { type: 'string', description: 'Unique, stable' },
+                              name: { type: 'string' },
+                              from: { type: 'string', description: 'Station name (case-insensitive)' },
+                              to: { type: 'string', description: 'Station name (case-insensitive); differs from from' },
+                              only: { type: 'array', items: { type: 'string' }, description: 'Globs on train_id / train name; non-empty = only these trains' },
+                              except: { type: 'array', items: { type: 'string' }, description: 'Globs on train_id / train name; matching trains never get the section' },
+                              elements: {
+                                type: 'array',
+                                items: {
+                                  type: 'object',
+                                  required: ['type', 'label', 'topic'],
+                                  properties: {
+                                    type: { type: 'string', enum: ['signal', 'token', 'condition', 'selector'] },
+                                    label: { type: 'string' },
+                                    topic: { type: 'string', description: 'MQTT topic, no wildcards' },
+                                    clear: { type: 'array', items: { type: 'string' }, description: 'Payload globs that mean clear (conditions)' },
+                                    caution: { type: 'array', items: { type: 'string' }, description: 'Payload globs that count as clear but show amber' },
+                                    revokes: { type: 'boolean', description: 'Defaults: token true, others false' },
+                                    options: { type: 'object', additionalProperties: { type: 'object' }, description: 'Selectors: payload value to condition' },
+                                    default: { type: 'string', description: 'Selectors: option key used before the selector topic has a value' },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               },

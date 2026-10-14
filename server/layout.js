@@ -9,6 +9,7 @@
 
 const { validateSoundName } = require('./sounds');
 const { validateEventsConfig } = require('./events');
+const { validateLoaConfig } = require('./loa');
 
 const MODES = ['on', 'off', 'toggle', 'pulse', 'hold', 'on_for'];
 const ACTION_RE = /^[a-z0-9_]{1,40}$/;
@@ -232,6 +233,11 @@ function validateLayout(body) {
 
   if (body.events !== undefined) {
     const e = validateEventsConfig(body.events, soundError, ACTION_RE);
+    if (e) return { error: e };
+  }
+
+  if (body.loa !== undefined) {
+    const e = validateLoaConfig(body.loa);
     if (e) return { error: e };
   }
 
