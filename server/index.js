@@ -8,6 +8,7 @@ const mqtt = require('mqtt');
 const path = require('path');
 const { readDB, writeDB, getTimetable, mutateTimetable, uuidv4 } = require('./db');
 const openApiSpec = require('./openapi');
+const { stripTrainType } = require('./migrations');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -166,7 +167,6 @@ app.post('/api/timetables/import', (req, res) => {
         name: String(tr.name || '').trim(),
         color: /^#[0-9a-fA-F]{3,8}$/.test(tr.color) ? tr.color : '#3b82f6',
         notes: String(tr.notes || ''),
-        train_type: String(tr.train_type || ''),
         train_id: String(tr.train_id || ''),
         direction: String(tr.direction || ''),
         crew_id: tr.crew_id ? (crewIdMap[tr.crew_id] || null) : null,
@@ -281,7 +281,6 @@ app.post('/api/timetables/:id/restore', (req, res) => {
       name: String(tr.name || '').trim(),
       color: /^#[0-9a-fA-F]{3,8}$/.test(tr.color) ? tr.color : '#3b82f6',
       notes: String(tr.notes || ''),
-      train_type: String(tr.train_type || ''),
       train_id: String(tr.train_id || ''),
       direction: String(tr.direction || ''),
       crew_id: tr.crew_id ? String(tr.crew_id) : null,
@@ -464,14 +463,14 @@ app.delete('/api/timetables/:id/paths/:pathId', (req, res) => {
 });
 
 app.post('/api/timetables/:id/trains', (req, res) => {
-  const { name, color, notes, trainType, trainId: trainIdField, direction, crewId, stops } = req.body;
+  const { name, color, notes, trainId: trainIdField, direction, crewId, stops } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const trainId = uuidv4();
   const updated = mutateTimetable(req.params.id, (tt) => {
     tt.trains.push({
       id: trainId, timetable_id: req.params.id, name: name.trim(),
       color: color || '#3b82f6', notes: notes || '',
-      train_type: trainType || '', train_id: trainIdField || '', direction: direction || '',
+      train_id: trainIdField || '', direction: direction || '',
       crew_id: crewId || null,
       stops: buildStops(trainId, stops || []),
     });
@@ -481,13 +480,13 @@ app.post('/api/timetables/:id/trains', (req, res) => {
 });
 
 app.put('/api/timetables/:id/trains/:trainId', (req, res) => {
-  const { name, color, notes, trainType, trainId: trainIdField, direction, crewId, stops } = req.body;
+  const { name, color, notes, trainId: trainIdField, direction, crewId, stops } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const updated = mutateTimetable(req.params.id, (tt) => {
     const tr = tt.trains.find((t) => t.id === req.params.trainId);
     if (tr) {
       tr.name = name.trim(); tr.color = color || '#3b82f6'; tr.notes = notes || '';
-      tr.train_type = trainType || ''; tr.train_id = trainIdField || ''; tr.direction = direction || '';
+      delete tr.train_type; tr.train_id = trainIdField || ''; tr.direction = direction || '';
       tr.crew_id = crewId || null;
       tr.stops = buildStops(req.params.trainId, stops || []);
     }
@@ -901,12 +900,11 @@ function deriveDirectionAtStation(train, stationId, stationOrderById) {
   return '';
 }
 
-function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, trainTypeFilter) {
+function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter) {
   const sortedStations = sortStationsForDirection(tt.stations || []);
   const stationOrderById = new Map(sortedStations.map((s, idx) => [s.id, idx]));
   const stationGraphPosById = new Map(sortedStations.map((s) => [s.id, Number(s.graph_pos ?? 0)]));
   const trainIdMatcher = makeLikeMatcher(trainIdFilter);
-  const trainTypeMatcher = makeLikeMatcher(trainTypeFilter);
   const stationNameQuery = String(stationNameParam || '').trim().toLowerCase();
   const station = (sortedStations || []).find((s) => String(s.name || '').trim().toLowerCase() === stationNameQuery);
   if (!station) {
@@ -933,7 +931,6 @@ function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, 
     const derivedDirection = deriveDirectionAtStation(tr, station.id, stationOrderById);
     if (directionQuery && derivedDirection !== directionQuery) continue;
     if (trainIdMatcher && !trainIdMatcher.test(String(tr.train_id || ''))) continue;
-    if (trainTypeMatcher && !trainTypeMatcher.test(String(tr.train_type || ''))) continue;
     const stoppingPattern = sequencedStops.slice(stationStopIndex).map((stop) => {
       const stopStation = stationMap.get(stop.station_id);
       return {
@@ -947,7 +944,6 @@ function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, 
     const eventTime = stationStop.arrival || stationStop.departure || null;
     allServices.push({
       name: tr.name,
-      trainType: tr.train_type || '',
       trainId: tr.train_id || '',
       direction: derivedDirection || tr.direction || '',
       notes: tr.notes || '',
@@ -966,7 +962,6 @@ function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, 
     for (const tr of (tt.trains || [])) {
       if (stoppingTrainIds.has(tr.id)) continue;
       if (trainIdMatcher && !trainIdMatcher.test(String(tr.train_id || ''))) continue;
-      if (trainTypeMatcher && !trainTypeMatcher.test(String(tr.train_type || ''))) continue;
 
       const sequencedStops = getSequencedTimedStops(tr, stationOrderById);
       if (sequencedStops.length < 2) continue;
@@ -1009,7 +1004,6 @@ function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, 
 
         allServices.push({
           name: tr.name,
-          trainType: tr.train_type || '',
           trainId: tr.train_id || '',
           direction: derivedDirection,
           notes: tr.notes || '',
@@ -1031,7 +1025,6 @@ function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, 
     stationName: station.name,
     direction: directionQuery || 'all',
     trainIdFilter: trainIdFilter || null,
-    trainTypeFilter: trainTypeFilter || null,
     services: allServices
       .sort((a, b) => {
         const am = a._sortMinute == null ? Number.POSITIVE_INFINITY : a._sortMinute;
@@ -1061,7 +1054,6 @@ app.get('/api/timetables/:id/live/trains', (req, res) => {
     .sort((a, b) => trainStartMinute(a) - trainStartMinute(b))
     .map((tr) => ({
       name: tr.name,
-      trainType: tr.train_type || '',
       trainId: tr.train_id || '',
       direction: tr.direction || '',
       notes: tr.notes || '',
@@ -1088,7 +1080,6 @@ app.get('/api/timetables/:id/live/trains/:trainName', (req, res) => {
   });
   res.json({
     name: train.name,
-    trainType: train.train_type || '',
     trainId: train.train_id || '',
     direction: train.direction || '',
     notes: train.notes || '',
@@ -1103,12 +1094,11 @@ app.get('/api/timetables/:id/live/stations/:stationName', (req, res) => {
 
   const directionQuery = parseDirection(req.query.direction);
   const trainIdFilter = parseTrainIdFilter(req.query.trainId);
-  const trainTypeFilter = parseTrainIdFilter(req.query.trainType);
   if (directionQuery === null) {
     return res.status(400).json({ error: 'direction must be "up" or "down"' });
   }
 
-  const board = buildStationBoard(tt, req.params.stationName, directionQuery, trainIdFilter, trainTypeFilter);
+  const board = buildStationBoard(tt, req.params.stationName, directionQuery, trainIdFilter);
   if (board.error) return res.status(board.status || 500).json({ error: board.error });
   res.json(board);
 });
@@ -1125,7 +1115,7 @@ function sendStationFeedTick(ws, config, clockMinute) {
     sendWsJson(ws, { type: 'error', error: 'Timetable not found' });
     return;
   }
-  const board = buildStationBoard(tt, config.stationName, config.direction, config.trainIdFilter, config.trainTypeFilter);
+  const board = buildStationBoard(tt, config.stationName, config.direction, config.trainIdFilter);
   if (board.error) {
     sendWsJson(ws, { type: 'error', error: board.error });
     return;
@@ -1355,13 +1345,12 @@ wsServer.on('connection', (ws, req) => {
   const stationName = String(reqUrl.searchParams.get('station') || '').trim();
   const direction = parseDirection(reqUrl.searchParams.get('direction'));
   const trainIdFilter = parseTrainIdFilter(reqUrl.searchParams.get('trainId'));
-  const trainTypeFilter = parseTrainIdFilter(reqUrl.searchParams.get('trainType'));
   const futureCount = Math.max(1, Math.min(100, Number(reqUrl.searchParams.get('futureCount')) || 10));
 
   if (!timetableId || !stationName || direction === null) {
     sendWsJson(ws, {
       type: 'error',
-      error: 'Expected query: id=<timetableId>&station=<stationName>[&direction=up|down][&trainId=%pattern%][&trainType=%pattern%][&futureCount=10]',
+      error: 'Expected query: id=<timetableId>&station=<stationName>[&direction=up|down][&trainId=%pattern%][&futureCount=10]',
     });
     ws.close(1008, 'Invalid query');
     return;
@@ -1388,7 +1377,6 @@ wsServer.on('connection', (ws, req) => {
     stationName,
     direction,
     trainIdFilter,
-    trainTypeFilter,
     clockTopic: settings.clock_topic,
     futureCount,
   };
@@ -1498,6 +1486,16 @@ server.on('upgrade', (req, socket, head) => {
   if (changed > 0) {
     writeDB(db);
     console.log(`Startup migration: normalised terminal stop times on ${changed} train(s).`);
+  }
+})();
+
+// ── Startup migration: remove retired train_type field ───────────────────────
+(function migrateStripTrainType() {
+  const db = readDB();
+  const changed = stripTrainType(db);
+  if (changed > 0) {
+    writeDB(db);
+    console.log(`Startup migration: removed train_type from ${changed} train(s).`);
   }
 })();
 

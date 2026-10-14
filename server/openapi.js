@@ -71,7 +71,6 @@ const spec = {
                         type: 'object',
                         properties: {
                           name: { type: 'string', example: 'K351' },
-                          trainType: { type: 'string', example: 'L' },
                           trainId: { type: 'string', example: 'CityRail 51L', description: 'Roster/JMRI ID' },
                           direction: { type: 'string', example: 'Down' },
                           notes: { type: 'string' },
@@ -110,7 +109,6 @@ const spec = {
                   type: 'object',
                   properties: {
                     name: { type: 'string', example: 'K351' },
-                    trainType: { type: 'string', example: 'L' },
                     trainId: { type: 'string', example: 'CityRail 51L' },
                     direction: { type: 'string', example: 'Down' },
                     notes: { type: 'string' },
@@ -178,7 +176,6 @@ const spec = {
                         type: 'object',
                         properties: {
                           name: { type: 'string', example: 'K351' },
-                          trainType: { type: 'string', example: 'L' },
                           trainId: { type: 'string', example: 'CityRail 51L' },
                           direction: { type: 'string', example: 'Down' },
                           notes: { type: 'string' },
