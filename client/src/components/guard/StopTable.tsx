@@ -9,10 +9,12 @@ interface Props {
   onTogglePin: (stopId: string) => void;
   formsNext: Train | null;
   onForms: (trainId: string) => void;
+  /** Stops Control just changed; their rows flash briefly. */
+  highlightStopIds?: ReadonlySet<string>;
 }
 
 /** Stop list for the selected train. Deliberately never renders special_instructions. */
-export function StopTable({ seq, stations, clock, pinnedStopId, onTogglePin, formsNext, onForms }: Props) {
+export function StopTable({ seq, stations, clock, pinnedStopId, onTogglePin, formsNext, onForms, highlightStopIds }: Props) {
   const cur = currentStop(seq, clock, pinnedStopId);
   const name = (id: string) => stations.find((s) => s.id === id)?.name ?? id;
 
@@ -33,12 +35,13 @@ export function StopTable({ seq, stations, clock, pinnedStopId, onTogglePin, for
           : state === 'pinned' ? 'bg-amber-500/20 border-l-4 border-l-amber-400 text-white'
           : state === 'next' ? 'bg-slate-800/60 border-l-4 border-l-slate-500 text-slate-100'
           : 'border-l-4 border-l-transparent text-slate-300';
+        const changed = highlightStopIds?.has(stop.id) ? ' ring-2 ring-inset ring-amber-400/80 animate-pulse' : '';
         return (
           <button
             key={stop.id}
             onClick={() => onTogglePin(stop.id)}
             aria-pressed={state === 'pinned'}
-            className={`w-full grid grid-cols-[1fr_5rem_5rem] items-center min-h-[52px] px-4 py-1.5 text-left border-b border-slate-800/70 ${rowCls}`}
+            className={`w-full grid grid-cols-[1fr_5rem_5rem] items-center min-h-[52px] px-4 py-1.5 text-left border-b border-slate-800/70 ${rowCls}${changed}`}
           >
             <span className="min-w-0">
               <span className="block truncate font-medium">{name(stop.station_id)}</span>

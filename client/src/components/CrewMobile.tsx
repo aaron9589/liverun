@@ -3,9 +3,10 @@ import type { Crew, Timetable, TimetableSummary, Train } from '../types';
 import { api } from '../api';
 import { useFastClock } from '../hooks/useFastClock';
 import { useLiveTimetable } from '../hooks/useLiveTimetable';
-import { diffJobs, type JobChange } from '../lib/jobDiff';
+import { describeJobChange, diffJobs } from '../lib/jobDiff';
+import { switchMode } from '../lib/mode';
 import { timeToMinutes, useLocalStorage } from '../utils';
-import { ChangeToasts, useToasts, type ToastTone } from './ChangeToasts';
+import { ChangeToasts, useToasts } from './ChangeToasts';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,21 +82,6 @@ function useTimedFlags(durationMs: number): [ReadonlySet<string>, (ids: string[]
 }
 
 /** Toast text + tone for one job change. */
-function describeChange(change: JobChange): { message: string; tone: ToastTone } {
-  switch (change.type) {
-    case 'added':
-      return { message: `New job: ${change.train.name} (${formatMins(trainFirstMinute(change.train))})`, tone: 'success' };
-    case 'removed':
-      return { message: `${change.train.name} removed`, tone: 'danger' };
-    case 'reassigned':
-      return { message: `${change.train.name} → ${change.crew?.name ?? 'unassigned'}`, tone: 'warning' };
-    case 'retimed':
-      return { message: `${change.train.name} retimed`, tone: 'info' };
-    case 'renamed':
-      return { message: `${change.oldName} renamed to ${change.train.name}`, tone: 'info' };
-  }
-}
-
 // ─── Train card ────────────────────────────────────────────────────────────────
 
 function trainEndpoints(train: Train, stationMap: Map<string, { name: string }>): { from: string | null; to: string | null } {
@@ -503,7 +489,7 @@ export function CrewMobile() {
       pushToast(`Control changed ${changes.length} of your jobs`, 'warning');
     } else {
       for (const change of changes) {
-        const { message, tone } = describeChange(change);
+        const { message, tone } = describeJobChange(change);
         pushToast(message, tone);
       }
     }
@@ -621,6 +607,11 @@ export function CrewMobile() {
               style={{ color: clockTime !== null ? '#4ade80' : '#94a3b8' }}
               title={clockTime !== null ? 'Fast clock' : 'Wall clock'}
             >{displayClock}</span>
+            <button
+              onClick={switchMode}
+              title="Switch mode (guard panel, crew view, planner)"
+              className="text-xs text-slate-400 hover:text-slate-200 border border-slate-700 rounded-md px-2 py-1 shrink-0"
+            >Switch</button>
           </div>
 
           {/* ── Row 2: timetable name / selector ── */}

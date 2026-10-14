@@ -15,7 +15,9 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        // LIVERUN_API overrides the dev proxy target, e.g. to test against a
+        // throwaway server while a real instance holds :3001.
+        target: process.env.LIVERUN_API ?? 'http://localhost:3001',
         changeOrigin: true,
         ws: true,
       },

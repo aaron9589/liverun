@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveTimetable } from '../../hooks/useLiveTimetable';
+import { api } from '../../api';
 import { useFastClock } from '../../hooks/useFastClock';
 import { requestWakeLock, unlockAudio } from '../../lib/audio';
 import { switchMode } from '../../lib/mode';
-import { autoSelectTrain, formsNext as findFormsNext, sequenceStops, sortByRun } from '../../lib/stops';
+import { autoSelectTrain, formsNext as findFormsNext, sequenceStops, sortByRun, type SeqStop } from '../../lib/stops';
+import { describeJobChange, diffJobs } from '../../lib/jobDiff';
+import type { Timetable, Train } from '../../types';
+import { ChangeToasts, useToasts } from '../ChangeToasts';
 import { CrewPicker } from './CrewPicker';
 import { StopTable } from './StopTable';
 
@@ -23,6 +27,27 @@ function formatClock(m: number | null): string {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
 
+/** Pin identity that survives Control re-saving the train (stop ids are re-minted on save). */
+function pinKeyOf(seq: SeqStop[], stopId: string): string | null {
+  const counts = new Map<string, number>();
+  for (const { stop } of seq) {
+    const n = counts.get(stop.station_id) ?? 0;
+    counts.set(stop.station_id, n + 1);
+    if (stop.id === stopId) return `${stop.station_id}#${n}`;
+  }
+  return null;
+}
+function stopIdOfPin(seq: SeqStop[], key: string | null): string | null {
+  if (!key) return null;
+  const counts = new Map<string, number>();
+  for (const { stop } of seq) {
+    const n = counts.get(stop.station_id) ?? 0;
+    counts.set(stop.station_id, n + 1);
+    if (`${stop.station_id}#${n}` === key) return stop.id;
+  }
+  return null;
+}
+
 function Dot({ ok, warn, label }: { ok: boolean; warn?: boolean; label: string }) {
   const color = ok ? 'bg-emerald-400' : warn ? 'bg-amber-400' : 'bg-red-500';
   return (
@@ -38,13 +63,22 @@ export function GuardPanel() {
   const live = useLiveTimetable(ttId);
   const { timetable, activeId, status: liveStatus } = live;
 
-  // Follow the server's active timetable.
+  const toasts = useToasts();
+
+  // Follow the server's active timetable. The first one is adopted directly;
+  // a later switch by Control waits for the guard's ACK (spec §6.5).
+  const [pendingActive, setPendingActive] = useState<string | null | undefined>(undefined);
   useEffect(() => {
-    if (activeId) setTtId(activeId);
-  }, [activeId]);
+    if (activeId === undefined) return;
+    if (ttId === null) { if (activeId) setTtId(activeId); return; }
+    setPendingActive(activeId !== ttId ? activeId : undefined);
+  }, [activeId, ttId]);
   useEffect(() => {
-    if (live.deleted && activeId && activeId !== ttId) setTtId(activeId);
-  }, [live.deleted, activeId, ttId]);
+    // Our timetable is gone: nothing left to hold on to, follow the active one now.
+    if (!live.deleted) return;
+    setPendingActive(undefined);
+    setTtId(activeId ?? null);
+  }, [live.deleted, activeId]);
 
   const settings = timetable?.settings;
   const { clockTime, status: clockStatus } = useFastClock(
@@ -88,8 +122,73 @@ export function GuardPanel() {
   const isAuto = useRef(true);
   const clockSeen = useRef(false);
 
+  // Selected train removed / reassigned away by Control: keep showing the old
+  // copy (so the guard can still close doors) until they acknowledge.
+  const [lost, setLost] = useState<{ train: Train; message: string } | null>(null);
+  const lostRef = useRef<{ train: Train; message: string } | null>(null);
+
+
+  const train = lost ? lost.train : trains.find((t) => t.id === selectedId) ?? null;
+  const select = useCallback((id: string, push: boolean) => {
+    if (!timetable) return;
+    isAuto.current = false;
+    writeStore(trainKey(timetable.id), id);
+    setBackStack((s) => (push && selectedId ? [...s, selectedId] : []));
+    setSelectedId(id);
+  }, [timetable, selectedId]);
+
+  const goBack = () => {
+    const prev = backStack[backStack.length - 1];
+    if (!prev || !timetable) return;
+    writeStore(trainKey(timetable.id), prev);
+    setBackStack((s) => s.slice(0, -1));
+    setSelectedId(prev);
+  };
+
+  const seq = useMemo(() => (train ? sequenceStops(train) : []), [train]);
+
+  // Pinned stop ("at platform"), reset per train. Held as station+visit so a
+  // retime by Control keeps the pin.
+  const [pinKey, setPinKey] = useState<string | null>(null);
+  useEffect(() => { setPinKey(null); }, [selectedId]);
+  const pinnedStopId = stopIdOfPin(seq, pinKey);
+
+  // React to Control's changes: toasts, flash retimed stops, hold a lost train.
+  const [flash, setFlash] = useState<ReadonlySet<string>>(() => new Set());
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedRef = useRef(selectedId);
+  selectedRef.current = selectedId;
+  const prevTt = useRef<Timetable | null>(null);
   useEffect(() => {
-    if (!timetable || trains.length === 0) return;
+    const prev = prevTt.current;
+    prevTt.current = timetable;
+    if (!prev || !timetable || prev.id !== timetable.id || !crewValid || !crewId) return;
+    const changes = diffJobs(prev, timetable, crewId === '*' ? null : [crewId]);
+    if (changes.length === 0) return;
+    if (changes.length > 5) toasts.push(`Control changed ${changes.length} of your jobs`, 'warning');
+    else for (const c of changes) { const d = describeJobChange(c); toasts.push(d.message, d.tone); }
+
+    const sel = selectedRef.current;
+    for (const c of changes) {
+      if (c.train.id !== sel) continue;
+      const lostMsg =
+        c.type === 'removed' ? `Control has removed ${c.train.name} from your jobs`
+        : c.type === 'reassigned' ? `Control has reassigned ${c.train.name} to ${c.crew?.name ?? 'no crew'}`
+        : null;
+      if (lostMsg) { lostRef.current = { train: c.train, message: lostMsg }; setLost(lostRef.current); }
+      if (c.type === 'retimed') {
+        setFlash(new Set(c.stopIds));
+        if (flashTimer.current) clearTimeout(flashTimer.current);
+        flashTimer.current = setTimeout(() => setFlash(new Set()), 10_000);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timetable]);
+
+  useEffect(() => {
+    // Runs after the change detection above, so a train Control just took
+    // away is already held in lostRef and isn't silently replaced.
+    if (lost || lostRef.current || !timetable || trains.length === 0) return;
     if (selectedId && trains.some((t) => t.id === selectedId)) {
       // Re-run auto-select once when the first clock reading arrives.
       if (isAuto.current && !clockSeen.current && clockShown !== null) {
@@ -108,30 +207,38 @@ export function GuardPanel() {
     isAuto.current = true;
     clockSeen.current = clockShown !== null;
     setSelectedId(autoSelectTrain(trains, clockShown)?.id ?? null);
-  }, [timetable, trains, selectedId, clockShown]);
+  }, [lost, timetable, trains, selectedId, clockShown]);
 
-  const train = trains.find((t) => t.id === selectedId) ?? null;
-  const select = useCallback((id: string, push: boolean) => {
-    if (!timetable) return;
-    isAuto.current = false;
-    writeStore(trainKey(timetable.id), id);
-    setBackStack((s) => (push && selectedId ? [...s, selectedId] : []));
-    setSelectedId(id);
-  }, [timetable, selectedId]);
-
-  const goBack = () => {
-    const prev = backStack[backStack.length - 1];
-    if (!prev || !timetable) return;
-    writeStore(trainKey(timetable.id), prev);
-    setBackStack((s) => s.slice(0, -1));
-    setSelectedId(prev);
+  const ackLost = () => {
+    lostRef.current = null;
+    setLost(null);
+    setBackStack([]);
+    isAuto.current = true;
+    clockSeen.current = clockShown !== null;
+    setSelectedId(autoSelectTrain(trains, clockShown)?.id ?? null);
   };
-
-  // Pinned stop ("at platform"), reset per train
-  const [pinnedStopId, setPinnedStopId] = useState<string | null>(null);
-  useEffect(() => { setPinnedStopId(null); }, [selectedId]);
-
-  const seq = useMemo(() => (train ? sequenceStops(train) : []), [train]);
+  const ackActive = () => {
+    const next = pendingActive ?? null;
+    setPendingActive(undefined);
+    lostRef.current = null;
+    setLost(null);
+    setSelectedId(null);
+    setBackStack([]);
+    isAuto.current = true;
+    clockSeen.current = false;
+    setTtId(next);
+  };
+  const [pendingName, setPendingName] = useState<string | null>(null);
+  useEffect(() => {
+    setPendingName(null);
+    if (!pendingActive) return;
+    let cancelled = false;
+    api.listTimetables()
+      .then((list) => { if (!cancelled) setPendingName(list.find((t) => t.id === pendingActive)?.name ?? null); })
+      .catch(() => { /* banner falls back to a generic label */ });
+    return () => { cancelled = true; };
+  }, [pendingActive]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const forms = train && timetable ? findFormsNext(train, timetable.trains) : null;
 
   // Tap to start
@@ -154,6 +261,7 @@ export function GuardPanel() {
           aria-label="Train"
           className="min-h-[48px] min-w-0 max-w-[40vw] rounded-lg bg-slate-800 border border-slate-700 px-3 text-base"
         >
+          {lost && <option value={lost.train.id} disabled>{lost.train.name} (removed)</option>}
           {trains.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
       )}
@@ -182,6 +290,7 @@ export function GuardPanel() {
               <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 mt-1 z-30 w-48 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); setPickingCrew(true); }}>Change crew</button>
+                <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); setHistoryOpen(true); }}>Changes from Control</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={switchMode}>Switch mode</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => window.location.reload()}>Reload</button>
               </div>
@@ -235,7 +344,8 @@ export function GuardPanel() {
             stations={timetable.stations}
             clock={clockShown}
             pinnedStopId={pinnedStopId}
-            onTogglePin={(id) => setPinnedStopId((p) => (p === id ? null : id))}
+            onTogglePin={(id) => setPinKey((k) => { const key = pinKeyOf(seq, id); return k === key ? null : key; })}
+            highlightStopIds={flash}
             formsNext={forms}
             onForms={(id) => select(id, true)}
           />
@@ -247,7 +357,46 @@ export function GuardPanel() {
   return (
     <div className="h-[100dvh] flex flex-col bg-slate-950 text-slate-100">
       {header}
+      {lost && (
+        <div role="alert" className="flex items-center gap-3 px-4 py-3 bg-red-900/60 border-b border-red-700 text-red-100">
+          <span className="flex-1 font-medium">{lost.message}. Close doors if open, then acknowledge.</span>
+          <button onClick={ackLost} className="min-h-[48px] px-5 rounded-lg bg-red-600 hover:bg-red-500 font-bold">ACK</button>
+        </div>
+      )}
+      {pendingActive !== undefined && (
+        <div role="alert" className="flex items-center gap-3 px-4 py-3 bg-amber-900/50 border-b border-amber-700 text-amber-100">
+          <span className="flex-1 font-medium">
+            {pendingActive === null
+              ? 'Control has cleared the active timetable.'
+              : `Control has switched to ${pendingName ?? 'another timetable'}.`}
+          </span>
+          <button onClick={ackActive} className="min-h-[48px] px-5 rounded-lg bg-amber-600 hover:bg-amber-500 font-bold text-slate-950">ACK</button>
+        </div>
+      )}
       {body}
+      <ChangeToasts toasts={toasts.toasts} onDismiss={toasts.dismiss} max={3} placement="bottom" />
+      {historyOpen && (
+        <div className="fixed inset-0 z-40 bg-slate-950/80 flex items-start justify-center p-4" onClick={() => setHistoryOpen(false)}>
+          <div className="w-full max-w-md mt-16 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+              <h2 className="font-semibold">Changes from Control</h2>
+              <button onClick={() => setHistoryOpen(false)} className="min-w-[48px] min-h-[48px] text-slate-400 hover:text-white" aria-label="Close">✕</button>
+            </div>
+            {toasts.history.length === 0 ? (
+              <p className="px-4 py-6 text-slate-500 text-sm">No changes yet this session.</p>
+            ) : (
+              <ul className="divide-y divide-slate-800">
+                {toasts.history.map((t) => (
+                  <li key={t.id} className="px-4 py-3 text-sm flex gap-3">
+                    <span className="text-slate-500 tabular-nums">{new Date(t.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span>{t.message}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
       {!started && (
         <button
           onClick={start}

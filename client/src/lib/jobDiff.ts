@@ -1,4 +1,5 @@
 import type { Crew, Timetable, Train, TrainStop } from '../types';
+import { runSpan } from './stops';
 
 /** One change to a crew's job list between two versions of a timetable (spec §6.5). */
 export type JobChange =
@@ -77,4 +78,29 @@ export function diffJobs(prev: Timetable, next: Timetable, crewIds: string[] | n
   }
 
   return changes;
+}
+
+/** Toast tone for a change; matches ToastTone in components/ChangeToasts. */
+export type JobChangeTone = 'info' | 'success' | 'warning' | 'danger';
+
+function hhmm(mins: number | undefined): string {
+  if (mins === undefined) return '—';
+  const t = ((mins % 1440) + 1440) % 1440;
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+}
+
+/** One-line description of a change, shared by CrewMobile and the guard panel. */
+export function describeJobChange(change: JobChange): { message: string; tone: JobChangeTone } {
+  switch (change.type) {
+    case 'added':
+      return { message: `New job: ${change.train.name} (${hhmm(runSpan(change.train)?.start)})`, tone: 'success' };
+    case 'removed':
+      return { message: `${change.train.name} removed`, tone: 'danger' };
+    case 'reassigned':
+      return { message: `${change.train.name} → ${change.crew?.name ?? 'unassigned'}`, tone: 'warning' };
+    case 'retimed':
+      return { message: `${change.train.name} retimed`, tone: 'info' };
+    case 'renamed':
+      return { message: `${change.oldName} renamed to ${change.train.name}`, tone: 'info' };
+  }
 }

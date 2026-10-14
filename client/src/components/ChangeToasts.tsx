@@ -58,19 +58,22 @@ const TONE_CLASSES: Record<ToastTone, string> = {
   danger: 'border-l-red-400',
 };
 
-/** Fixed top-right stack. Shows the newest `max` toasts; tap one to dismiss it. */
+/** Fixed right-hand stack (top or bottom). Shows the newest `max` toasts; tap one to dismiss it. */
 export function ChangeToasts({
   toasts,
   onDismiss,
   max = 4,
+  placement = 'top',
 }: {
   toasts: Toast[];
   onDismiss: (id: number) => void;
   max?: number;
+  /** 'bottom' keeps the stack clear of header controls and banners. */
+  placement?: 'top' | 'bottom';
 }) {
   return (
     <div
-      className="fixed top-3 right-3 z-50 flex flex-col gap-2 w-[min(20rem,calc(100vw-1.5rem))] pointer-events-none"
+      className={`fixed ${placement === 'top' ? 'top-3 flex-col' : 'bottom-3 flex-col-reverse'} right-3 z-50 flex gap-2 w-[min(20rem,calc(100vw-1.5rem))] pointer-events-none`}
       role="status"
       aria-live="polite"
     >
