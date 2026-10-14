@@ -28,10 +28,3 @@ export function warningText(s: SectionView): { title: string; detail: string } {
     detail: s.pending.map(elementLabel).join(', '),
   };
 }
-
-/** Small "via X" note for a selector row, or null for plain elements. */
-export function selectorNote(e: ElementView): string | null {
-  if (e.element.type !== 'selector') return null;
-  if (e.optionFrom === 'default') return 'default';
-  return e.option ? `via ${e.option}` : null;
-}

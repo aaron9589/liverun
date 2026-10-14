@@ -1,5 +1,5 @@
 import type { ElementState, SectionPhase, SectionView } from '../../lib/loa';
-import { elementLabel, sectionRoute, selectorNote } from '../../lib/loaDisplay';
+import { elementLabel, sectionRoute } from '../../lib/loaDisplay';
 
 const DOT: Record<ElementState, string> = {
   clear: 'bg-emerald-400', caution: 'bg-amber-400', stop: 'bg-red-500', unknown: 'bg-slate-600',
@@ -11,7 +11,11 @@ const BADGE: Record<SectionPhase, { text: string; cls: string }> = {
   complete: { text: 'COMPLETE', cls: 'bg-slate-800 text-slate-500' },
 };
 
-/** Every section on the train's route, in order, with element dots (spec §11.6). */
+/**
+ * Every section on the train's route, in order, with element dots (spec §11.6).
+ * Raw MQTT values are deliberately not shown: the guard only needs the dot and
+ * the element's label (for a selector, the label of the signal that applies).
+ */
 export function AuthorityTab({ sections }: { sections: SectionView[] }) {
   return (
     <div data-testid="authority-tab" className="flex flex-col gap-3">
@@ -31,21 +35,14 @@ export function AuthorityTab({ sections }: { sections: SectionView[] }) {
               <span className={`text-xs font-bold px-2 py-1 rounded ${badge.cls}`}>{badge.text}</span>
             </div>
             <ul className="mt-2 divide-y divide-slate-800/70">
-              {s.elements.map((e, i) => {
-                const note = selectorNote(e);
-                return (
+              {s.elements.map((e, i) => (
                   <li key={i} className="flex items-center gap-3 min-h-[40px] py-1">
                     <span className={`w-3.5 h-3.5 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold text-slate-300 ${DOT[e.state]}`}>
                       {e.state === 'unknown' ? '?' : ''}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm">{elementLabel(e)}</span>
-                      {note && <span className="block text-xs text-slate-500">{note}</span>}
-                    </span>
-                    <span className="font-mono text-xs text-slate-400 truncate max-w-[40%]">{e.value ?? '—'}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm">{elementLabel(e)}</span>
                   </li>
-                );
-              })}
+              ))}
               {s.elements.length === 0 && <li className="py-2 text-sm text-slate-500">No elements configured</li>}
             </ul>
           </div>
