@@ -24,7 +24,14 @@ A web app for planning and running model railway operating sessions. Features: v
 | `client/src/lib/jobDiff.ts` | `diffJobs()` (added/removed/reassigned/retimed/renamed per crew) + `describeJobChange()` |
 | `client/src/lib/mode.ts` | Entry routing: `resolveMode()` (planner / crew / guard / mode picker), saved mode, `switchMode()` |
 | `client/src/lib/stops.ts` | `sequenceStops()` (chronological, midnight-safe), `currentStop()`, run-order helpers |
-| `client/src/components/guard/` | Guard panel at `/guard` (`GuardPanel.tsx`, `StopTable.tsx`, `CrewPicker.tsx`) |
+| `client/src/components/guard/` | Guard panel at `/guard` (`GuardPanel.tsx`, `StopTable.tsx`, `CrewPicker.tsx`, `DoorsCard.tsx`) |
+| `server/sounds.js` | Sound library `/api/sounds` (list/serve/upload/delete; name + magic-byte checks; seeds `server/default-sounds/` into `<data>/sounds` on first start) |
+| `client/src/hooks/useJmriThrottle.ts` | Browser → JMRI JSON throttle: acquire/release by roster name, heartbeat, reconnect, reported F states. Never queues commands |
+| `client/src/hooks/useProfileActions.ts` | Runs train-profile actions (on/off/toggle/pulse/hold/on_for) via `lib/actionRunner.ts` |
+| `client/src/lib/profiles.ts` | `resolveProfile()` (first glob match on `train_id`, else fallback) and `resolveAction()` (F-number or roster label → fn, with skip reasons) |
+| `client/src/lib/boarding.ts` | Pure boarding model: demand curve, rules, `sampleCount()`, `createBoardingRun()` run-down state machine |
+| `client/src/lib/sound.ts` | `playSound()` via the shared Web Audio context (unlocked by Tap to start) |
+| `client/src/components/layout/` | Layout settings sections (JMRI, Train profiles, Sound library, Guard) |
 | `client/src/components/ChangeToasts.tsx` | Reusable toast stack + `useToasts()` (with history) |
 | `server/migrations.js` | Pure startup migrations (e.g. `stripTrainType`), called from `server/index.js` |
 | `client/src/App.tsx` | Root component — single source of truth for all UI state (~1100 lines) |
@@ -103,6 +110,7 @@ All mutation endpoints return the full updated Timetable.
 - **Train status is ephemeral:** `status` ('running'|'completed') lives on Train objects in the DB but is stripped from undo/redo history stacks (`stripStatus()` in App.tsx) so undoing edits never restores stale run state.
 - **Live sync (`server/sync.js`):** `mutateTimetable` bumps `tt.rev` and notifies `onTimetableChange` listeners; sync coalesces these (~300 ms) into `timetable-updated` notices that carry no data — clients re-fetch. Status-only mutations (`complete`, `reset-complete`) pass `{ notify: false }` and send `completions` with `rev` instead, so crew taps don't make every screen re-fetch. Clients compare `rev` in `hello` to catch anything missed while disconnected.
 - **Entry routing:** `main.tsx` uses `resolveMode()`: `…/guard` → guard panel, `…/mobile` → crew view, `?desktop` → planner, `?choose` → mode picker; otherwise the saved mode (`localStorage['liverun.mode']`) or, with none, mobile UA → picker / desktop → planner. `/guard/` and `/mobile/` redirect to the slash-less path with a relative `Location` (works under `BASE_PATH`).
+- **Train profiles, not train types:** sounds and decoder functions for a train come from the first `layout.train_profiles` entry whose glob matches `train_id` (the JMRI roster name). Actions that resolve to a function are disabled while the throttle isn't acquired; actions that don't resolve still play sounds. The guard panel's throttle follows the *displayed* train, so a train held behind the lost-train ACK banner keeps its throttle until ACK.
 - **Guard panel never renders `special_instructions`** — on the owner's layout that field holds hidden scripted events (to be replaced by `guard_events`, spec §10).
 - **Station name style defaults:** `stationNameStyle()` in utils.ts returns `bold:true` when none of the three flags are set — preserving legacy bold appearance for existing stations.
 - **`reset-complete` route ordering:** The `POST /trains/reset-complete` route is registered before `/:trainId` routes so Express doesn't match the literal string "reset-complete" as a train ID.
