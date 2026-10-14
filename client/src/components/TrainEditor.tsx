@@ -53,6 +53,17 @@ const PRESET_COLORS = [
 
 export function TrainEditor({ train, stations, paths, crews = [], existingColors, distanceUnit = 'km', onDraftChange, onSave, onDelete, onClose, jmriUrl }: Props) {
   const roster = useJmriRoster(jmriUrl);
+  // Escape closes the editor like Cancel. Inner controls that use Escape
+  // themselves (e.g. an open roster dropdown) stop propagation first.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !e.defaultPrevented) closeRef.current();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
   const sorted = [...stations].sort((a, b) => (a.graph_pos ?? 0) - (b.graph_pos ?? 0));
   // Keep original stops around so we can restore all-stations view if path is deselected
   const trainStopsRef = useRef(train?.stops);
