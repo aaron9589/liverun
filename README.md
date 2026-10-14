@@ -65,7 +65,7 @@ The heart of LiveRun — an interactive stringline graph with time on the X axis
 - **Rich metadata** — train number, roster ID (suggested from JMRI when configured), direction, and free-text notes
 - **Special instructions** — per-stop public notes, printed on station reports and shown on operator displays
 - **Guard events** — hidden, scripted per-stop events (with probability and random timing) that only fire on the guard panel
-- At-a-glance dot indicators on the train list: 🔵 notes · 🟡 special instructions · 🟢 crew assigned
+- At-a-glance badges on the train list: **N** notes · **S** special instructions · the assigned crew's initials (e.g. **LO1**) in their colour
 - **Search and filter** — type in the filter bar to instantly narrow the train list by name
 - **Terminal stop enforcement** — the first stop has no arrival field; the last stop has no departure field, matching real-world practice
 - **Location alias** — override the displayed station name for a specific stop (e.g. show a platform or siding rather than the parent station)

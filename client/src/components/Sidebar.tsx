@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { Path, Timetable, TimetableSummary, Train } from '../types';
 import { StationPanel } from './StationPanel';
-import { useLocalStorage } from '../utils';
+import { crewInitials, useLocalStorage } from '../utils';
 
 interface Props {
   timetables: TimetableSummary[];
@@ -39,6 +39,9 @@ interface Props {
   onCrewTrainHover?: (trainId: string | null) => void;
   distanceUnit?: 'km' | 'mi';
 }
+
+/** Train list indicator badge: N (notes), S (special instructions), crew initials. */
+const BADGE_CLS = 'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded border bg-slate-900 text-[10px] font-bold leading-none tracking-tight';
 
 export function Sidebar({
   timetables,
@@ -304,24 +307,21 @@ export function Sidebar({
                       />
                       <span className={`flex-1 text-sm truncate ${hidden ? 'text-slate-600' : 'text-slate-300'}`}>{train.name}</span>
                       {(hasNotes || hasSpecialInstructions || assignedCrew) && (
-                        <span className="flex items-center gap-0.5 shrink-0">
+                        <span className="flex items-center gap-1 shrink-0">
                           {hasNotes && (
-                            <span
-                              className="w-1.5 h-1.5 rounded-full bg-blue-400"
-                              title="Has train notes"
-                            />
+                            <span className={BADGE_CLS + ' border-blue-500/60 text-blue-300'} title="Has train notes">N</span>
                           )}
                           {hasSpecialInstructions && (
-                            <span
-                              className="w-1.5 h-1.5 rounded-full bg-amber-400"
-                              title="Has special instructions"
-                            />
+                            <span className={BADGE_CLS + ' border-amber-500/60 text-amber-300'} title="Has special instructions">S</span>
                           )}
                           {assignedCrew && (
                             <span
-                              className="w-1.5 h-1.5 rounded-full bg-green-400"
+                              className={BADGE_CLS}
+                              style={{ color: assignedCrew.color, borderColor: assignedCrew.color }}
                               title={`Crew: ${assignedCrew.name}`}
-                            />
+                            >
+                              {crewInitials(assignedCrew.name)}
+                            </span>
                           )}
                         </span>
                       )}

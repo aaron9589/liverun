@@ -184,3 +184,10 @@ export function generateTicks(
   }
   return ticks;
 }
+
+/** Short crew label for badges: first letter of each word, numbers kept whole ("Local Operator 12" → "LO12"). */
+export function crewInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const out = words.map((w) => (/^\d+$/.test(w) ? w : w[0].toUpperCase())).join('');
+  return out.slice(0, 4) || '?';
+}
