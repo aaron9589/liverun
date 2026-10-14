@@ -42,6 +42,53 @@ export interface TrainStop {
   departure: string | null;
   special_instructions?: string;
   location_alias?: string | null;
+  /** Hidden scripted events, read only by the guard panel (spec §10). En-route placements describe the section from this stop to the next. */
+  guard_events?: GuardEventPlacement[];
+}
+
+// ── Guard events (spec §10) ──
+
+export type GuardEventKind = 'station' | 'enroute';
+/** Door events at a stop that can trigger a station event. */
+export type StationTrigger = 'door_open' | 'boarding_done' | 'door_close';
+
+/** Reusable event definition in layout.events.library. */
+export interface GuardEventDef {
+  id: string;
+  name: string;
+  kind: GuardEventKind;
+  /** Alternative wordings; one is picked at random when the event is rolled. */
+  messages: string[];
+  /** Sound library file ('' = layout.guard.event_alert_sound). */
+  sound: string;
+  /** Optional train-profile action run when the event fires (e.g. 'brake_squeal'). */
+  action?: string;
+}
+
+/** An event placed on a train stop: a library reference, or inline (kind + messages set). */
+export interface GuardEventPlacement {
+  /** Stable id for this placement (rolled state is keyed by it). */
+  id: string;
+  /** Library event id; omit for an inline event. */
+  event?: string;
+  /** Inline events only (library events take their kind from the definition). */
+  kind?: GuardEventKind;
+  /** Inline wording, or an override of the library wording; null/absent = use the library's. */
+  messages?: string[] | null;
+  /** 0–1 chance the event happens this run. */
+  probability: number;
+  /** Station events: which door event at this stop starts the delay. */
+  trigger?: StationTrigger;
+  /** Station events: random delay in real seconds [min, max] after the trigger. */
+  delay_s?: [number, number];
+  /** En-route events: fire at a random fraction [min, max] of the section's scheduled running time. */
+  at?: [number, number];
+}
+
+export interface EventsConfig {
+  library: GuardEventDef[];
+  /** MQTT topic to publish fired events to ('' = off). Blind push, like stats. */
+  publish_topic: string;
 }
 
 export interface Crew {
@@ -188,6 +235,7 @@ export interface LayoutConfig {
   train_profiles: TrainProfile[];
   boarding: BoardingConfig;
   stats: StatsConfig;
+  events: EventsConfig;
 }
 
 // ─── Live sync WebSocket (/api/live/sync?id=) ──────────────────────────────────

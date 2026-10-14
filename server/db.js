@@ -124,6 +124,7 @@ const LAYOUT_DEFAULTS = {
     alighting: { ...NEUTRAL_BOARDING_MODEL, position: { origin: 0, intermediate: 1, terminus: 1.5 } },
   },
   stats: { enabled: false, topic: '', payload: 'count', publish_on: 'door_close' },
+  events: { library: [], publish_topic: '' },
 };
 
 function isPlainObject(v) {
