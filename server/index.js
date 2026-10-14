@@ -6,10 +6,11 @@ const rateLimit = require('express-rate-limit');
 const { WebSocketServer } = require('ws');
 const mqtt = require('mqtt');
 const path = require('path');
-const { readDB, writeDB, getTimetable, mutateTimetable, uuidv4, getLayout, setLayout } = require('./db');
+const { readDB, writeDB, getTimetable, mutateTimetable, onTimetableChange, uuidv4, getLayout, setLayout } = require('./db');
 const openApiSpec = require('./openapi');
 const { stripTrainType } = require('./migrations');
 const layoutRoutes = require('./layout');
+const { WS_SYNC_PATH, createSync } = require('./sync');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -55,6 +56,13 @@ app.get(['/guard/', '/mobile/'], (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
 }
+
+// Live sync socket (/api/live/sync) — see server/sync.js
+const sync = createSync({
+  getTimetable,
+  getActiveId: () => readDB().active_timetable_id || null,
+  onTimetableChange,
+});
 
 const DEFAULT_SETTINGS = {
   clock_enabled: false,
@@ -111,7 +119,11 @@ app.put('/api/timetables/:id', (req, res) => {
 app.delete('/api/timetables/:id', (req, res) => {
   const db = readDB();
   db.timetables = db.timetables.filter((t) => t.id !== req.params.id);
+  // Don't leave the active flag pointing at a timetable that no longer exists
+  const wasActive = db.active_timetable_id === req.params.id;
+  if (wasActive) db.active_timetable_id = null;
   writeDB(db);
+  sync.timetableDeleted(req.params.id, { activeCleared: wasActive });
   res.json({ ok: true });
 });
 
@@ -131,6 +143,7 @@ app.put('/api/active-timetable', (req, res) => {
   }
   db.active_timetable_id = id || null;
   writeDB(db);
+  sync.activeChanged(db.active_timetable_id);
   res.json({ id: db.active_timetable_id });
 });
 
@@ -336,7 +349,7 @@ app.post('/api/timetables/:id/restore', (req, res) => {
     }));
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcastCompletions(req.params.id, updated);
+  sync.broadcastCompletions(req.params.id, updated);
   res.json(normalise(updated));
 });
 
@@ -520,17 +533,18 @@ app.delete('/api/timetables/:id/trains/:trainId', (req, res) => {
     tt.trains = tt.trains.filter((t) => t.id !== req.params.trainId);
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcastCompletions(req.params.id, updated);
+  sync.broadcastCompletions(req.params.id, updated);
   res.json(normalise(updated));
 });
 
 // Must be before /:trainId to avoid 'reset-complete' matching as an ID
 app.post('/api/timetables/:id/trains/reset-complete', (req, res) => {
+  // Run status only: crews tap this constantly, so no 'timetable-updated' re-fetch
   const updated = mutateTimetable(req.params.id, (tt) => {
     tt.trains.forEach((t) => { delete t.status; });
-  });
+  }, { notify: false });
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcastCompletions(req.params.id, updated);
+  sync.broadcastCompletions(req.params.id, updated, { statusOnly: true });
   res.json(normalise(updated));
 });
 
@@ -545,9 +559,9 @@ app.patch('/api/timetables/:id/trains/:trainId/complete', (req, res) => {
         delete train.status;
       }
     }
-  });
+  }, { notify: false });
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcastCompletions(req.params.id, updated);
+  sync.broadcastCompletions(req.params.id, updated, { statusOnly: true });
   res.json(normalise(updated));
 });
 
@@ -1312,53 +1326,6 @@ app.use((err, _req, res, _next) => {
 const server = http.createServer(app);
 const wsServer = new WebSocketServer({ noServer: true });
 
-// ── Sync WebSocket — broadcasts completion state to all connected clients ──────
-
-const WS_SYNC_PATH = '/api/live/sync';
-const wsSyncServer = new WebSocketServer({ noServer: true });
-// timetableId → Set<WebSocket>
-const syncClients = new Map();
-
-function broadcastCompletions(timetableId, tt) {
-  const clients = syncClients.get(timetableId);
-  if (!clients || clients.size === 0) return;
-  const statuses = {};
-  for (const train of (tt.trains || [])) {
-    if (train.status) statuses[train.id] = train.status;
-  }
-  const msg = JSON.stringify({ type: 'completions', timetableId, statuses });
-  for (const ws of clients) {
-    if (ws.readyState === 1) ws.send(msg);
-  }
-}
-
-wsSyncServer.on('connection', (ws, req) => {
-  const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const timetableId = String(reqUrl.searchParams.get('id') || '').trim();
-  if (!timetableId) { ws.close(1008, 'id query param required'); return; }
-
-  const tt = getTimetable(timetableId);
-  if (!tt) { ws.close(1008, 'Timetable not found'); return; }
-
-  if (!syncClients.has(timetableId)) syncClients.set(timetableId, new Set());
-  syncClients.get(timetableId).add(ws);
-
-  // Send current status state immediately on connect
-  const statuses = {};
-  for (const train of (tt.trains || [])) {
-    if (train.status) statuses[train.id] = train.status;
-  }
-  if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'completions', timetableId, statuses }));
-
-  ws.on('close', () => {
-    const clients = syncClients.get(timetableId);
-    if (clients) {
-      clients.delete(ws);
-      if (clients.size === 0) syncClients.delete(timetableId);
-    }
-  });
-});
-
 wsServer.on('connection', (ws, req) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const timetableId = String(reqUrl.searchParams.get('id') || '').trim();
@@ -1475,9 +1442,7 @@ server.on('upgrade', (req, socket, head) => {
       wsServer.emit('connection', ws, req);
     });
   } else if (targetPath === WS_SYNC_PATH || targetPath === bpSync) {
-    wsSyncServer.handleUpgrade(req, socket, head, (ws) => {
-      wsSyncServer.emit('connection', ws, req);
-    });
+    sync.handleUpgrade(req, socket, head);
   } else {
     socket.destroy();
   }
@@ -1491,6 +1456,7 @@ server.on('upgrade', (req, socket, head) => {
   const db = readDB();
   let changed = 0;
   for (const tt of db.timetables) {
+    const before = changed;
     for (const tr of (tt.trains ?? [])) {
       const original = JSON.stringify(tr.stops);
       tr.stops = stripTerminalTimes(
@@ -1502,6 +1468,8 @@ server.on('upgrade', (req, socket, head) => {
       );
       if (JSON.stringify(tr.stops) !== original) changed++;
     }
+    // Bump rev so live clients holding the old copy re-fetch on reconnect
+    if (changed > before) tt.rev = (tt.rev || 0) + 1;
   }
   if (changed > 0) {
     writeDB(db);
@@ -1512,8 +1480,12 @@ server.on('upgrade', (req, socket, head) => {
 // ── Startup migration: remove retired train_type field ───────────────────────
 (function migrateStripTrainType() {
   const db = readDB();
+  const before = db.timetables.map((tt) => JSON.stringify(tt.trains ?? []));
   const changed = stripTrainType(db);
   if (changed > 0) {
+    db.timetables.forEach((tt, i) => {
+      if (JSON.stringify(tt.trains ?? []) !== before[i]) tt.rev = (tt.rev || 0) + 1;
+    });
     writeDB(db);
     console.log(`Startup migration: removed train_type from ${changed} train(s).`);
   }

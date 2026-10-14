@@ -52,15 +52,41 @@ function getTimetable(id) {
   return timetables.find((t) => t.id === id) ?? null;
 }
 
-/** Persist a mutation to a specific timetable. fn receives the timetable and may mutate it. */
-function mutateTimetable(id, fn) {
+// ── Change notifications ───────────────────────────────────────────────────
+// Every timetable mutation bumps tt.rev and tells registered listeners, so the
+// live sync socket (server/sync.js) can push it to clients. Listeners receive
+// { type: 'updated', timetableId, rev, notify }.
+
+const changeListeners = new Set();
+
+/** Registers a change listener. Returns a function that unregisters it. */
+function onTimetableChange(listener) {
+  changeListeners.add(listener);
+  return () => changeListeners.delete(listener);
+}
+
+function emitChange(event) {
+  for (const listener of changeListeners) {
+    try { listener(event); } catch (err) { console.error('Timetable change listener failed:', err); }
+  }
+}
+
+/**
+ * Persist a mutation to a specific timetable. fn receives the timetable and may mutate it.
+ * Bumps tt.rev. notify:false marks the change as not worth a 'timetable-updated'
+ * broadcast (e.g. train run status, which has its own 'completions' message).
+ */
+function mutateTimetable(id, fn, { notify = true } = {}) {
   const db = readDB();
   const idx = db.timetables.findIndex((t) => t.id === id);
   if (idx === -1) return null;
-  fn(db.timetables[idx]);
-  db.timetables[idx].updated_at = new Date().toISOString();
+  const tt = db.timetables[idx];
+  fn(tt);
+  tt.updated_at = new Date().toISOString();
+  tt.rev = (tt.rev || 0) + 1;
   writeDB(db);
-  return db.timetables[idx];
+  emitChange({ type: 'updated', timetableId: id, rev: tt.rev, notify });
+  return tt;
 }
 
 // ── Layout-wide configuration ──────────────────────────────────────────────
@@ -101,4 +127,4 @@ function setLayout(layout) {
   return db.layout;
 }
 
-module.exports = { readDB, writeDB, getTimetable, mutateTimetable, uuidv4, getLayout, setLayout, LAYOUT_DEFAULTS };
+module.exports = { readDB, writeDB, getTimetable, mutateTimetable, onTimetableChange, uuidv4, getLayout, setLayout, LAYOUT_DEFAULTS };

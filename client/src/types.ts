@@ -99,7 +99,8 @@ export interface LayoutConfig {
 export type SyncMessage =
   /** Sent once on connect: current rev of the subscribed timetable + active timetable id. */
   | { type: 'hello'; timetableId: string; rev: number; activeId: string | null }
-  | { type: 'completions'; timetableId: string; statuses: Record<string, 'running' | 'completed'> }
+  /** rev is present only when the mutation changed nothing but run status, so it can be adopted without a re-fetch. */
+  | { type: 'completions'; timetableId: string; statuses: Record<string, 'running' | 'completed'>; rev?: number }
   /** Coalesced (~300 ms) after any mutation of the timetable. */
   | { type: 'timetable-updated'; timetableId: string; rev: number }
   | { type: 'timetable-deleted'; timetableId: string }
