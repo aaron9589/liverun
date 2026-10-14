@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, useCallback, type InputHTMLAttributes } fr
 import { useJmriRoster } from '../hooks/useJmriRoster';
 import { RosterCombobox } from './RosterCombobox';
 import { resolveProfile } from '../lib/profiles';
-import type { TrainProfile, Station, Train, TrainStop, TrainRequest, Path, PathStop, Crew } from '../types';
+import { GuardEventsEditor } from './GuardEventsEditor';
+import { fromForm, toForm, validateStopForms, type PlacementForm } from '../lib/guardEventForm';
+import type { GuardEventDef, TrainProfile, Station, Train, TrainStop, TrainRequest, Path, PathStop, Crew } from '../types';
 
 interface StopForm {
   stationId: string;
@@ -13,6 +15,8 @@ interface StopForm {
   dwell: string; // minutes, used to compute departure and cascade
   specialInstructions: string;
   locationAlias: string;
+  /** Hidden guard-panel events on this stop (spec §10). */
+  guardEvents: PlacementForm[];
 }
 
 interface Props {
@@ -29,7 +33,11 @@ interface Props {
   jmriUrl?: string;
   /** Layout train profiles, to show which one the Train ID resolves to. */
   profiles?: TrainProfile[];
+  /** layout.events.library, for placing library events on stops. */
+  eventLibrary?: GuardEventDef[];
 }
+
+const NO_EVENTS: GuardEventDef[] = [];
 
 const PRESET_COLORS = [
   '#ef4444', // red-500
@@ -54,7 +62,7 @@ const PRESET_COLORS = [
   '#c084fc', // purple-400 (soft purple)
 ];
 
-export function TrainEditor({ train, stations, paths, crews = [], existingColors, distanceUnit = 'km', onDraftChange, onSave, onDelete, onClose, jmriUrl, profiles = [] }: Props) {
+export function TrainEditor({ train, stations, paths, crews = [], existingColors, distanceUnit = 'km', onDraftChange, onSave, onDelete, onClose, jmriUrl, profiles = [], eventLibrary = NO_EVENTS }: Props) {
   const roster = useJmriRoster(jmriUrl);
   // Escape closes the editor like Cancel. Inner controls that use Escape
   // themselves (e.g. an open roster dropdown) stop propagation first.
@@ -83,7 +91,7 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
   const [trainIdField, setTrainIdField] = useState(train?.train_id ?? '');
   const [direction, setDirection] = useState(train?.direction ?? '');
   const [crewId, setCrewId] = useState(train?.crew_id ?? '');
-  const [stops, setStops] = useState<StopForm[]>(() => buildStopForms(sorted, train?.stops));
+  const [stops, setStops] = useState<StopForm[]>(() => buildStopForms(sorted, train?.stops, eventLibrary));
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -100,6 +108,8 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
         departure: s.departure || null,
         special_instructions: s.specialInstructions || undefined,
         location_alias: s.locationAlias || null,
+        ...(s.guardEvents.length > 0 && !validateStopForms(s.guardEvents, eventLibrary)
+          ? { guard_events: s.guardEvents.map((f) => fromForm(f, eventLibrary)) } : {}),
       }));
 
     return {
@@ -113,7 +123,7 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
       crew_id: crewId || undefined,
       stops: draftStops,
     };
-  }, [name, color, notes, trainIdField, direction, crewId, stops, train]);
+  }, [name, color, notes, trainIdField, direction, crewId, stops, train, eventLibrary]);
 
   useEffect(() => {
     onDraftChange(buildDraft());
@@ -202,7 +212,7 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
     const pid = pathId || null;
     setSelectedPathId(pid);
     if (!pid) {
-      setStops(buildStopForms(sorted, trainStopsRef.current));
+      setStops(buildStopForms(sorted, trainStopsRef.current, eventLibrary));
       return;
     }
     const path = paths.find((p) => p.id === pid);
@@ -222,6 +232,7 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
           dwell: existing?.dwell ?? '',
           specialInstructions: existing?.specialInstructions ?? '',
           locationAlias: existing?.locationAlias ?? '',
+          guardEvents: existing?.guardEvents ?? [],
         };
       });
     setStops(newStops);
@@ -258,6 +269,16 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
     });
   }
 
+  // Guard events on stops that are not timed are not saved, so only those with times can block saving.
+  const guardEventProblem = (() => {
+    for (const s of stops) {
+      if (!(s.arrival || s.departure)) continue;
+      const e = validateStopForms(s.guardEvents, eventLibrary);
+      if (e) return `Guard events at ${s.stationName}: ${e}`;
+    }
+    return null;
+  })();
+
   function handleSave() {
     if (!name.trim()) {
       setError('Train name is required');
@@ -271,6 +292,11 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
     setError('');
 
     const timedStops = stops.filter((s) => s.arrival || s.departure);
+    const eventProblem = guardEventProblem;
+    if (eventProblem) {
+      setError(eventProblem);
+      return;
+    }
     const sortedByTime = [...timedStops].sort((a, b) => stopMinutes(a) - stopMinutes(b));
     const firstTimedId = sortedByTime[0]?.stationId;
     const lastTimedId = sortedByTime[sortedByTime.length - 1]?.stationId;
@@ -284,6 +310,7 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
         departure: (s.stationId === lastTimedId && !hasDwell) ? null : (s.departure || null),
         specialInstructions: s.specialInstructions || undefined,
         locationAlias: s.locationAlias || undefined,
+        guardEvents: s.guardEvents.length > 0 ? s.guardEvents.map((f) => fromForm(f, eventLibrary)) : undefined,
       };
     });
 
@@ -605,6 +632,16 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
                         />
                       </div>
                     )}
+
+                    {(stop.arrival || stop.departure || stop.guardEvents.length > 0) && (
+                      <GuardEventsEditor
+                        value={stop.guardEvents}
+                        library={eventLibrary}
+                        onChange={(next) =>
+                          setStops((prev) => prev.map((s, i) => (i === idx ? { ...s, guardEvents: next } : s)))
+                        }
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -631,7 +668,9 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
           </button>
           <button
             onClick={handleSave}
-            className="px-5 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+            disabled={!!guardEventProblem}
+            title={guardEventProblem ?? undefined}
+            className="disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
           >
             Save train
           </button>
@@ -677,7 +716,7 @@ function stopMinutes(s: StopForm): number {
   return h * 60 + m;
 }
 
-function buildStopForms(stations: Station[], existingStops?: TrainStop[]): StopForm[] {
+function buildStopForms(stations: Station[], existingStops: TrainStop[] | undefined, library: GuardEventDef[]): StopForm[] {
   const stopMap = new Map(existingStops?.map((s) => [s.station_id, s]) ?? []);
   return stations.map((s) => {
     const existing = stopMap.get(s.id);
@@ -690,6 +729,7 @@ function buildStopForms(stations: Station[], existingStops?: TrainStop[]): StopF
       dwell: '',
       specialInstructions: existing?.special_instructions ?? '',
       locationAlias: existing?.location_alias ?? '',
+      guardEvents: (existing?.guard_events ?? []).map((p) => toForm(p, library)),
     };
   });
 }

@@ -7,6 +7,7 @@ import { GuardSection } from './layout/GuardSection';
 import { TrainProfilesSection } from './layout/TrainProfilesSection';
 import { SoundLibrarySection } from './layout/SoundLibrarySection';
 import { BoardingSection, validateBoarding } from './layout/BoardingSection';
+import { GuardEventsSection, validateGuardEvents } from './layout/GuardEventsSection';
 import { StatsSection, validateStats } from './layout/StatsSection';
 import { validateGuard, validateProfiles, type LayoutSectionProps } from './layout/shared';
 
@@ -24,6 +25,7 @@ const SECTIONS: SectionDef[] = [
   { id: 'guard', label: 'Guard panel', component: GuardSection, validate: validateGuard },
   { id: 'profiles', label: 'Train profiles', component: TrainProfilesSection, validate: validateProfiles },
   { id: 'boarding', label: 'Boarding', component: BoardingSection, validate: validateBoarding },
+  { id: 'events', label: 'Guard events', component: GuardEventsSection, validate: validateGuardEvents },
   { id: 'stats', label: 'Stats', component: StatsSection, validate: validateStats },
   { id: 'sounds', label: 'Sound library', component: SoundLibrarySection },
 ];

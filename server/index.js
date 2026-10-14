@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { WebSocketServer } = require('ws');
 const mqtt = require('mqtt');
 const path = require('path');
+const events = require('./events');
 const { readDB, writeDB, getTimetable, mutateTimetable, onTimetableChange, uuidv4, getLayout, setLayout } = require('./db');
 const openApiSpec = require('./openapi');
 const { stripTrainType } = require('./migrations');
@@ -216,6 +217,7 @@ app.post('/api/timetables/import', (req, res) => {
           departure: stop.departure ? String(stop.departure) : null,
           special_instructions: stop.special_instructions ? String(stop.special_instructions) : null,
           location_alias: stop.location_alias ? String(stop.location_alias) : null,
+          ...withGuardEvents(stop.guard_events),
         })),
       };
     }),
@@ -332,6 +334,7 @@ app.post('/api/timetables/:id/restore', (req, res) => {
         departure: s.departure ? String(s.departure) : null,
         special_instructions: s.special_instructions ? String(s.special_instructions) : null,
         location_alias: s.location_alias ? String(s.location_alias) : null,
+        ...withGuardEvents(s.guard_events),
       })),
     }));
     if (Array.isArray(paths)) tt.paths = paths.map((p) => ({
@@ -519,6 +522,8 @@ app.delete('/api/timetables/:id/paths/:pathId', (req, res) => {
 app.post('/api/timetables/:id/trains', (req, res) => {
   const { name, color, notes, trainId: trainIdField, direction, crewId, stops } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
+  const evCheck = events.validateStopsEvents(stops);
+  if (evCheck.error) return res.status(400).json({ error: evCheck.error });
   const trainId = uuidv4();
   const updated = mutateTimetable(req.params.id, (tt) => {
     tt.trains.push({
@@ -536,6 +541,8 @@ app.post('/api/timetables/:id/trains', (req, res) => {
 app.put('/api/timetables/:id/trains/:trainId', (req, res) => {
   const { name, color, notes, trainId: trainIdField, direction, crewId, stops } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
+  const evCheck = events.validateStopsEvents(stops);
+  if (evCheck.error) return res.status(400).json({ error: evCheck.error });
   const updated = mutateTimetable(req.params.id, (tt) => {
     const tr = tt.trains.find((t) => t.id === req.params.trainId);
     if (tr) {
@@ -691,6 +698,11 @@ function stripTerminalTimes(stops) {
     .filter((s) => s.arrival || s.departure); // drop any null-null stops
 }
 
+function withGuardEvents(list) {
+  const g = events.sanitizePlacements(list);
+  return g ? { guard_events: g } : {};
+}
+
 function buildStops(trainId, stops) {
   const built = stops
     .filter((s) => s.arrival || s.departure)
@@ -699,6 +711,7 @@ function buildStops(trainId, stops) {
       arrival: s.arrival || null, departure: s.departure || null,
       special_instructions: s.specialInstructions || null,
       location_alias: s.locationAlias || null,
+      ...withGuardEvents(s.guardEvents),
     }));
   return stripTerminalTimes(built);
 }

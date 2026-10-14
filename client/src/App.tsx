@@ -1003,6 +1003,7 @@ export default function App() {
           distanceUnit={distanceUnit}
           jmriUrl={layout?.jmri.url}
           profiles={layout?.train_profiles ?? []}
+          eventLibrary={layout?.events?.library}
           onDraftChange={setDraftTrain}
           onSave={handleSaveTrain}
           onDelete={modal.type === 'editTrain' ? () => handleDeleteTrain(modal.train.id) : undefined}

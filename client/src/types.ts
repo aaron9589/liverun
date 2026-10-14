@@ -296,6 +296,7 @@ export interface StopRequest {
   departure: string | null;
   specialInstructions?: string;
   locationAlias?: string;
+  guardEvents?: GuardEventPlacement[];
 }
 
 export interface TrainRequest {
