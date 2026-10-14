@@ -17,6 +17,7 @@ LiveRun is a web app built for model railway clubs and home layouts. Build a str
 | **Speed up train entry** | Define reusable route templates (Paths) and auto-fill all stop times from a single departure time |
 | **Print timetables and registers** | Print the full working timetable, station registers, and the train graph — formatted for A4 and A5 |
 | **Find trains instantly** | Filter the train list by name as you type — useful in large timetables |
+| **Run trains from a tablet** | A guard panel at `/guard` with doors and bell via JMRI, passenger boarding, scripted events and Limit of Authority |
 | **Connect external systems** | Feed guard panels, JMRI displays, and operator apps from a live REST API |
 | **Sync the fast clock** | Subscribe to an MQTT broker topic and see the session clock ticking on the graph |
 | **Export to CATS** | One click exports your trains and crew roster as CATS XML |
@@ -62,7 +63,8 @@ The heart of LiveRun — an interactive stringline graph with time on the X axis
 
 - **Colour-coded** — 12 preset colours plus a custom colour picker
 - **Rich metadata** — train number, roster ID (suggested from JMRI when configured), direction, and free-text notes
-- **Special instructions** — per-stop notes surfaced on guard panels and operator displays
+- **Special instructions** — per-stop public notes, printed on station reports and shown on operator displays
+- **Guard events** — hidden, scripted per-stop events (with probability and random timing) that only fire on the guard panel
 - At-a-glance dot indicators on the train list: 🔵 notes · 🟡 special instructions · 🟢 crew assigned
 - **Search and filter** — type in the filter bar to instantly narrow the train list by name
 - **Terminal stop enforcement** — the first stop has no arrival field; the last stop has no departure field, matching real-world practice
@@ -119,9 +121,21 @@ Open the **Print** menu (🖨 icon) in the header toolbar to access all print op
 - Connect to an **MQTT broker** (e.g. from JMRI) to show a live session clock on the graph
 - Status dot and topic name displayed in the header
 - Broker URL and topic are configured per timetable
-- **Layout settings** — the JMRI WebSocket URL (e.g. `wss://jmri.example.net/json/`) is shared by all timetables and drives Train ID roster suggestions
+- **Layout settings** — configuration shared by all timetables: JMRI WebSocket URL (e.g. `wss://jmri.example.net/json/`, drives Train ID roster suggestions and the guard panel throttle), guard panel, train profiles, boarding model, stats publishing, guard event library, Limit of Authority and the sound library. Export/import as JSON; `docs/layout.example.json` is a worked example
 
 ![Settings panel — km/mi toggle and fast clock](docs/screenshots/08-settings-panel.png)
+
+### Guard Panel and Crew View
+
+Open LiveRun on a phone or tablet and a **mode picker** offers the planner, the crew view (`/mobile`) or the guard panel (`/guard`); the choice is remembered. Both crew screens update within a second or two when Control adds, removes, reassigns or retimes a job — no refreshing.
+
+The **guard panel** is built for a tablet riding with the train:
+
+- **Crew and train** — pick your crew, then your trains are listed in run order; the current stop follows the fast clock (tap a row to pin it)
+- **Doors, bell and DOIL** — sent straight to the loco's decoder through JMRI. **Train profiles** (glob patterns on the JMRI roster name) choose the tablet sounds and the function keys per loco
+- **Passenger boarding** — a configurable demand model counts passengers on at each stop and can publish stats over MQTT
+- **Guard events** — hidden scripted events (station or en-route) fire as a banner with a sound, and can trigger a loco function
+- **Limit of Authority** — directional sections between stations, each watching MQTT topics for signals, staffs and other conditions. The panel shows the current section (`AWAIT` / `AUTHORITY GRANTED`), an Authority tab with every element, and warns if the doors close at a section's start without authority. The server caches topic values so a reloaded tablet sees them straight away
 
 ### Live API for External Systems
 
@@ -189,6 +203,12 @@ npm run dev
 
 ---
 
+## Upgrading to 2.0
+
+2.0 removes the **train type** field everywhere. A one-off migration deletes it from stored trains on first start. External consumers of the live API lose the `trainType` field and the `?trainType=` station-board filter (REST and WebSocket). Sounds and loco functions that used to depend on train type now come from **train profiles** in Layout settings.
+
+---
+
 ## Running your first session
 
 1. **Create a timetable** — click *+ New* in the sidebar. Give it a name and set the time window (e.g. `06:00 – 22:00`)
@@ -249,7 +269,10 @@ A read-only REST API for connecting guard panels, JMRI displays, and operator ap
   Returns `{ id }` for the timetable currently marked active.
 
 - `GET /api/layout` and `PUT /api/layout`
-  Read or replace the layout-wide configuration (currently the JMRI WebSocket URL).
+  Read or replace the layout-wide configuration (JMRI, guard panel, train profiles, boarding, stats, events, LOA).
+
+- `GET /api/loa/values`
+  Last value of every MQTT topic referenced by the Limit of Authority configuration.
 
 - `GET /api/timetables/{id}/live/trains`
   Returns all services sorted by start time.
@@ -291,6 +314,10 @@ The feed is driven by the timetable's MQTT fast clock settings. On connect, Live
 On connect, the server sends:
 - `type: "hello"` once
 - `type: "stationFeed"` repeatedly, each with `clockTime`, `services[]`, and `minutesUntil` per service
+
+### Live sync socket
+
+`ws://localhost:3001/api/live/sync?id={timetableId}` pushes small notices so clients can re-fetch instead of polling: `hello` (current `rev`), `completions`, `timetable-updated`, `timetable-deleted`, `active-changed` and `loa-values`.
 
 ### Browser inspector
 
