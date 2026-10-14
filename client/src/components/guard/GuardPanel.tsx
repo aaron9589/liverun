@@ -15,7 +15,11 @@ import { useJmriRoster } from '../../hooks/useJmriRoster';
 import { useJmriThrottle } from '../../hooks/useJmriThrottle';
 import { useProfileActions } from '../../hooks/useProfileActions';
 import { CrewPicker } from './CrewPicker';
+import { BoardingCard, type BoardingEvent } from './BoardingCard';
 import { DoorsCard } from './DoorsCard';
+import { useMqttPublish } from '../../hooks/useMqttPublish';
+import { buildBoardingContext } from '../../lib/boardingContext';
+import { statsMessage } from '../../lib/stats';
 import { StopTable } from './StopTable';
 
 const CREW_KEY = 'guard:crew';
@@ -181,10 +185,6 @@ export function GuardPanel() {
   useEffect(() => () => actionsRef.current.stopAll(), [shownTrainId]);
   const jmriConfigured = throttle.status !== 'unconfigured';
 
-  // Placeholders for the boarding phase.
-  const onBoardingStart = useCallback(() => { /* boarding UI: next phase */ }, []);
-  const onDoorsClosed = useCallback(() => { /* boarding UI: next phase */ }, []);
-
   const seq = useMemo(() => (train ? sequenceStops(train) : []), [train]);
 
   // Pinned stop ("at platform"), reset per train. Held as station+visit so a
@@ -192,6 +192,38 @@ export function GuardPanel() {
   const [pinKey, setPinKey] = useState<string | null>(null);
   useEffect(() => { setPinKey(null); }, [selectedId]);
   const pinnedStopId = stopIdOfPin(seq, pinKey);
+
+  // Boarding (spec §8): the doors card calls back after the open sound / on close.
+  // Context is read from refs at that moment, so the stop is the one at the time of opening.
+  const [boardingEvent, setBoardingEvent] = useState<BoardingEvent | null>(null);
+  const boardingSeqN = useRef(0);
+  const liveRef = useRef({ train, seq, timetable, clockShown, pinnedStopId });
+  liveRef.current = { train, seq, timetable, clockShown, pinnedStopId };
+  const onBoardingStart = useCallback(() => {
+    const l = liveRef.current;
+    const ctx = l.train && l.timetable
+      ? buildBoardingContext({
+          train: l.train, seq: l.seq, stations: l.timetable.stations,
+          clockMinutes: l.clockShown, pinnedStopId: l.pinnedStopId,
+        })
+      : null;
+    setBoardingEvent({ n: ++boardingSeqN.current, type: 'start', ctx });
+  }, []);
+  const onDoorsClosed = useCallback(() => {
+    setBoardingEvent({ n: ++boardingSeqN.current, type: 'close' });
+    setPinKey(null); // a manual pin lasts until the next door close (§6.3)
+  }, []);
+
+  // Stats (spec §9) over the clock broker (D2).
+  const stats = layout.stats;
+  const statsActive = stats.enabled && !!stats.topic.trim();
+  const mqttPub = useMqttPublish(settings?.clock_broker_url ?? '', statsActive);
+  const statsRef = useRef(stats);
+  statsRef.current = stats;
+  const onStats = useCallback((trigger: 'boarding_start' | 'door_close', record: Parameters<typeof statsMessage>[2]) => {
+    const m = statsMessage(statsRef.current, trigger, record);
+    if (m) mqttPub.publish(m.topic, m.payload);
+  }, [mqttPub.publish]);
 
   // React to Control's changes: toasts, flash retimed stops, hold a lost train.
   const [flash, setFlash] = useState<ReadonlySet<string>>(() => new Set());
@@ -402,6 +434,13 @@ export function GuardPanel() {
             hasTrainId={!!train.train_id}
             onBoardingStart={onBoardingStart}
             onDoorsClosed={onDoorsClosed}
+          />
+          <BoardingCard
+            key={train.id + (lost ? ':lost' : '')}
+            config={layout.boarding}
+            event={boardingEvent}
+            onStats={onStats}
+            statsDown={statsActive && mqttPub.status !== 'connected'}
           />
         </section>
         <section>
