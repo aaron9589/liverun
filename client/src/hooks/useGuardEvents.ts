@@ -20,6 +20,23 @@ function save(ttId: string, s: RolledState): void {
 
 export interface FiredEvent { key: string; ev: RolledEvent; train: Train }
 
+// Un-ACKed banners survive a reload (the engine has already marked them fired,
+// so without this a reload would lose them for good). Restored banners don't
+// replay their sound or action.
+const queueKey = (ttId: string) => `guard:eventQueue:${ttId}`;
+function loadQueue(ttId: string): FiredEvent[] {
+  try {
+    const q = JSON.parse(localStorage.getItem(queueKey(ttId)) ?? '[]') as FiredEvent[];
+    return Array.isArray(q) ? q.filter((f) => f && f.key && f.ev && f.train) : [];
+  } catch { return []; }
+}
+function saveQueue(ttId: string, q: FiredEvent[]): void {
+  try {
+    if (q.length) localStorage.setItem(queueKey(ttId), JSON.stringify(q));
+    else localStorage.removeItem(queueKey(ttId));
+  } catch { /* storage unavailable */ }
+}
+
 interface Args {
   timetableId: string | null;
   train: Train | null;
@@ -40,6 +57,16 @@ export function useGuardEvents({ timetableId, train, library, clockMin, onFire }
   const live = useRef({ timetableId, train, clockMin, onFire });
   live.current = { timetableId, train, clockMin, onFire };
   const warned = useRef(new Set<string>());
+
+  // Restore un-ACKed banners for this timetable, then keep them saved.
+  const queueTt = useRef<string | null>(null);
+  useEffect(() => {
+    queueTt.current = timetableId;
+    setQueue(timetableId ? loadQueue(timetableId) : []);
+  }, [timetableId]);
+  useEffect(() => {
+    if (queueTt.current && queueTt.current === timetableId) saveQueue(timetableId, queue);
+  }, [queue, timetableId]);
 
   const apply = useCallback((res: StepResult) => {
     const { timetableId: tt, train: t, onFire: fire } = live.current;
