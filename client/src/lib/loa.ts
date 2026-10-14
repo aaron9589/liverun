@@ -5,8 +5,8 @@
  * Driven ONLY by the safeworking elements (L6): doors, pinned stops and the
  * fast clock play no part. Everything here is pure; the state is plain JSON so
  * the guard panel can persist it (localStorage per timetable + train, see
- * hooks/useLoa.ts). "Reset LOA for this train" = discard the stored state
- * (`initialLoaState`).
+ * hooks/useLoa.ts). There is no manual reset: LOA is governed entirely by
+ * Control through the field elements.
  *
  * Usage:
  *   matches = sectionsForTrain(train, stations, layout.loa)

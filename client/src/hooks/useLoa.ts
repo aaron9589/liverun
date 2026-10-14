@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { LoaConfig, LoaValue, Station, Train } from '../types';
 import {
   initialLoaState, parseLoaState, sectionsForTrain, stepLoa,
@@ -32,8 +32,6 @@ export interface UseLoa {
   sections: SectionView[];
   /** First section that isn't complete, or null. */
   current: SectionView | null;
-  /** "Reset LOA for this train": forget grants and completions. */
-  reset: () => void;
 }
 
 /**
@@ -72,16 +70,5 @@ export function useLoa({ timetableId, train, stations, config, values }: Args): 
   const sections = useMemo(() => result?.sections ?? [], [result]);
   const current = useMemo(() => sections.find((s) => s.current) ?? null, [sections]);
 
-  const live = useRef({ key, timetableId, state: result?.state ?? null });
-  live.current = { key, timetableId, state: result?.state ?? null };
-
-  const reset = useCallback(() => {
-    const l = live.current;
-    if (!l.key || !l.timetableId || !l.state) return;
-    const fresh = initialLoaState(l.state.trainId);
-    save(l.timetableId, fresh);
-    setHeld({ key: l.key, state: fresh });
-  }, []);
-
-  return { matches, sections, current, reset };
+  return { matches, sections, current };
 }

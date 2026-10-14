@@ -514,9 +514,9 @@ LOA is driven **only by the safeworking elements (L6)**. The guard's doors are n
 
 - **Grant rule (L1)**: GRANTED only when **every granting element is clear at the same moment** (caution counts as clear). Elements not ticked *Grants* are shown but never hold the grant up.
 - **Revoke (L5)**: a GRANTED section is released when a *Revokes* element goes not-clear ('no value' never revokes), e.g. the staff sunk at Berry. The section is then COMPLETE and the panel moves to the next section. In the field, the interlocking stops the departure signal re-clearing while the staff is out, so the train keeps its authority all the way to the staff being sunk.
-- **Frozen**: a completed section is never re-granted, so a following train getting the same staff can't bring it back. If Control cancels an authority and then re-issues it, the guard uses **Reset LOA for this train**.
+- **Frozen**: a completed section is never re-granted, so a following train getting the same staff can't bring it back.
 - **Current section**: the first section on the train's route that isn't COMPLETE.
-- **Persistence**: latch and complete state are stored per device under timetable + train id, the same as guard events, so a reload keeps them. The ☰ menu gets **Reset LOA for this train**.
+- **Persistence**: latch and complete state are stored per device under timetable + train id, the same as guard events, so a reload keeps them. There is **no manual reset**: LOA is governed entirely by Control through the field elements.
 
 ### 11.5 Initial state: server-side topic cache
 

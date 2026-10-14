@@ -270,9 +270,6 @@ export function GuardPanel() {
   const hasLoa = loa.matches.length > 0;
   const [rightTab, setRightTab] = useState<'stops' | 'authority'>(() => (readStore(TAB_KEY) === 'authority' ? 'authority' : 'stops'));
   const pickTab = (t: 'stops' | 'authority') => { setRightTab(t); writeStore(TAB_KEY, t); };
-  const resetLoa = () => {
-    if (window.confirm('Reset LOA for this train? Grants and completed sections are forgotten.')) loa.reset();
-  };
 
   guardDoorRef.current = (type) => {
     const l = liveRef.current;
@@ -449,7 +446,6 @@ export function GuardPanel() {
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); setPickingCrew(true); }}>Change crew</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); setHistoryOpen(true); }}>Changes from Control</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); resetEvents(); }}>Reset events for this train</button>
-                {hasLoa && <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); resetLoa(); }}>Reset LOA for this train</button>}
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={switchMode}>Switch mode</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => window.location.reload()}>Reload</button>
               </div>
