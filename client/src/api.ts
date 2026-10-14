@@ -3,6 +3,7 @@ import type {
   TimetableSummary,
   TimetableSettings,
   LayoutConfig,
+  LoaValue,
   TrainRequest,
   PathRequest,
 } from './types';
@@ -40,6 +41,10 @@ export interface SoundFile {
 // ── Timetables ────────────────────────────────────────────────
 
 export const api = {
+  // ── Limit of Authority: last known topic values (server cache) ──
+  getLoaValues: () =>
+    req<Record<string, LoaValue>>('/loa/values'),
+
   // ── Layout-wide config ──
   getLayout: () =>
     req<LayoutConfig>('/layout'),

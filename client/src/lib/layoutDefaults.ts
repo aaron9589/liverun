@@ -32,4 +32,5 @@ export const DEFAULT_LAYOUT: LayoutConfig = {
   },
   stats: { enabled: false, topic: '', payload: 'count', publish_on: 'door_close' },
   events: { library: [], publish_topic: '' },
+  loa: { sections: [], warn_on_depart: true },
 };

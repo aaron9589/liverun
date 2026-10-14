@@ -228,6 +228,58 @@ export interface StatsConfig {
   publish_on: 'boarding_start' | 'door_close';
 }
 
+// ── Limit of Authority (spec §11) ──
+
+/** One watched MQTT topic. A payload in `clear` (globs) is clear, in `caution` is clear-but-amber, anything else is stop. */
+export interface LoaCondition {
+  type: 'signal' | 'token' | 'condition';
+  label: string;
+  topic: string;
+  clear: string[];
+  caution?: string[];
+  /** Losing this element before the section completes revokes GRANTED. Default: true for tokens, false otherwise. */
+  revokes?: boolean;
+}
+
+/** Picks which condition applies from another topic's value (e.g. a turnout choosing the departure signal). */
+export interface LoaSelector {
+  type: 'selector';
+  label: string;
+  topic: string;
+  /** Payload value → the condition that applies. */
+  options: Record<string, LoaCondition>;
+  /** Option used until the selector topic has a value. */
+  default: string;
+}
+
+export type LoaElement = LoaCondition | LoaSelector;
+
+/** Directional section between two stations (matched by name, case-insensitive). */
+export interface LoaSection {
+  id: string;
+  name: string;
+  from: string;
+  to: string;
+  /** Optional globs on train_id / train name: when non-empty, only matching trains get this section. */
+  only: string[];
+  /** Optional globs on train_id / train name: matching trains never get this section. */
+  except: string[];
+  elements: LoaElement[];
+}
+
+export interface LoaConfig {
+  sections: LoaSection[];
+  /** Warn (not block) when doors close at a section's start without authority. */
+  warn_on_depart: boolean;
+}
+
+/** Last known value of an LOA topic, from the server-side topic cache. */
+export interface LoaValue {
+  value: string;
+  /** ISO time the server received it. */
+  at: string;
+}
+
 export interface LayoutConfig {
   jmri: JmriConfig;
   guard: GuardConfig;
@@ -236,6 +288,7 @@ export interface LayoutConfig {
   boarding: BoardingConfig;
   stats: StatsConfig;
   events: EventsConfig;
+  loa: LoaConfig;
 }
 
 // ─── Live sync WebSocket (/api/live/sync?id=) ──────────────────────────────────
@@ -249,7 +302,9 @@ export type SyncMessage =
   /** Coalesced (~300 ms) after any mutation of the timetable. */
   | { type: 'timetable-updated'; timetableId: string; rev: number }
   | { type: 'timetable-deleted'; timetableId: string }
-  | { type: 'active-changed'; activeId: string | null };
+  | { type: 'active-changed'; activeId: string | null }
+  /** LOA topic values from the server cache, sent to every client: full snapshot after hello, then coalesced deltas. */
+  | { type: 'loa-values'; values: Record<string, LoaValue>; full: boolean };
 
 // ─── JMRI roster (fetched by the browser directly from JMRI) ───────────────────
 

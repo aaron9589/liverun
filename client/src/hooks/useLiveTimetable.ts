@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SyncMessage, Timetable } from '../types';
+import type { LoaValue, SyncMessage, Timetable } from '../types';
+
+// Placeholder until 'loa-values' handling lands (phase 6A).
+const NO_LOA_VALUES: Record<string, LoaValue> = {};
 import { api } from '../api';
 import { liveSyncUrl } from '../lib/live';
 
@@ -20,6 +23,8 @@ export interface LiveTimetable {
   refresh: () => void;
   /** Replace the held timetable with a fresher copy (e.g. a mutation response). */
   replace: (tt: Timetable) => void;
+  /** LOA topic values (spec §11.5), from 'loa-values' messages. Empty until the server sends a snapshot. */
+  loaValues: Record<string, LoaValue>;
 }
 
 const BACKOFF_MIN_MS = 1_000;
@@ -249,5 +254,5 @@ export function useLiveTimetable(timetableId: string | null): LiveTimetable {
     if (s.rev === null || rev(tt) >= s.rev) s.adopt(tt);
   }, []);
 
-  return { timetable, loading, error, status, activeId, deleted, refresh, replace };
+  return { timetable, loading, error, status, activeId, deleted, refresh, replace, loaValues: NO_LOA_VALUES };
 }
