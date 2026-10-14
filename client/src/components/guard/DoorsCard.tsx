@@ -19,9 +19,13 @@ interface Props {
 
 const NO_SOUNDS = { door_open: '', door_close: '', bell: '' };
 
-/** Why an unresolved action isn't driving JMRI, or null if it resolves. */
-function skipChip(r: ResolvedAction, hasTrainId: boolean): string | null {
-  if (r.ok) return null;
+/**
+ * Why an unresolved action isn't driving JMRI, or null if it resolves. Silent
+ * for sounds-only profiles (no functions mapped at all): not driving JMRI is
+ * the intent there, so a note would just be noise.
+ */
+function skipChip(r: ResolvedAction, hasTrainId: boolean, soundsOnly: boolean): string | null {
+  if (r.ok || soundsOnly) return null;
   if (!hasTrainId) return 'no roster ID';
   return describeSkip(r.reason);
 }
@@ -32,6 +36,7 @@ function skipChip(r: ResolvedAction, hasTrainId: boolean): string | null {
  */
 export function DoorsCard({ profile, throttle, actions, boarding, hasTrainId, onBoardingStart, onDoorsClosed }: Props) {
   const sounds = profile?.sounds ?? NO_SOUNDS;
+  const soundsOnly = !profile || Object.keys(profile.functions).length === 0;
   const open = actions.resolve('door_open');
   const close = actions.resolve('door_close');
   const bell = actions.resolve('bell');
@@ -113,7 +118,7 @@ export function DoorsCard({ profile, throttle, actions, boarding, hasTrainId, on
             className="min-h-[96px] rounded-xl bg-emerald-600 enabled:hover:bg-emerald-500 enabled:active:bg-emerald-400 disabled:opacity-40 text-xl font-bold"
           >DOORS OPEN</button>
           {chip(whyOpen, true)}
-          {chip(skipChip(open, hasTrainId))}
+          {chip(skipChip(open, hasTrainId, soundsOnly))}
         </div>
         <div className="flex flex-col gap-1">
           <button
@@ -122,7 +127,7 @@ export function DoorsCard({ profile, throttle, actions, boarding, hasTrainId, on
             className="min-h-[96px] rounded-xl bg-red-600 enabled:hover:bg-red-500 enabled:active:bg-red-400 disabled:opacity-40 text-xl font-bold"
           >DOORS CLOSE</button>
           {chip(whyClose, true)}
-          {chip(skipChip(close, hasTrainId))}
+          {chip(skipChip(close, hasTrainId, soundsOnly))}
         </div>
       </div>
       <div className="flex items-start gap-4">
@@ -147,7 +152,7 @@ export function DoorsCard({ profile, throttle, actions, boarding, hasTrainId, on
             className="min-h-[56px] px-8 rounded-xl bg-slate-700 enabled:hover:bg-slate-600 enabled:active:bg-slate-500 disabled:opacity-40 font-bold select-none touch-none"
           >BELL</button>
           {chip(whyBell, true)}
-          {bell.ok || bell.reason !== 'unmapped' ? chip(skipChip(bell, hasTrainId)) : null}
+          {bell.ok || bell.reason !== 'unmapped' ? chip(skipChip(bell, hasTrainId, soundsOnly)) : null}
         </div>
       </div>
     </div>

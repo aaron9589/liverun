@@ -169,12 +169,25 @@ export interface BoardingConfig extends BoardingModel {
   alighting: BoardingModel;
 }
 
+// ── Stats published to MQTT (spec §9): blind push, QoS 0, not retained ──
+
+export interface StatsConfig {
+  enabled: boolean;
+  /** Topic template; placeholders {train} {trainId} {station} (sanitised: / + # → _). */
+  topic: string;
+  /** 'count' = plain integer (as the original panel sent); 'json' = full record. */
+  payload: 'count' | 'json';
+  /** 'boarding_start' = initial count when boarding starts (original behaviour); 'door_close' = final result. */
+  publish_on: 'boarding_start' | 'door_close';
+}
+
 export interface LayoutConfig {
   jmri: JmriConfig;
   guard: GuardConfig;
   /** Ordered: first matching profile wins. */
   train_profiles: TrainProfile[];
   boarding: BoardingConfig;
+  stats: StatsConfig;
 }
 
 // ─── Live sync WebSocket (/api/live/sync?id=) ──────────────────────────────────
