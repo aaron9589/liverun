@@ -43,6 +43,9 @@ export const api = {
   listTimetables: () =>
     req<TimetableSummary[]>('/timetables'),
 
+  getActiveTimetable: () =>
+    req<{ id: string | null }>('/active-timetable'),
+
   setActiveTimetable: (id: string | null) =>
     req<{ id: string | null }>('/active-timetable', {
       method: 'PUT',

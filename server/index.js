@@ -25,9 +25,12 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || null;
 app.use(cors(ALLOWED_ORIGIN ? { origin: ALLOWED_ORIGIN } : {}));
 app.use(express.json({ limit: '1mb' }));
 
-// 200 requests per minute across all API routes
-app.use('/api', rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false }));
+// Behind a reverse proxy every client would otherwise share the proxy's IP
+// (and its rate-limit bucket). Trust X-Forwarded-For only from proxies on
+// loopback/private networks, which covers Docker bridges and LAN proxies.
+app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 
+// Strip BASE_PATH before anything path-based (rate limiter, routes, static).
 if (BASE_PATH) {
   app.use((req, _res, next) => {
     if (req.url.startsWith(BASE_PATH + '/') || req.url === BASE_PATH) {
@@ -36,6 +39,18 @@ if (BASE_PATH) {
     next();
   });
 }
+
+// 200 requests per minute per client across all API routes
+app.use('/api', rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false }));
+
+// '/guard/' and '/mobile/' would resolve the relative ./assets and ./api URLs
+// one level too deep. Redirect to the slash-less form with a *relative*
+// Location so it is correct with or without BASE_PATH / proxy prefixes.
+app.get(['/guard/', '/mobile/'], (req, res) => {
+  const name = req.path.replace(/\//g, '');
+  const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  res.redirect(301, `../${name}${qs}`);
+});
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));

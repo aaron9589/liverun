@@ -169,7 +169,7 @@ The proxy passes the full path and the server's `BASE_PATH` middleware strips th
 - **Crew choice (D11)**: on first open (and from ☰ → Change crew) the guard picks their name from the timetable's crews ("Local Operator 1", …). The train selector then lists **only that crew's trains, in run order**. Freights belong to other crews, so no name/type filtering is needed. An "All trains" entry stays available at the bottom of the crew list for relief/testing. Stored in `localStorage['guard:crew']` (single crew; independent of CrewMobile's multi-select `mob:crewFilter`). If the stored crew no longer exists in the active timetable, the picker reopens.
 - **Auto-select train**: on load / crew change, pick the crew's train whose time span contains the fast clock, else the next one to start; else the first. Manual selection persisted and restored while it's still valid.
 - Trains without a `train_id` are listed; JMRI controls show "no roster ID" (§7.1).
-- Live API `/live/trains` gains `crewId` / `crewName` so the panel needn't load the full timetable.
+- The panel holds the **full timetable** via the shared `useLiveTimetable` hook (same as CrewMobile), so it has trains, stops, stations and crews without extra live-API endpoints.
 - Stops shown in **route order as returned by the server** (no client time sort). Location alias shown when set. **Hidden events are never rendered** in the list (§10).
 - "Forms next service" link on the last stop navigates; back stack as today.
 - **Live refresh**: see §6.5.
@@ -206,7 +206,7 @@ Control deletes, reassigns, adds and retimes jobs mid-session. Today crews are a
 - Also re-fetch on `visibilitychange` → visible. No polling.
 
 **Stable identity**
-- The guard panel tracks trains by **id**, not name: `/live/trains` gains `id`, and a `/live/trains/by-id/:trainId` variant is added. A rename then shows as a rename, not a delete plus an add. Rolled event state (§10.4) is keyed by train id too.
+- The guard panel tracks trains by **id**, not name (it has the full timetable), so a rename shows as a rename, not a delete plus an add. Rolled event state (§10.4) is keyed by train id too.
 
 **What the guard/crew sees.** The client diffs the old and new job lists for its crew:
 
@@ -555,7 +555,7 @@ LOA has its own section in Layout settings:
   - `train_type` removal + startup migration.
   - `Station.boarding_weight`; `TrainStop.guard_events` (validated; stripped from station board, station feed and any non-guard live output).
   - LOA topic cache: one server MQTT client on the active broker, subscribed to all `loa` topics; snapshot + coalesced deltas on the sync WS.
-  - `/live/trains` adds `id`, `crewId`, `crewName`; new `/live/trains/by-id/:trainId`; per-stop `guardEvents` on train detail.
+  - (No live-API additions needed: guard panel and CrewMobile use the full timetable via `useLiveTimetable`.)
 - `openapi.js`, `CLAUDE.md`, `README.md`, `docs/layout.example.json`.
 - Version **2.0.0**.
 

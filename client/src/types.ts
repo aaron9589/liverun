@@ -71,6 +71,8 @@ export interface TimetableSettings {
 }
 
 export interface Timetable extends TimetableSummary {
+  /** Bumped by the server on every mutation; used to detect missed live updates. */
+  rev?: number;
   stations: Station[];
   trains: Train[];
   paths: Path[];
@@ -90,6 +92,18 @@ export interface JmriConfig {
 export interface LayoutConfig {
   jmri: JmriConfig;
 }
+
+// ─── Live sync WebSocket (/api/live/sync?id=) ──────────────────────────────────
+// Server → client messages. Notices carry no timetable data; clients re-fetch.
+
+export type SyncMessage =
+  /** Sent once on connect: current rev of the subscribed timetable + active timetable id. */
+  | { type: 'hello'; timetableId: string; rev: number; activeId: string | null }
+  | { type: 'completions'; timetableId: string; statuses: Record<string, 'running' | 'completed'> }
+  /** Coalesced (~300 ms) after any mutation of the timetable. */
+  | { type: 'timetable-updated'; timetableId: string; rev: number }
+  | { type: 'timetable-deleted'; timetableId: string }
+  | { type: 'active-changed'; activeId: string | null };
 
 // ─── JMRI roster (fetched by the browser directly from JMRI) ───────────────────
 
