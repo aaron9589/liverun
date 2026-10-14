@@ -94,7 +94,11 @@ export function RosterCombobox({ value, onChange, roster, placeholder }: Props) 
           placeholder={placeholder}
           onChange={(e) => { setText(e.target.value); setOpen(true); setActive(e.target.value && usable ? 0 : -1); }}
           onFocus={() => setOpen(true)}
-          onBlur={() => { setOpen(false); setActive(-1); }}
+          onBlur={() => {
+            // Commit typed text on blur so clicking Save without Enter doesn't drop it.
+            if (text.trim()) accept(text.trim());
+            else { setOpen(false); setActive(-1); }
+          }}
           onKeyDown={onKeyDown}
           role="combobox"
           aria-expanded={showList}
