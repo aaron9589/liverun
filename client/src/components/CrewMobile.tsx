@@ -153,9 +153,6 @@ function TrainCard({
           </div>
         )}
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {train.train_type && (
-            <span className="text-xs text-slate-500 bg-slate-700/50 rounded px-1.5 py-0.5">{train.train_type}</span>
-          )}
           {train.train_id && (
             <span className="text-xs text-slate-500 font-mono tabular-nums">{train.train_id}</span>
           )}
@@ -367,9 +364,7 @@ export function CrewMobile() {
   const [timetable, setTimetable] = useState<Timetable | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useLocalStorage<string[]>('mob:typeFilter', []);
   const [crewFilter, setCrewFilter] = useLocalStorage<string[]>('mob:crewFilter', []);
-  const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const [crewFilterOpen, setCrewFilterOpen] = useState(false);
   const wallClock = useWallClock();
 
@@ -397,7 +392,6 @@ export function CrewMobile() {
     const prev = prevSelectedId.current;
     prevSelectedId.current = selectedId;
     if (prev !== null && prev !== selectedId) {
-      setTypeFilter([]);
       setCrewFilter([]);
     }
   }, [selectedId]);
@@ -449,26 +443,16 @@ export function CrewMobile() {
     } catch { /* ignore */ }
   }
 
-  // Derived: unique train types in this timetable ('' = no type set)
-  const allTypes = timetable
-    ? [
-        ...([...new Set(timetable.trains.map((t) => t.train_type ?? '').filter(Boolean))].sort()),
-        ...(timetable.trains.some((t) => !t.train_type) ? [''] : []),
-      ]
-    : [];
-
   const crewMap = new Map((timetable?.crews ?? []).map((c) => [c.id, c]));
   const stationMap = new Map((timetable?.stations ?? []).map((s) => [s.id, { name: s.name }]));
 
   // Drop any stored filter values that don't exist in the current timetable
   // (avoids blank screen when stale localStorage values don't match loaded data)
-  const validTypeFilter = typeFilter.filter((f) => allTypes.includes(f));
   const validCrewIds = new Set((timetable?.crews ?? []).map((c) => c.id));
   const validCrewFilter = crewFilter.filter((f) => f === '' || validCrewIds.has(f));
 
   // Filtered + sorted trains
   const visibleTrains = (timetable?.trains ?? []).filter((t) => {
-    if (validTypeFilter.length > 0 && !validTypeFilter.includes(t.train_type ?? '')) return false;
     if (validCrewFilter.length > 0 && !validCrewFilter.includes(t.crew_id ?? '')) return false;
     return true;
   });
@@ -566,60 +550,11 @@ export function CrewMobile() {
 
           {/* ── Row 3: filters + progress ── */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Train type filter */}
-            {allTypes.length > 0 && (
-              <div className="relative">
-                <button
-                  onClick={() => { setTypeFilterOpen((v) => !v); setCrewFilterOpen(false); }}
-                  className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                    validTypeFilter.length > 0
-                      ? 'bg-blue-600/20 border-blue-500/50 text-blue-300'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Type {validTypeFilter.length > 0 ? `(${validTypeFilter.length})` : ''}
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${typeFilterOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9" /></svg>
-                </button>
-                {typeFilterOpen && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setTypeFilterOpen(false)} />
-                    <div className="absolute left-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[160px]">
-                      {allTypes.map((type) => (
-                        <label key={type || '__blank__'} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-700 transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={validTypeFilter.includes(type)}
-                            onChange={(e) =>
-                              setTypeFilter((prev) =>
-                                e.target.checked ? [...prev, type] : prev.filter((t) => t !== type)
-                              )
-                            }
-                            className="accent-blue-500 w-4 h-4"
-                          />
-                          <span className={`text-sm ${type ? 'text-slate-200' : 'text-slate-500 italic'}`}>
-                            {type || '(blank)'}
-                          </span>
-                        </label>
-                      ))}
-                      {validTypeFilter.length > 0 && (
-                        <button
-                          onClick={() => { setTypeFilter([]); setTypeFilterOpen(false); }}
-                          className="w-full text-left px-3 py-2 text-xs text-slate-500 hover:text-slate-300 border-t border-slate-700 transition-colors"
-                        >
-                          Clear filter
-                        </button>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
             {/* Crew filter */}
             {(timetable?.crews ?? []).length > 0 && (
               <div className="relative">
                 <button
-                  onClick={() => { setCrewFilterOpen((v) => !v); setTypeFilterOpen(false); }}
+                  onClick={() => { setCrewFilterOpen((v) => !v); }}
                   className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                     validCrewFilter.length > 0
                       ? 'bg-blue-600/20 border-blue-500/50 text-blue-300'

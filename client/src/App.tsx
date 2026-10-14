@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { Timetable, TimetableSummary, TimetableSettings, Train, ModalState, TrainRequest, Path, PathRequest } from './types';
+import type { LayoutConfig, Timetable, TimetableSummary, TimetableSettings, Train, ModalState, TrainRequest, Path, PathRequest } from './types';
 import { api } from './api';
 import { useLocalStorage, timeToMinutes, exportCatsXml, exportCrewsXml, escapeHtml, stationNameStyle } from './utils';
 import { useFastClock } from './hooks/useFastClock';
@@ -165,6 +165,9 @@ ${pagesHtml}
 
 export default function App() {
   const [timetables, setTimetables] = useState<TimetableSummary[]>([]);
+  const [layout, setLayout] = useState<LayoutConfig | null>(null);
+  // Layout config is optional; if the endpoint fails, JMRI is treated as unconfigured.
+  useEffect(() => { api.getLayout().then(setLayout).catch(() => {}); }, []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [timetable, setTimetable] = useState<Timetable | null>(null);
   const [loading, setLoading] = useState(false);
@@ -500,7 +503,6 @@ export default function App() {
       name: train.name,
       color: train.color,
       notes: train.notes,
-      trainType: train.train_type,
       trainId: train.train_id,
       direction: train.direction,
       crewId: undefined,
@@ -976,6 +978,7 @@ export default function App() {
           crews={timetable.crews}
           existingColors={timetable.trains.map((t) => t.color)}
           distanceUnit={distanceUnit}
+          jmriUrl={layout?.jmri.url}
           onDraftChange={setDraftTrain}
           onSave={handleSaveTrain}
           onDelete={modal.type === 'editTrain' ? () => handleDeleteTrain(modal.train.id) : undefined}

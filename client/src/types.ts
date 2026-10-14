@@ -55,7 +55,6 @@ export interface Train {
   name: string;
   color: string;
   notes: string;
-  train_type?: string;
   train_id?: string;
   direction?: string;
   crew_id?: string;
@@ -144,7 +143,6 @@ export interface TrainRequest {
   name: string;
   color: string;
   notes: string;
-  trainType?: string;
   trainId?: string;
   direction?: string;
   crewId?: string;

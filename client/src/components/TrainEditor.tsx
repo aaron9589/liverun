@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useCallback, type InputHTMLAttributes } from 'react';
+import { useJmriRoster } from '../hooks/useJmriRoster';
+import { RosterCombobox } from './RosterCombobox';
 import type { Station, Train, TrainStop, TrainRequest, Path, PathStop, Crew } from '../types';
 
 interface StopForm {
@@ -23,6 +25,7 @@ interface Props {
   onSave: (data: TrainRequest) => void;
   onDelete?: () => void;
   onClose: () => void;
+  jmriUrl?: string;
 }
 
 const PRESET_COLORS = [
@@ -48,7 +51,8 @@ const PRESET_COLORS = [
   '#c084fc', // purple-400 (soft purple)
 ];
 
-export function TrainEditor({ train, stations, paths, crews = [], existingColors, distanceUnit = 'km', onDraftChange, onSave, onDelete, onClose }: Props) {
+export function TrainEditor({ train, stations, paths, crews = [], existingColors, distanceUnit = 'km', onDraftChange, onSave, onDelete, onClose, jmriUrl }: Props) {
+  const roster = useJmriRoster(jmriUrl);
   const sorted = [...stations].sort((a, b) => (a.graph_pos ?? 0) - (b.graph_pos ?? 0));
   // Keep original stops around so we can restore all-stations view if path is deselected
   const trainStopsRef = useRef(train?.stops);
@@ -62,7 +66,6 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
     return pool[Math.floor(Math.random() * pool.length)];
   });
   const [notes, setNotes] = useState(train?.notes ?? '');
-  const [trainType, setTrainType] = useState(train?.train_type ?? '');
   const [trainIdField, setTrainIdField] = useState(train?.train_id ?? '');
   const [direction, setDirection] = useState(train?.direction ?? '');
   const [crewId, setCrewId] = useState(train?.crew_id ?? '');
@@ -91,13 +94,12 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
       name: name || '(unnamed)',
       color,
       notes,
-      train_type: trainType,
       train_id: trainIdField,
       direction,
       crew_id: crewId || undefined,
       stops: draftStops,
     };
-  }, [name, color, notes, trainType, trainIdField, direction, crewId, stops, train]);
+  }, [name, color, notes, trainIdField, direction, crewId, stops, train]);
 
   useEffect(() => {
     onDraftChange(buildDraft());
@@ -271,7 +273,7 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
       };
     });
 
-    onSave({ id: train?.id, name: name.trim(), color, notes, trainType, trainId: trainIdField, direction, crewId: crewId || undefined, stops: saveStops });
+    onSave({ id: train?.id, name: name.trim(), color, notes, trainId: trainIdField, direction, crewId: crewId || undefined, stops: saveStops });
   }
 
   // Derived: which rows get the arrival-only / departure-only treatment.
@@ -422,22 +424,13 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
 
           {/* Train metadata */}
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">Train Type</label>
-              <input
-                value={trainType}
-                onChange={(e) => setTrainType(e.target.value)}
-                placeholder="e.g. L"
-                className="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-              />
-            </div>
-            <div>
+            <div className="col-span-2">
               <label className="block text-xs font-medium text-slate-400 mb-1">Train ID</label>
-              <input
+              <RosterCombobox
                 value={trainIdField}
-                onChange={(e) => setTrainIdField(e.target.value)}
-                placeholder="e.g. CityRail 2L"
-                className="w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 text-sm"
+                onChange={setTrainIdField}
+                roster={roster}
+                placeholder="JMRI roster entry"
               />
             </div>
             <div>
