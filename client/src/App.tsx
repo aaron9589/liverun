@@ -8,6 +8,7 @@ import { Sidebar } from './components/Sidebar';
 import { TrainGraph } from './components/TrainGraph';
 import { SettingsPanel } from './components/SettingsPanel';
 import { LayoutSettings } from './components/LayoutSettings';
+import { DEFAULT_LAYOUT } from './lib/layoutDefaults';
 import { TimetableForm } from './components/TimetableForm';
 import { TrainEditor } from './components/TrainEditor';
 import { PathEditor } from './components/PathEditor';
@@ -1024,7 +1025,7 @@ export default function App() {
 
       {modal.type === 'layoutSettings' && (
         <LayoutSettings
-          layout={layout ?? { jmri: { url: '' } }}
+          layout={layout ?? DEFAULT_LAYOUT}
           onSaved={setLayout}
           onClose={() => setModal({ type: 'none' })}
         />

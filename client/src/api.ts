@@ -27,6 +27,11 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** URL of a sound-library file (served by GET /api/sounds/:file). */
+export function soundUrl(file: string): string {
+  return `${BASE}/sounds/${encodeURIComponent(file)}`;
+}
+
 // ── Timetables ────────────────────────────────────────────────
 
 export const api = {

@@ -13,6 +13,8 @@ test('getLayout returns defaults when nothing is stored', () => {
 
 test('setLayout merges over defaults and drops unknown keys', () => {
   const saved = setLayout({ jmri: { url: 'wss://jmri.example/json/', bogus: 1 }, nope: true });
-  assert.deepStrictEqual(saved, { jmri: { url: 'wss://jmri.example/json/' } });
+  assert.deepStrictEqual(saved.jmri, { url: 'wss://jmri.example/json/' });
+  assert.strictEqual(saved.nope, undefined);
+  assert.deepStrictEqual(saved.train_profiles, []);
   assert.deepStrictEqual(getLayout(), saved);
 });

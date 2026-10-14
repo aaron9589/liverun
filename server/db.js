@@ -94,8 +94,35 @@ function mutateTimetable(id, fn, { notify = true } = {}) {
 // Stored under db.layout; always read through getLayout() so callers see
 // defaults for any section that hasn't been saved yet.
 
+const NEUTRAL_BOARDING_MODEL = {
+  max_passengers: 60,
+  demand_curve: [['00:00', 1], ['24:00', 1]],
+  rules: [],
+  position: { origin: 1, intermediate: 1, terminus: 0 },
+  spread: 0.15,
+};
+
+// Neutral defaults only (spec D13): layout-specific values belong in the
+// layout's own config, e.g. docs/layout.example.json.
 const LAYOUT_DEFAULTS = {
   jmri: { url: '' },
+  guard: { event_alert_sound: '' },
+  train_profiles: [],
+  boarding: {
+    ...NEUTRAL_BOARDING_MODEL,
+    tick_s: 1,
+    jitter: 0.3,
+    flow_rate: 3,
+    straggler_threshold: 5,
+    straggler_rate: 0.5,
+    runner_chance: 0.2,
+    runner_count: [1, 3],
+    runner_delay_s: [2, 6],
+    start_delay_s: 4,
+    doil_off_delay_s: 8,
+    show_alighting: false,
+    alighting: { ...NEUTRAL_BOARDING_MODEL, position: { origin: 0, intermediate: 1, terminus: 1.5 } },
+  },
 };
 
 function isPlainObject(v) {

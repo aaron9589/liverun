@@ -30,6 +30,8 @@ export interface Station {
   bold_name?: boolean;
   italic_name?: boolean;
   underline_name?: boolean;
+  /** Boarding demand weight for the guard panel (0–2, default 1). */
+  boarding_weight?: number;
 }
 
 export interface TrainStop {
@@ -89,8 +91,90 @@ export interface JmriConfig {
   url: string;
 }
 
+// ── Train profiles (spec §7.3): tablet sounds + decoder functions per train_id glob ──
+
+/** How a guard action drives its decoder function. */
+export type FunctionMode = 'on' | 'off' | 'toggle' | 'pulse' | 'hold' | 'on_for';
+
+/** Which decoder function: an explicit number, or a label looked up in the loco's roster functionKeys. Exactly one is set. */
+export type FunctionKeyRef = { fn: number } | { label: string };
+
+export interface ProfileFunction {
+  key: FunctionKeyRef;
+  mode: FunctionMode;
+  /** 'pulse': how long the function stays on. */
+  pulse_ms?: number;
+  /** 'on_for': how long the function stays on. */
+  duration_s?: number;
+}
+
+/** Built-in guard actions; profiles may also define custom action names (e.g. 'brake_squeal'). */
+export type GuardAction = 'door_open' | 'door_close' | 'bell';
+
+export interface ProfileSounds {
+  /** Sound library file names ('' = silent). */
+  door_open: string;
+  door_close: string;
+  bell: string;
+}
+
+export interface TrainProfile {
+  id: string;
+  name: string;
+  /** Case-insensitive globs on Train.train_id (* any run, ? one char). Empty = fallback profile. */
+  match: string[];
+  sounds: ProfileSounds;
+  /** Keyed by action name (GuardAction or custom). Unmapped actions send nothing. */
+  functions: Record<string, ProfileFunction>;
+}
+
+export interface GuardConfig {
+  /** Sound library file played for guard events, Control banners and new-job toasts ('' = silent). */
+  event_alert_sound: string;
+}
+
+// ── Boarding model (spec §8) — all layout-specific values are config (D13) ──
+
+export interface BoardingRule {
+  name: string;
+  /** All keys optional; text keys are case-insensitive globs; from/to is a clock window (may cross midnight). */
+  when: { direction?: string; train_id?: string; train_name?: string; from?: string; to?: string };
+  factor: number;
+}
+
+export interface BoardingModel {
+  max_passengers: number;
+  /** [["HH:MM", factor], …] piecewise-linear over the fast clock. */
+  demand_curve: [string, number][];
+  rules: BoardingRule[];
+  position: { origin: number; intermediate: number; terminus: number };
+  /** Extra randomness as a fraction of expected. */
+  spread: number;
+}
+
+export interface BoardingConfig extends BoardingModel {
+  tick_s: number;
+  jitter: number;
+  flow_rate: number;
+  straggler_threshold: number;
+  straggler_rate: number;
+  runner_chance: number;
+  runner_count: [number, number];
+  runner_delay_s: [number, number];
+  /** Used when the profile has no door_open sound to time against. */
+  start_delay_s: number;
+  /** Used when the profile has no door_close sound to time against. */
+  doil_off_delay_s: number;
+  show_alighting: boolean;
+  alighting: BoardingModel;
+}
+
 export interface LayoutConfig {
   jmri: JmriConfig;
+  guard: GuardConfig;
+  /** Ordered: first matching profile wins. */
+  train_profiles: TrainProfile[];
+  boarding: BoardingConfig;
 }
 
 // ─── Live sync WebSocket (/api/live/sync?id=) ──────────────────────────────────
