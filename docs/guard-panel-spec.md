@@ -25,6 +25,7 @@ Source: `guard_panel.html` (standalone page, Paho MQTT, direct JMRI JSON WebSock
 | D16 | Function mapping | Per **train profile** (glob on `train_id`): optional tablet sounds + optional decoder function per action, by F-number or roster label (§7.3) |
 | D17 | Guard events on the train API | Fine as-is; no separate endpoint |
 | D18 | En-route event missed (train arrives first) | **Dropped** |
+| D20 | Existing special instructions | **Not converted.** `special_instructions` stays as-is and editable; the owner moves text into guard events by hand |
 | D19 | Events driving the loco | Yes — library entries can trigger a profile action (§10.5) |
 
 ## 1. Phasing
