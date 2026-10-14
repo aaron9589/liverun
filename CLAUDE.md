@@ -18,6 +18,8 @@ A web app for planning and running model railway operating sessions. Features: v
 | `server/index.js` | All Express routes, WebSocket handler, MQTT lifecycle, auto-assign algorithm, import/export (~1420 lines) |
 | `server/db.js` | DB layer: `readDB()`, `writeDB()`, `getTimetable(id)`, `mutateTimetable(id, fn)` |
 | `server/openapi.js` | OpenAPI 3.0 spec (served at `/api/schema`, UI at `/api/docs`) |
+| `server/layout.js` | Layout-wide config routes: `GET/PUT /api/layout` (validation, see `register()`) |
+| `server/migrations.js` | Pure startup migrations (e.g. `stripTrainType`), called from `server/index.js` |
 | `client/src/App.tsx` | Root component — single source of truth for all UI state (~1100 lines) |
 | `client/src/types.ts` | All TypeScript domain types |
 | `client/src/api.ts` | Typed fetch client (all API calls) |
@@ -28,19 +30,27 @@ A web app for planning and running model railway operating sessions. Features: v
 | `client/src/components/StationReport.tsx` | A5 printable arrival/departure register |
 | `client/src/components/CrewMobile.tsx` | Mobile-optimised crew/train view |
 | `client/src/hooks/useFastClock.ts` | Browser MQTT subscriber for live clock |
+| `client/src/hooks/useJmriRoster.ts` | Fetches and caches the JMRI roster for Train ID suggestions |
+| `client/src/lib/jmri.ts` | JMRI roster helpers (HTTP base from WS URL, normalise, rank matches) |
+| `client/src/components/RosterCombobox.tsx` | Train ID combobox fed by the JMRI roster |
+| `docs/guard-panel-spec.md` | Guard panel design spec — source of truth for the v2 work |
 
 ## Data Model (types.ts)
 
 ```
 Timetable: id, name, description, start_time, end_time, active?, stations[], trains[], paths[], crews[], settings
 Station:   id, timetable_id, name, short_code, distance (display label), graph_pos (Y-axis), sort_order, branch_name, alias_enabled?, bold_name?, italic_name?, underline_name?
-Train:     id, timetable_id, name, color, notes, train_type?, train_id?, direction?, crew_id?, status? ('running'|'completed'), stops[]
+Train:     id, timetable_id, name, color, notes, train_id?, direction?, crew_id?, status? ('running'|'completed'), stops[]
 TrainStop: id, train_id, station_id, arrival (HH:MM|null), departure (HH:MM|null), special_instructions?, location_alias?
 Path:      id, timetable_id, name, stops[]  — reusable route template
 PathStop:  station_id, sort_order, travel_time_from_prev (min), dwell_time (min)
 Crew:      id, timetable_id, name, color
 TimetableSettings: clock_enabled, clock_broker_url, clock_topic, auto_assign_min_break
 ```
+
+`Train.train_id` is the JMRI roster entry name (client-side combobox; saving never depends on JMRI being reachable).
+
+**Layout config:** layout-wide (not per timetable), stored at top-level `db.layout` and read via `getLayout()`/`setLayout()` in `server/db.js` (defaults merged). Currently `jmri.url` (ws:// or wss://, used for roster suggestions). Routes in `server/layout.js`.
 
 ## API Endpoints
 
@@ -53,6 +63,7 @@ POST       /api/timetables/:id/duplicate
 POST       /api/timetables/:id/restore
 PUT        /api/timetables/:id/settings
 GET/PUT    /api/active-timetable
+GET/PUT    /api/layout                                        — layout-wide config (see Data Model)
 
 POST/PUT/DELETE  /api/timetables/:id/stations/:stationId?
 POST/PUT/DELETE  /api/timetables/:id/trains/:trainId?
@@ -86,6 +97,8 @@ All mutation endpoints return the full updated Timetable.
 - **Sync WS broadcasts completions:** `/api/live/sync` keeps a `Map<timetableId, Set<WebSocket>>`; any status mutation calls `broadcastCompletions()` to push `{type:'completions', statuses}` to all subscribers.
 - **Station name style defaults:** `stationNameStyle()` in utils.ts returns `bold:true` when none of the three flags are set — preserving legacy bold appearance for existing stations.
 - **`reset-complete` route ordering:** The `POST /trains/reset-complete` route is registered before `/:trainId` routes so Express doesn't match the literal string "reset-complete" as a train ID.
+- **Feature modules:** New server features live in their own module exporting `register(app, deps)`, called from `server/index.js` (routes themselves are still flat Express handlers, no router framework). See `server/layout.js`.
+- **`train_type` removed in v2:** A startup migration (`stripTrainType` in `server/migrations.js`) deletes the field from all trains; the `?trainType=` station-board filter is gone. Don't reintroduce either.
 
 ## Dev Commands
 
@@ -95,7 +108,10 @@ npm run dev       # Vite (5173) + Express (3001) concurrently
 npm run build     # tsc + vite build → client/dist/
 npm run start     # Express serving client/dist/ (production)
 docker compose up -d  # production; UI at localhost:3001
+npm test          # server node:test + client Vitest
 ```
+
+**Local build on macOS arm64:** the committed lockfile lacks the Rollup/esbuild native packages (npm optional-deps bug; CI deletes the lockfile). Before `npm run build` locally, run `npm install --no-save @rollup/rollup-darwin-arm64@<rollup version> @esbuild/darwin-arm64@<esbuild version>`, using the versions in `node_modules/rollup/package.json` and `node_modules/esbuild/package.json` (currently rollup 4.60.1, esbuild 0.21.5).
 
 ## Environment Variables
 

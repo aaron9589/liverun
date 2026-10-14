@@ -61,7 +61,7 @@ The heart of LiveRun — an interactive stringline graph with time on the X axis
 ### Trains
 
 - **Colour-coded** — 12 preset colours plus a custom colour picker
-- **Rich metadata** — train number, type, roster ID, direction, and free-text notes
+- **Rich metadata** — train number, roster ID (suggested from JMRI when configured), direction, and free-text notes
 - **Special instructions** — per-stop notes surfaced on guard panels and operator displays
 - At-a-glance dot indicators on the train list: 🔵 notes · 🟡 special instructions · 🟢 crew assigned
 - **Search and filter** — type in the filter bar to instantly narrow the train list by name
@@ -119,6 +119,7 @@ Open the **Print** menu (🖨 icon) in the header toolbar to access all print op
 - Connect to an **MQTT broker** (e.g. from JMRI) to show a live session clock on the graph
 - Status dot and topic name displayed in the header
 - Broker URL and topic are configured per timetable
+- **Layout settings** — the JMRI WebSocket URL (e.g. `wss://jmri.example.net/json/`) is shared by all timetables and drives Train ID roster suggestions
 
 ![Settings panel — km/mi toggle and fast clock](docs/screenshots/08-settings-panel.png)
 
@@ -246,6 +247,9 @@ A read-only REST API for connecting guard panels, JMRI displays, and operator ap
 
 - `GET /api/active-timetable`
   Returns `{ id }` for the timetable currently marked active.
+
+- `GET /api/layout` and `PUT /api/layout`
+  Read or replace the layout-wide configuration (currently the JMRI WebSocket URL).
 
 - `GET /api/timetables/{id}/live/trains`
   Returns all services sorted by start time.
