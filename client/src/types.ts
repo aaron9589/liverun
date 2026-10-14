@@ -171,4 +171,5 @@ export type ModalState =
   | { type: 'editTrain'; train: Train }
   | { type: 'newPath' }
   | { type: 'editPath'; path: Path }
-  | { type: 'stationReport'; stationId: string | null };
+  | { type: 'stationReport'; stationId: string | null }
+  | { type: 'layoutSettings' };

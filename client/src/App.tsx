@@ -6,6 +6,7 @@ import { useFastClock } from './hooks/useFastClock';
 import { Sidebar } from './components/Sidebar';
 import { TrainGraph } from './components/TrainGraph';
 import { SettingsPanel } from './components/SettingsPanel';
+import { LayoutSettings } from './components/LayoutSettings';
 import { TimetableForm } from './components/TimetableForm';
 import { TrainEditor } from './components/TrainEditor';
 import { PathEditor } from './components/PathEditor';
@@ -914,6 +915,7 @@ export default function App() {
                       clockStatus={clockStatus}
                       clockError={clockError}
                       onClose={() => setSettingsOpen(false)}
+                      onOpenLayoutSettings={() => setModal({ type: 'layoutSettings' })}
                       timetableId={selectedId ?? undefined}
                       firstStationName={timetable.stations?.[0]?.name}
                     />
@@ -921,6 +923,17 @@ export default function App() {
                 </div>
               </>
             )}
+            {/* Layout settings — reachable without a timetable */}
+            <button
+              onClick={() => setModal({ type: 'layoutSettings' })}
+              title="Layout settings"
+              className={`flex items-center gap-1 px-1.5 py-1.5 rounded text-xs transition-colors hover:bg-slate-800 ${
+                modal.type === 'layoutSettings' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <LayoutIcon />
+              Layout
+            </button>
           </div>
         </header>
 
@@ -1001,6 +1014,14 @@ export default function App() {
         />
       )}
 
+      {modal.type === 'layoutSettings' && layout && (
+        <LayoutSettings
+          layout={layout}
+          onSaved={setLayout}
+          onClose={() => setModal({ type: 'none' })}
+        />
+      )}
+
       {modal.type === 'stationReport' && timetable && (
         <StationReport
           timetable={timetable}
@@ -1037,6 +1058,17 @@ function ReportIcon() {
       <line x1="9" y1="7" x2="15" y2="7" />
       <line x1="9" y1="11" x2="15" y2="11" />
       <line x1="9" y1="15" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+function LayoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+      <circle cx="8" cy="6" r="2" fill="currentColor" />
+      <circle cx="16" cy="12" r="2" fill="currentColor" />
+      <circle cx="10" cy="18" r="2" fill="currentColor" />
     </svg>
   );
 }
