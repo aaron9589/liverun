@@ -49,6 +49,42 @@ const spec = {
         },
       },
     },
+    '/api/layout': {
+      get: {
+        tags: ['Layout'],
+        summary: 'Get the layout-wide configuration',
+        description: 'Physical-layout settings shared by every timetable (e.g. the JMRI JSON WebSocket URL). Sections not yet saved are returned with defaults.',
+        responses: {
+          200: {
+            description: 'Layout configuration',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    jmri: {
+                      type: 'object',
+                      properties: {
+                        url: { type: 'string', example: 'wss://jmri.example.net/json/', description: "JMRI JSON WebSocket URL ('' = not configured)" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      put: {
+        tags: ['Layout'],
+        summary: 'Replace the layout-wide configuration',
+        description: 'Validates and stores the layout configuration, returning the stored result with defaults applied. `jmri.url` must use ws:// or wss://.',
+        responses: {
+          200: { description: 'Stored layout configuration' },
+          400: { description: 'Validation error' },
+        },
+      },
+    },
     '/api/timetables/{id}/live/trains': {
       parameters: [
         { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' }, description: 'Timetable ID' },

@@ -6,9 +6,10 @@ const rateLimit = require('express-rate-limit');
 const { WebSocketServer } = require('ws');
 const mqtt = require('mqtt');
 const path = require('path');
-const { readDB, writeDB, getTimetable, mutateTimetable, uuidv4 } = require('./db');
+const { readDB, writeDB, getTimetable, mutateTimetable, uuidv4, getLayout, setLayout } = require('./db');
 const openApiSpec = require('./openapi');
 const { stripTrainType } = require('./migrations');
+const layoutRoutes = require('./layout');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -117,6 +118,10 @@ app.put('/api/active-timetable', (req, res) => {
   writeDB(db);
   res.json({ id: db.active_timetable_id });
 });
+
+// ── Layout-wide config (see server/layout.js) ────────────────
+
+layoutRoutes.register(app, { getLayout, setLayout });
 
 // Must be defined before /:id routes to avoid 'import' being matched as an id
 app.post('/api/timetables/import', (req, res) => {
