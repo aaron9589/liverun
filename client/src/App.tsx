@@ -1014,9 +1014,9 @@ export default function App() {
         />
       )}
 
-      {modal.type === 'layoutSettings' && layout && (
+      {modal.type === 'layoutSettings' && (
         <LayoutSettings
-          layout={layout}
+          layout={layout ?? { jmri: { url: '' } }}
           onSaved={setLayout}
           onClose={() => setModal({ type: 'none' })}
         />
