@@ -119,6 +119,9 @@ npm run start     # Express serving client/dist/ (production)
 docker compose up -d  # production; UI at localhost:3001
 npm test          # server node:test + client Vitest
 LIVERUN_API=http://localhost:3011 npm run dev --workspace=client   # point the Vite dev proxy at another server
+npm run mock:jmri  # mock JMRI JSON server: ws://localhost:12080/json/ + /json/roster (env PORT, ROSTER=file.json, HEARTBEAT)
+                   # logs every throttle command/broadcast; set Layout → JMRI URL to ws://localhost:12080/json/
+curl -X POST 'localhost:12080/mock/set?address=3001&fn=6&on=true'  # simulate a driver's handheld; GET /mock/state shows F states
 ```
 
 **Local build on macOS arm64:** the committed lockfile lacks the Rollup/esbuild native packages (npm optional-deps bug; CI deletes the lockfile). Before `npm run build` locally, run `npm install --no-save @rollup/rollup-darwin-arm64@<rollup version> @esbuild/darwin-arm64@<esbuild version>`, using the versions in `node_modules/rollup/package.json` and `node_modules/esbuild/package.json` (currently rollup 4.60.1, esbuild 0.21.5).
