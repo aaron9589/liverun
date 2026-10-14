@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { modeUrl } from './lib/mode';
 import type { LayoutConfig, Timetable, TimetableSummary, TimetableSettings, Train, ModalState, TrainRequest, Path, PathRequest } from './types';
 import { api } from './api';
 import { useLocalStorage, timeToMinutes, exportCatsXml, exportCrewsXml, escapeHtml, stationNameStyle } from './utils';
@@ -923,6 +924,13 @@ export default function App() {
                 </div>
               </>
             )}
+            <a
+              href={modeUrl('guard')}
+              title="Open the guard panel"
+              className="flex items-center gap-1 px-1.5 py-1.5 rounded text-xs transition-colors hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+            >
+              Guard panel
+            </a>
             {/* Layout settings — reachable without a timetable */}
             <button
               onClick={() => setModal({ type: 'layoutSettings' })}
