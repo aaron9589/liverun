@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LoaValue, SyncMessage, Timetable } from '../types';
-
-// Placeholder until 'loa-values' handling lands (phase 6A).
-const NO_LOA_VALUES: Record<string, LoaValue> = {};
 import { api } from '../api';
 import { liveSyncUrl } from '../lib/live';
+import { applyLoaValues } from '../lib/loa';
 
 export type LiveStatus = 'connecting' | 'live' | 'reconnecting';
 
@@ -52,6 +50,8 @@ function rev(tt: Timetable): number {
   return tt.rev ?? 0;
 }
 
+type LoaValues = Record<string, LoaValue>;
+
 function mergeStatuses(tt: Timetable, statuses: Record<string, 'running' | 'completed'>): Timetable {
   return { ...tt, trains: tt.trains.map((t) => ({ ...t, status: statuses[t.id] ?? undefined })) };
 }
@@ -63,7 +63,8 @@ function mergeStatuses(tt: Timetable, statuses: Record<string, 'running' | 'comp
  * Subscribes to /api/live/sync. The server's notices carry no data: the hook
  * re-fetches on 'timetable-updated' with a newer rev and on a rev mismatch at
  * 'hello' (reconnect / server restart), and on visibilitychange→visible
- * (tablets waking). 'completions' are merged in place. Fetches are serialised
+ * (tablets waking). 'completions' are merged in place; 'loa-values' feed
+ * `loaValues` (spec §11.5: full snapshot replaces, deltas merge). Fetches are serialised
  * and a response older than what is held is discarded.
  */
 export function useLiveTimetable(timetableId: string | null): LiveTimetable {
@@ -73,6 +74,9 @@ export function useLiveTimetable(timetableId: string | null): LiveTimetable {
   const [status, setStatus] = useState<LiveStatus>('connecting');
   const [activeId, setActiveIdState] = useState<string | null | undefined>(undefined);
   const [deleted, setDeleted] = useState(false);
+  // Layout-wide (not per timetable), so kept across timetable switches; the
+  // full snapshot after every (re)connect replaces it.
+  const [loaValues, setLoaValues] = useState<LoaValues>({});
   const sessionRef = useRef<Session | null>(null);
 
   // Bumped whenever the socket reports the active id, so a slower REST answer can't overwrite it.
@@ -186,6 +190,9 @@ export function useLiveTimetable(timetableId: string | null): LiveTimetable {
         case 'active-changed':
           setActiveFromSocket(msg.activeId);
           return;
+        case 'loa-values':
+          setLoaValues((prev) => applyLoaValues(prev, msg));
+          return;
         case 'timetable-deleted':
           if (msg.timetableId !== id) return;
           gone = true;
@@ -254,5 +261,5 @@ export function useLiveTimetable(timetableId: string | null): LiveTimetable {
     if (s.rev === null || rev(tt) >= s.rev) s.adopt(tt);
   }, []);
 
-  return { timetable, loading, error, status, activeId, deleted, refresh, replace, loaValues: NO_LOA_VALUES };
+  return { timetable, loading, error, status, activeId, deleted, refresh, replace, loaValues };
 }

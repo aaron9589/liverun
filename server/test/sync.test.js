@@ -149,3 +149,55 @@ test('sync socket: hello, coalesced updates, status-only completions, delete, ac
     await new Promise((r) => server.close(r));
   }
 });
+
+test('sync socket: LOA snapshot after hello, coalesced deltas to every client, full resets', async () => {
+  db.writeDB({ timetables: [{ id: 'tt', name: 'A', trains: [] }, { id: 'other', name: 'B', trains: [] }] });
+  let cache = { sig: { value: 'THROWN', at: 't0' } };
+  const listeners = new Set();
+  const emit = (e) => { for (const l of listeners) l(e); };
+  const sync = createSync({
+    getTimetable: db.getTimetable,
+    getActiveId: () => null,
+    onTimetableChange: db.onTimetableChange,
+    getLoaSnapshot: () => ({ ...cache }),
+    onLoaChange: (l) => { listeners.add(l); return () => listeners.delete(l); },
+    loaCoalesceMs: 40,
+  });
+  const server = http.createServer();
+  server.on('upgrade', (req, socket, head) => sync.handleUpgrade(req, socket, head));
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address();
+
+  try {
+    const a = connect(port, 'tt');
+    const b = connect(port, 'other');
+    await a.next((m) => m.type === 'loa-values');
+    await b.next((m) => m.type === 'loa-values');
+    assert.deepStrictEqual(a.messages.map((m) => m.type), ['hello', 'completions', 'loa-values']);
+    assert.deepStrictEqual(a.messages[2], { type: 'loa-values', values: { sig: { value: 'THROWN', at: 't0' } }, full: true });
+
+    // A burst of changes → one delta with the latest value per topic, to every timetable's clients
+    emit({ values: { sig: { value: 'CLOSED', at: 't1' } }, full: false });
+    emit({ values: { staff: { value: 'CATS', at: 't2' } }, full: false });
+    emit({ values: { sig: { value: 'THROWN', at: 't3' } }, full: false });
+    const delta = await a.next((m) => m.type === 'loa-values' && !m.full);
+    assert.deepStrictEqual(delta.values, { sig: { value: 'THROWN', at: 't3' }, staff: { value: 'CATS', at: 't2' } });
+    await b.next((m) => m.type === 'loa-values' && !m.full);
+    await new Promise((r) => setTimeout(r, 80));
+    assert.strictEqual(a.messages.filter((m) => m.type === 'loa-values' && !m.full).length, 1);
+
+    // A full reset replaces any pending delta and is sent at once
+    emit({ values: { x: { value: '1', at: 't4' } }, full: false });
+    cache = {};
+    emit({ values: {}, full: true });
+    await a.next((m) => m.type === 'loa-values' && m.full && Object.keys(m.values).length === 0);
+    await new Promise((r) => setTimeout(r, 80));
+    assert.ok(!a.messages.some((m) => m.type === 'loa-values' && m.values.x), 'pending delta dropped');
+    a.ws.close();
+    b.ws.close();
+  } finally {
+    sync.close();
+    await new Promise((r) => server.close(r));
+  }
+  assert.strictEqual(listeners.size, 0, 'close unsubscribes');
+});

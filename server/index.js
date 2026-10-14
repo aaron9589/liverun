@@ -12,6 +12,7 @@ const openApiSpec = require('./openapi');
 const { stripTrainType } = require('./migrations');
 const layoutRoutes = require('./layout');
 const { WS_SYNC_PATH, createSync } = require('./sync');
+const loaCacheRoutes = require('./loa-cache');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -61,11 +62,18 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
 }
 
+// LOA topic cache (GET /api/loa/values) — see server/loa-cache.js. refresh()
+// after the layout or the active timetable changes; edits to the active
+// timetable (its broker URL) are picked up through onTimetableChange.
+const loaCache = loaCacheRoutes.register(app, { getLayout, readDB, onTimetableChange });
+
 // Live sync socket (/api/live/sync) — see server/sync.js
 const sync = createSync({
   getTimetable,
   getActiveId: () => readDB().active_timetable_id || null,
   onTimetableChange,
+  getLoaSnapshot: loaCache.snapshot,
+  onLoaChange: loaCache.onChange,
 });
 
 const DEFAULT_SETTINGS = {
@@ -128,6 +136,7 @@ app.delete('/api/timetables/:id', (req, res) => {
   if (wasActive) db.active_timetable_id = null;
   writeDB(db);
   sync.timetableDeleted(req.params.id, { activeCleared: wasActive });
+  if (wasActive) loaCache.refresh();
   res.json({ ok: true });
 });
 
@@ -148,12 +157,13 @@ app.put('/api/active-timetable', (req, res) => {
   db.active_timetable_id = id || null;
   writeDB(db);
   sync.activeChanged(db.active_timetable_id);
+  loaCache.refresh();
   res.json({ id: db.active_timetable_id });
 });
 
 // ── Layout-wide config (see server/layout.js) ────────────────
 
-layoutRoutes.register(app, { getLayout, setLayout });
+layoutRoutes.register(app, { getLayout, setLayout: (layout) => { const saved = setLayout(layout); loaCache.refresh(); return saved; } });
 require('./sounds').register(app, { dataDir: require('./db').dataDir });
 
 // Must be defined before /:id routes to avoid 'import' being matched as an id

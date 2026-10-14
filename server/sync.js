@@ -11,12 +11,15 @@
  *   timetable-updated  coalesced notice after any mutation (carries no data)
  *   timetable-deleted  the subscribed timetable is gone; socket then closes
  *   active-changed     Control switched the active timetable (all clients)
+ *   loa-values         LOA topic cache (server/loa-cache.js, spec §11.5): full
+ *                      snapshot on connect, then coalesced deltas (all clients)
  */
 
 const { WebSocketServer } = require('ws');
 
 const WS_SYNC_PATH = '/api/live/sync';
 const COALESCE_MS = 300;
+const LOA_COALESCE_MS = 100;
 // Ping idle sockets so reverse proxies don't time them out and dead tablets get dropped.
 const HEARTBEAT_MS = 25_000;
 
@@ -60,9 +63,15 @@ function completionStatuses(tt) {
 
 /**
  * Creates the sync socket server.
- * deps: getTimetable(id), getActiveId(), onTimetableChange(listener) (db.js).
+ * deps: getTimetable(id), getActiveId(), onTimetableChange(listener) (db.js);
+ * optional getLoaSnapshot() and onLoaChange(listener) from the LOA topic cache
+ * (listener receives { values, full }).
  */
-function createSync({ getTimetable, getActiveId, onTimetableChange, coalesceMs = COALESCE_MS }) {
+function createSync({
+  getTimetable, getActiveId, onTimetableChange,
+  getLoaSnapshot = () => ({}), onLoaChange = () => () => {},
+  coalesceMs = COALESCE_MS, loaCoalesceMs = LOA_COALESCE_MS,
+}) {
   const wss = new WebSocketServer({ noServer: true });
   // timetableId → Set<WebSocket>
   const clients = new Map();
@@ -87,6 +96,31 @@ function createSync({ getTimetable, getActiveId, onTimetableChange, coalesceMs =
 
   const unsubscribe = onTimetableChange((event) => {
     if (event.type === 'updated' && event.notify) updates.push(event.timetableId, event.rev);
+  });
+
+  // LOA deltas: changed topics accumulate for loaCoalesceMs, then go to every
+  // client in one message. A full snapshot (topics dropped, broker changed)
+  // replaces anything pending and is sent at once.
+  let loaPending = null;
+  let loaTimer = null;
+  function cancelLoa() {
+    clearTimeout(loaTimer);
+    loaTimer = null;
+    loaPending = null;
+  }
+  const unsubscribeLoa = onLoaChange(({ values, full }) => {
+    if (full) {
+      cancelLoa();
+      broadcast(null, { type: 'loa-values', values: getLoaSnapshot(), full: true });
+      return;
+    }
+    loaPending = { ...(loaPending || {}), ...values };
+    if (loaTimer) return;
+    loaTimer = setTimeout(() => {
+      const pending = loaPending;
+      cancelLoa();
+      if (pending && Object.keys(pending).length) broadcast(null, { type: 'loa-values', values: pending, full: false });
+    }, loaCoalesceMs);
   });
 
   /**
@@ -138,6 +172,7 @@ function createSync({ getTimetable, getActiveId, onTimetableChange, coalesceMs =
 
     send(ws, { type: 'hello', timetableId, rev: tt.rev || 0, activeId: getActiveId() });
     send(ws, { type: 'completions', timetableId, statuses: completionStatuses(tt) });
+    send(ws, { type: 'loa-values', values: getLoaSnapshot(), full: true });
 
     ws.on('close', () => {
       const set = clients.get(timetableId);
@@ -165,7 +200,9 @@ function createSync({ getTimetable, getActiveId, onTimetableChange, coalesceMs =
   function close() {
     clearInterval(heartbeat);
     updates.cancelAll();
+    cancelLoa();
     unsubscribe();
+    unsubscribeLoa();
     for (const ws of wss.clients) ws.terminate();
     wss.close();
   }

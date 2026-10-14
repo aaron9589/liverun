@@ -124,6 +124,35 @@ const spec = {
         },
       },
     },
+    '/api/loa/values': {
+      get: {
+        tags: ['Layout'],
+        summary: 'Get cached LOA topic values',
+        description:
+          'Last value and receive time of every MQTT topic referenced in `layout.loa`, from the server\'s single connection to the active timetable\'s broker (`settings.clock_broker_url`). ' +
+          'Empty when there is no active timetable, no broker URL or no LOA topics. Values are dropped when the broker changes or a topic is no longer referenced. ' +
+          'The live sync WebSocket (`/api/live/sync`) sends the same snapshot on connect (`loa-values`, `full: true`) and then coalesced deltas (`full: false`).',
+        responses: {
+          200: {
+            description: 'Topic → last value',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  additionalProperties: {
+                    type: 'object',
+                    properties: {
+                      value: { type: 'string', description: 'Payload as text', example: 'THROWN' },
+                      at: { type: 'string', format: 'date-time', description: 'When the server received it' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     '/api/sounds': {
       get: {
         tags: ['Sounds'],
