@@ -20,7 +20,7 @@ const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 
 // Spec §8.1 Illawarra example, as test data only.
 const illawarra: BoardingModel = {
-  max_passengers: 60,
+  max_passengers: 80,
   spread: 0.15,
   demand_curve: [['00:00', 0.02], ['05:00', 0.05], ['06:00', 0.4], ['07:00', 0.85], ['08:00', 1], ['09:00', 0.6], ['10:00', 0.35],
     ['14:30', 0.4], ['15:30', 0.6], ['16:30', 0.85], ['17:30', 1], ['18:30', 0.6], ['19:30', 0.3], ['22:00', 0.12], ['24:00', 0.02]],
@@ -94,7 +94,7 @@ describe('expectedCount', () => {
   });
   it('station weight and position factors apply', () => {
     expect(expectedCount(m, { clockMinutes: 700, position: 'intermediate', stationWeight: 0.5 })).toBe(30);
-    expect(expectedCount(illawarra, { clockMinutes: 480, position: 'origin' })).toBeCloseTo(72);
+    expect(expectedCount(illawarra, { clockMinutes: 480, position: 'origin' })).toBeCloseTo(96);
   });
 });
 
@@ -117,7 +117,7 @@ describe('sampleCount', () => {
     const rng = mulberry32(4);
     const peak = Array.from({ length: 3000 }, () =>
       sampleCount(illawarra, { clockMinutes: 450 + Math.floor(rng() * 60), direction: 'Up', position: 'intermediate' }, rng));
-    expect(mean(peak)).toBeGreaterThan(40);
+    expect(mean(peak)).toBeGreaterThan(70);
     const full = Array.from({ length: 3000 }, () =>
       sampleCount(illawarra, { clockMinutes: 450 + Math.floor(rng() * 60), direction: 'Up', position: 'intermediate', stationWeight: 1 }, rng));
     expect(mean(full)).toBeLessThan(90);
