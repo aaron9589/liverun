@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
 import type { LayoutConfig, Timetable } from '../types';
 import { api } from '../api';
+import { mergeLayoutPatch } from '../lib/layoutDefaults';
 import { JmriSection, validateJmriUrl } from './layout/JmriSection';
 import { GuardSection } from './layout/GuardSection';
 import { TrainProfilesSection } from './layout/TrainProfilesSection';
@@ -118,8 +119,8 @@ export function LayoutSettings({ layout, timetable, onSaved, onClose }: Props) {
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         throw new Error('expected a JSON object');
       }
-      // Merge over the current draft so sections absent from the file keep their values.
-      setDraft({ ...draft, ...(parsed as Partial<LayoutConfig>) });
+      // Deep-merge over the current draft so sections and fields absent from the file keep their values.
+      setDraft(mergeLayoutPatch(draft, parsed));
       setError('');
     } catch (e) {
       setImportError(`Could not import "${file.name}": ${e instanceof Error ? e.message : 'invalid JSON'}`);

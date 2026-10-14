@@ -64,13 +64,19 @@ const PRESET_COLORS = [
 
 export function TrainEditor({ train, stations, paths, crews = [], existingColors, distanceUnit = 'km', onDraftChange, onSave, onDelete, onClose, jmriUrl, profiles = [], eventLibrary = NO_EVENTS }: Props) {
   const roster = useJmriRoster(jmriUrl);
-  // Escape closes the editor like Cancel. Inner controls that use Escape
-  // themselves (e.g. an open roster dropdown) stop propagation first.
+  // Escape closes the editor like Cancel, but asks first when the form has
+  // changed (a stray Escape in a select or field mustn't lose edits). Inner
+  // controls that use Escape themselves (e.g. an open roster dropdown) stop
+  // propagation first.
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const formRef = useRef('');
+  const initialFormRef = useRef<string | null>(null);
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !e.defaultPrevented) closeRef.current();
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (formRef.current !== initialFormRef.current && !window.confirm('Discard unsaved changes to this train?')) return;
+      closeRef.current();
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -93,6 +99,8 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
   const [crewId, setCrewId] = useState(train?.crew_id ?? '');
   const [stops, setStops] = useState<StopForm[]>(() => buildStopForms(sorted, train?.stops, eventLibrary));
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
+  formRef.current = JSON.stringify({ name, color, notes, trainIdField, direction, crewId, stops });
+  if (initialFormRef.current === null) initialFormRef.current = formRef.current;
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 

@@ -175,7 +175,8 @@ function createLoaCache({ getLayout, getActive, onTimetableChange, connect = mqt
   }
 
   const unsubscribeChanges = onTimetableChange
-    ? onTimetableChange((event) => { if (event.timetableId === activeId) refresh(); })
+    // Status-only changes (crew taps, notify:false) can't touch the broker URL; skip their DB re-read.
+    ? onTimetableChange((event) => { if (event.timetableId === activeId && event.notify !== false) refresh(); })
     : () => {};
 
   return {

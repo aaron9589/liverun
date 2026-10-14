@@ -515,6 +515,8 @@ export default function App() {
         arrival: s.arrival,
         departure: s.departure,
         specialInstructions: s.special_instructions,
+        locationAlias: s.location_alias ?? undefined,
+        guardEvents: s.guard_events,
       })),
     });
     recordAndSet(updated);

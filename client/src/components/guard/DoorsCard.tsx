@@ -101,7 +101,8 @@ export function DoorsCard({ profile, throttle, actions, boarding, hasTrainId, on
 
   const gate = (r: ResolvedAction): string | null => {
     if (!r.ok || throttle.acquired) return null;
-    return throttle.status === 'connected' ? 'Acquiring…' : 'JMRI disconnected';
+    // A refused or dropped acquire leaves an error (e.g. roster entry not found): show it, not a bare "Acquiring…".
+    return throttle.status === 'connected' ? (throttle.error ?? 'Acquiring…') : 'JMRI disconnected';
   };
   const whyOpen = gate(open);
   const whyClose = gate(close);

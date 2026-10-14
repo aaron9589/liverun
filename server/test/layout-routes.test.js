@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { validateLayout } = require('../layout');
+const { validateLayout, mergePatch, register } = require('../layout');
 
 test('accepts an empty object and an empty JMRI URL', () => {
   assert.deepStrictEqual(validateLayout({}), { layout: {} });
@@ -63,4 +63,31 @@ test('rejects bad train profiles', () => {
   bad([profile({ functions: { x: { key: { fn: 1 }, mode: 'pulse', pulse_ms: 10 } } })]);
   bad([profile({ functions: { x: { key: { fn: 1 }, mode: 'on_for', duration_s: 301 } } })]);
   bad([profile({ functions: { x: { key: { fn: 1 }, mode: 'on_for', duration_s: 0 } } })]);
+});
+
+test('mergePatch merges objects key by key, replaces arrays and ignores prototype keys', () => {
+  const base = { stats: { enabled: false, topic: 't/{train}' }, train_profiles: [{ id: 'a' }], jmri: { url: 'ws://x/' } };
+  const out = mergePatch(base, JSON.parse('{"stats":{"enabled":true},"train_profiles":[],"__proto__":{"polluted":1}}'));
+  assert.deepStrictEqual(out, { stats: { enabled: true, topic: 't/{train}' }, train_profiles: [], jmri: { url: 'ws://x/' } });
+  assert.strictEqual(({}).polluted, undefined);
+  assert.strictEqual(Object.getPrototypeOf(out), Object.prototype);
+});
+
+test('PUT /api/layout with a partial body changes only what it names', () => {
+  const handlers = {};
+  const app = { get: (p, h) => { handlers['GET ' + p] = h; }, put: (p, h) => { handlers['PUT ' + p] = h; } };
+  let stored = { jmri: { url: 'ws://jmri/json/' }, stats: { enabled: false, topic: 'trains/stats', payload: 'count', publish_on: 'door_close' } };
+  register(app, { getLayout: () => stored, setLayout: (l) => { stored = l; return l; } });
+  const call = (body) => {
+    const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+    handlers['PUT /api/layout']({ body }, res);
+    return res;
+  };
+  assert.strictEqual(call({ stats: { enabled: true } }).code, 200);
+  assert.deepStrictEqual(stored, { jmri: { url: 'ws://jmri/json/' }, stats: { enabled: true, topic: 'trains/stats', payload: 'count', publish_on: 'door_close' } });
+  // Cross-field rules see the stored values: enabling stats with an empty stored topic is refused.
+  stored.stats.topic = '';
+  stored.stats.enabled = false;
+  assert.strictEqual(call({ stats: { enabled: true } }).code, 400);
+  assert.strictEqual(call([]).code, 400);
 });

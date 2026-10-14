@@ -7,6 +7,9 @@ import {
 
 export type JmriStatus = 'unconfigured' | 'connecting' | 'connected' | 'error';
 
+/** Delay before asking JMRI again after it released or refused our throttle. */
+const REACQUIRE_MS = 5_000;
+
 export interface JmriThrottle {
   /** State of the browser → JMRI JSON WebSocket. */
   status: JmriStatus;
@@ -93,6 +96,14 @@ export function useJmriThrottle(
     let pingTimer: ReturnType<typeof setInterval> | null = null;
     let pingMs = pingIntervalMs(null);
     let lastRx = 0;
+    let reacquireTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const stopReacquire = () => { if (reacquireTimer) clearTimeout(reacquireTimer); reacquireTimer = null; };
+    /** JMRI dropped or refused our throttle: try again later rather than staying unacquired until a reload. */
+    const scheduleReacquire = () => {
+      if (reacquireTimer || disposed) return;
+      reacquireTimer = setTimeout(() => { reacquireTimer = null; sync(); }, REACQUIRE_MS);
+    };
 
     const stopPing = () => { if (pingTimer) clearInterval(pingTimer); pingTimer = null; };
     const startPing = (ms: number) => {
@@ -120,6 +131,7 @@ export function useJmriThrottle(
       if (wsRef.current === sock) wsRef.current = null;
       heldRef.current = null;
       stopPing();
+      stopReacquire();
       update(disconnected);
       if (disposed) return;
       const delay = backoffMs(attempt++);
@@ -157,12 +169,16 @@ export function useJmriThrottle(
           startPing(pingIntervalMs(msg.heartbeat));
         } else if (msg.kind === 'throttle') {
           const held = heldRef.current;
-          if (held && msg.name === held.name) update((s) => applyThrottleUpdate(s, msg));
+          if (held && msg.name === held.name) {
+            update((s) => applyThrottleUpdate(s, msg));
+            // Released by JMRI (loco taken by another throttle or a dispatcher): we no longer hold it.
+            if (msg.released) { heldRef.current = null; scheduleReacquire(); }
+          }
         } else if (msg.kind === 'error') {
           // An error mid-acquire means JMRI holds nothing under our name, so
           // don't send a release for it later (JMRI would answer that with
           // another error, which could then fail the next acquire).
-          if (tsRef.current.phase === 'acquiring') heldRef.current = null;
+          if (tsRef.current.phase === 'acquiring') { heldRef.current = null; scheduleReacquire(); }
           update((s) => applyError(s, msg.code ? `${msg.message} (${msg.code})` : msg.message));
         }
       };
@@ -178,6 +194,7 @@ export function useJmriThrottle(
       disposed = true;
       if (retryTimer) clearTimeout(retryTimer);
       stopPing();
+      stopReacquire();
       const sock = ws;
       ws = null;
       if (!sock) return;

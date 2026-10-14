@@ -63,3 +63,12 @@ describe('library helpers', () => {
     expect(customActionNames([{ functions: { bell: 1, brake_squeal: 1 } }, { functions: { aaa: 1, brake_squeal: 1 } }])).toEqual(['aaa', 'brake_squeal']);
   });
 });
+
+describe('probability precision', () => {
+  it('keeps one decimal place of a percentage', () => {
+    const f = { ...toForm({ id: 'p', event: 'brakes', probability: 1 }, lib), probabilityPct: '12.5' };
+    expect(fromForm(f, lib).probability).toBe(0.125);
+    expect(fromForm({ ...f, probabilityPct: '0.4' }, lib).probability).toBe(0.004);
+    expect(toForm(fromForm(f, lib), lib).probabilityPct).toBe('12.5');
+  });
+});

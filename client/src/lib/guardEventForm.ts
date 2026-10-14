@@ -106,7 +106,7 @@ export function validateForm(f: PlacementForm, library: GuardEventDef[]): string
 export function fromForm(f: PlacementForm, library: GuardEventDef[]): GuardEventPlacement {
   const lines = splitLines(f.messagesText);
   const kind = effectiveKind(f, library);
-  const out: GuardEventPlacement = { id: f.id, probability: Math.round(num(f.probabilityPct)) / 100 };
+  const out: GuardEventPlacement = { id: f.id, probability: Math.round(num(f.probabilityPct) * 10) / 1000 };
   if (f.event === INLINE) {
     out.kind = f.kind;
     out.messages = lines;

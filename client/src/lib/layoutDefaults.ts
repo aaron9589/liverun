@@ -34,3 +34,22 @@ export const DEFAULT_LAYOUT: LayoutConfig = {
   events: { library: [], publish_topic: '' },
   loa: { sections: [], warn_on_depart: true },
 };
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === 'object' && !Array.isArray(v);
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Merges an imported (possibly partial) layout over a complete one: objects
+ * merge key by key, arrays and scalars replace. Same rule as PUT /api/layout,
+ * so a file holding `{"stats": {"enabled": true}}` keeps the other stats fields.
+ */
+export function mergeLayoutPatch<T>(base: T, patch: unknown): T {
+  if (patch === undefined) return base;
+  if (!isPlainObject(base) || !isPlainObject(patch)) return patch as T;
+  const out: Record<string, unknown> = { ...base };
+  for (const [k, v] of Object.entries(patch)) {
+    if (!UNSAFE_KEYS.has(k)) out[k] = mergeLayoutPatch((base as Record<string, unknown>)[k], v);
+  }
+  return out as T;
+}

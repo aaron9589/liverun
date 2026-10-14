@@ -6,7 +6,7 @@ import { requestWakeLock, unlockAudio } from '../../lib/audio';
 import { playSound } from '../../lib/sound';
 import { resolveProfile } from '../../lib/profiles';
 import { switchMode } from '../../lib/mode';
-import { autoSelectTrain, currentStop, formsNext as findFormsNext, sequenceStops, sortByRun, type SeqStop } from '../../lib/stops';
+import { autoSelectTrain, currentStop, formsNext as findFormsNext, sequenceStops, sortByRun } from '../../lib/stops';
 import { describeJobChange, diffJobs } from '../../lib/jobDiff';
 import type { Timetable, Train } from '../../types';
 import { ChangeToasts, useToasts } from '../ChangeToasts';
@@ -23,7 +23,7 @@ import { statsMessage } from '../../lib/stats';
 import { StopTable } from './StopTable';
 import { EventBanner } from './EventBanner';
 import { useGuardEvents } from '../../hooks/useGuardEvents';
-import { stopKeyOf, type RolledEvent } from '../../lib/guardEvents';
+import { stopKeyOf, stopKeysOf, type RolledEvent } from '../../lib/guardEvents';
 import { eventPublishPayload } from '../../lib/guardEventPublish';
 import { useLoa } from '../../hooks/useLoa';
 import { stopIndexOf } from '../../lib/loa';
@@ -47,27 +47,6 @@ function formatClock(m: number | null): string {
   if (m === null) return '--:--';
   const t = ((m % 1440) + 1440) % 1440;
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
-}
-
-/** Pin identity that survives Control re-saving the train (stop ids are re-minted on save). */
-function pinKeyOf(seq: SeqStop[], stopId: string): string | null {
-  const counts = new Map<string, number>();
-  for (const { stop } of seq) {
-    const n = counts.get(stop.station_id) ?? 0;
-    counts.set(stop.station_id, n + 1);
-    if (stop.id === stopId) return `${stop.station_id}#${n}`;
-  }
-  return null;
-}
-function stopIdOfPin(seq: SeqStop[], key: string | null): string | null {
-  if (!key) return null;
-  const counts = new Map<string, number>();
-  for (const { stop } of seq) {
-    const n = counts.get(stop.station_id) ?? 0;
-    counts.set(stop.station_id, n + 1);
-    if (`${stop.station_id}#${n}` === key) return stop.id;
-  }
-  return null;
 }
 
 function Dot({ ok, warn, label }: { ok: boolean; warn?: boolean; label: string }) {
@@ -195,6 +174,15 @@ export function GuardPanel() {
   const shownTrainId = train?.id ?? null;
   useEffect(() => () => actionsRef.current.stopAll(), [shownTrainId]);
   const jmriConfigured = throttle.status !== 'unconfigured';
+  // The roster fetch has no retry of its own: if it failed (JMRI was down when
+  // the tablet started), fetch again once the throttle socket reaches JMRI, so
+  // label-keyed functions resolve without a reload.
+  // Only on the transition to connected, so a roster endpoint that keeps failing isn't hammered.
+  const rosterRetry = useRef({ status: roster.status, refresh: roster.refresh });
+  rosterRetry.current = { status: roster.status, refresh: roster.refresh };
+  useEffect(() => {
+    if (throttle.status === 'connected' && rosterRetry.current.status === 'error') rosterRetry.current.refresh();
+  }, [throttle.status]);
 
   const seq = useMemo(() => (train ? sequenceStops(train) : []), [train]);
 
@@ -202,7 +190,12 @@ export function GuardPanel() {
   // retime by Control keeps the pin.
   const [pinKey, setPinKey] = useState<string | null>(null);
   useEffect(() => { setPinKey(null); }, [selectedId]);
-  const pinnedStopId = stopIdOfPin(seq, pinKey);
+  // Pins are stored as stop keys (station + visit), which survive Control re-saving the train (stop ids are re-minted).
+  const pinnedStopId = useMemo(() => {
+    if (!train || !pinKey) return null;
+    const i = stopKeysOf(train).indexOf(pinKey);
+    return i >= 0 ? train.stops[i].id : null;
+  }, [train, pinKey]);
 
   // Boarding (spec §8): the doors card calls back after the open sound / on close.
   // Context is read from refs at that moment, so the stop is the one at the time of opening.
@@ -567,7 +560,7 @@ export function GuardPanel() {
             stations={timetable.stations}
             clock={clockShown}
             pinnedStopId={pinnedStopId}
-            onTogglePin={(id) => setPinKey((k) => { const key = pinKeyOf(seq, id); return k === key ? null : key; })}
+            onTogglePin={(id) => setPinKey((k) => { const key = train ? stopKeyOf(train, id) : null; return k === key ? null : key; })}
             highlightStopIds={flash}
             formsNext={forms}
             onForms={(id) => select(id, true)}

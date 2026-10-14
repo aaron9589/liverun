@@ -182,7 +182,7 @@ function validateStats(s) {
   if (s.publish_on !== undefined && !['boarding_start', 'door_close'].includes(s.publish_on)) {
     return 'stats.publish_on must be "boarding_start" or "door_close"';
   }
-  // A partial body that omits topic keeps the stored one (merged by setLayout), so only an explicit empty topic is an error.
+  // PUT validates the body merged over the stored layout, so topic is present there.
   if (s.enabled === true && s.topic !== undefined && !s.topic.trim()) return 'stats.topic is required when stats are enabled';
   return null;
 }
@@ -244,16 +244,34 @@ function validateLayout(body) {
   return { layout: body };
 }
 
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Merges a PUT body over the stored layout: objects merge key by key, arrays
+ * and scalars replace. A partial body therefore changes only what it names.
+ */
+function mergePatch(base, patch) {
+  if (patch === undefined) return base;
+  if (!isPlainObject(base) || !isPlainObject(patch)) return patch;
+  const out = { ...base };
+  for (const [k, v] of Object.entries(patch)) {
+    if (!UNSAFE_KEYS.has(k)) out[k] = mergePatch(base[k], v);
+  }
+  return out;
+}
+
 function register(app, { getLayout, setLayout }) {
   app.get('/api/layout', (_req, res) => {
     res.json(getLayout());
   });
 
   app.put('/api/layout', (req, res) => {
-    const result = validateLayout(req.body);
+    if (!isPlainObject(req.body)) return res.status(400).json({ error: 'Layout must be a JSON object' });
+    // Validate the merged result, so rules that span fields (e.g. stats enabled ⇒ topic) see stored values too.
+    const result = validateLayout(mergePatch(getLayout(), req.body));
     if (result.error) return res.status(400).json({ error: result.error });
     res.json(setLayout(result.layout));
   });
 }
 
-module.exports = { register, validateLayout };
+module.exports = { register, validateLayout, mergePatch };
