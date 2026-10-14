@@ -47,7 +47,10 @@ app.use('/api', rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, l
 // '/guard/' and '/mobile/' would resolve the relative ./assets and ./api URLs
 // one level too deep. Redirect to the slash-less form with a *relative*
 // Location so it is correct with or without BASE_PATH / proxy prefixes.
-app.get(['/guard/', '/mobile/'], (req, res) => {
+// (A middleware with an exact path check: Express routes ignore a trailing
+// slash, so app.get('/guard/') would also catch '/guard' and loop.)
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || (req.path !== '/guard/' && req.path !== '/mobile/')) return next();
   const name = req.path.replace(/\//g, '');
   const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
   res.redirect(301, `../${name}${qs}`);
