@@ -2,6 +2,7 @@ import type {
   Timetable,
   TimetableSummary,
   TimetableSettings,
+  LayoutConfig,
   TrainRequest,
   PathRequest,
 } from './types';
@@ -29,6 +30,16 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 // ── Timetables ────────────────────────────────────────────────
 
 export const api = {
+  // ── Layout-wide config ──
+  getLayout: () =>
+    req<LayoutConfig>('/layout'),
+
+  updateLayout: (layout: LayoutConfig) =>
+    req<LayoutConfig>('/layout', {
+      method: 'PUT',
+      body: JSON.stringify(layout),
+    }),
+
   listTimetables: () =>
     req<TimetableSummary[]>('/timetables'),
 

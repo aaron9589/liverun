@@ -63,4 +63,42 @@ function mutateTimetable(id, fn) {
   return db.timetables[idx];
 }
 
-module.exports = { readDB, writeDB, getTimetable, mutateTimetable, uuidv4 };
+// ── Layout-wide configuration ──────────────────────────────────────────────
+// Physical-layout settings shared by every timetable (JMRI, guard panel, …).
+// Stored under db.layout; always read through getLayout() so callers see
+// defaults for any section that hasn't been saved yet.
+
+const LAYOUT_DEFAULTS = {
+  jmri: { url: '' },
+};
+
+function isPlainObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** Deep-merge stored values over defaults. Arrays and scalars replace wholesale. */
+function mergeLayout(defaults, stored) {
+  if (!isPlainObject(stored)) return structuredClone(defaults);
+  const out = {};
+  for (const key of Object.keys(defaults)) {
+    out[key] = isPlainObject(defaults[key])
+      ? mergeLayout(defaults[key], stored[key])
+      : (stored[key] !== undefined ? stored[key] : structuredClone(defaults[key]));
+  }
+  return out;
+}
+
+/** Returns the layout config with defaults applied. Unknown keys are dropped. */
+function getLayout() {
+  return mergeLayout(LAYOUT_DEFAULTS, readDB().layout);
+}
+
+/** Replaces the stored layout config (caller validates). Returns the merged result. */
+function setLayout(layout) {
+  const db = readDB();
+  db.layout = mergeLayout(LAYOUT_DEFAULTS, layout);
+  writeDB(db);
+  return db.layout;
+}
+
+module.exports = { readDB, writeDB, getTimetable, mutateTimetable, uuidv4, getLayout, setLayout, LAYOUT_DEFAULTS };

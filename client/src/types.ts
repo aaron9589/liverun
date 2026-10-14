@@ -79,6 +79,37 @@ export interface Timetable extends TimetableSummary {
   settings: TimetableSettings;
 }
 
+// ─── Layout-wide configuration (GET/PUT /api/layout) ──────────────────────────
+// Stored and sent in snake_case, like TimetableSettings. Sections are added
+// phase by phase (see docs/guard-panel-spec.md §4.1).
+
+export interface JmriConfig {
+  /** JMRI JSON WebSocket URL, e.g. wss://jmri.example.net/json/ ('' = not configured). */
+  url: string;
+}
+
+export interface LayoutConfig {
+  jmri: JmriConfig;
+}
+
+// ─── JMRI roster (fetched by the browser directly from JMRI) ───────────────────
+
+export interface JmriFunctionKey {
+  /** Function name as JMRI reports it, e.g. "F6". */
+  name: string;
+  label: string;
+  lockable?: boolean;
+}
+
+export interface JmriRosterEntry {
+  /** Roster entry name — this is what Train.train_id stores. */
+  name: string;
+  address: string;
+  road?: string;
+  number?: string;
+  functionKeys: JmriFunctionKey[];
+}
+
 // ─── Path types ───────────────────────────────────────────────────────────────
 
 export interface PathStop {
