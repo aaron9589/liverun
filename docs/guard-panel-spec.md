@@ -167,11 +167,11 @@ The proxy passes the full path and the server's `BASE_PATH` middleware strips th
 ### 6.2 Data
 
 - Active timetable from `GET /api/active-timetable`.
-- **Crew choice (D11)**: on first open (and from ☰ → Change crew) the guard picks their name from the timetable's crews ("Local Operator 1", …). The train selector then lists **only that crew's trains, in run order**. Freights belong to other crews, so no name/type filtering is needed. An "All trains" entry stays available at the bottom of the crew list for relief/testing. Stored in `localStorage['guard:crew']` (single crew; independent of CrewMobile's multi-select `mob:crewFilter`). If the stored crew no longer exists in the active timetable, the picker reopens.
+- **Crew choice (D11)**: on first open (and from ☰ → Change crew) the guard picks their name from the timetable's crews ticked **Guard** in the planner (`Crew.guard_visible`, opt-in) ("Local Operator 1", …). The train selector then lists **only that crew's trains, in run order**. Freights belong to other crews, so no name/type filtering is needed. An "All trains" entry stays available at the bottom of the crew list for relief/testing. Stored in `localStorage['guard:crew']` (single crew; independent of CrewMobile's multi-select `mob:crewFilter`). If the stored crew no longer exists in the active timetable, the picker reopens.
 - **Auto-select train**: on load / crew change, pick the crew's train whose time span contains the fast clock, else the next one to start; else the first. Manual selection persisted and restored while it's still valid.
 - Trains without a `train_id` are listed; JMRI controls show "no roster ID" (§7.1).
 - The panel holds the **full timetable** via the shared `useLiveTimetable` hook (same as CrewMobile), so it has trains, stops, stations and crews without extra live-API endpoints.
-- Stops shown in **route order as returned by the server** (no client time sort). Location alias shown when set. **Hidden events are never rendered** in the list (§10).
+- Stops shown in **running order**. The planner stores stops in station order, so a train running the other way is stored backwards; the panel reverses it when its times run backwards (midnight-safe, `runningOrder()`). An aliased stop leads with the alias (e.g. *Sydney Terminal*) with the real location (*Staging (Up)*) underneath. **Hidden events are never rendered** in the list (§10).
 - "Forms next service" link on the last stop navigates; back stack as today.
 - **Live refresh**: see §6.5.
 - All requests use an abort/sequence guard so a slow response for a previously-selected train can't overwrite the current one.

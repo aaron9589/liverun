@@ -23,7 +23,7 @@ A web app for planning and running model railway operating sessions. Features: v
 | `client/src/hooks/useLiveTimetable.ts` | Holds a timetable live: sync WS, rev checks, re-fetch on change/reconnect/wake. Used by CrewMobile and the guard panel |
 | `client/src/lib/jobDiff.ts` | `diffJobs()` (added/removed/reassigned/retimed/renamed per crew) + `describeJobChange()` |
 | `client/src/lib/mode.ts` | Entry routing: `resolveMode()` (planner / crew / guard / mode picker), saved mode, `switchMode()` |
-| `client/src/lib/stops.ts` | `sequenceStops()` (chronological, midnight-safe), `currentStop()`, run-order helpers |
+| `client/src/lib/stops.ts` | `runningOrder()`/`inRunningOrder()` (stored station order → running order), `sequenceStops()` (midnight-safe), `currentStop()`, run-order helpers |
 | `client/src/components/guard/` | Guard panel at `/guard` (`GuardPanel.tsx`, `StopTable.tsx`, `CrewPicker.tsx`, `DoorsCard.tsx`) |
 | `server/sounds.js` | Sound library `/api/sounds` (list/serve/upload/delete; name + magic-byte checks; seeds `server/default-sounds/` into `<data>/sounds` on first start) |
 | `client/src/hooks/useJmriThrottle.ts` | Browser → JMRI JSON throttle: acquire/release by roster name, heartbeat, reconnect, reported F states. Never queues commands |
@@ -66,7 +66,7 @@ Train:     id, timetable_id, name, color, notes, train_id?, direction?, crew_id?
 TrainStop: id, train_id, station_id, arrival (HH:MM|null), departure (HH:MM|null), special_instructions?, location_alias?
 Path:      id, timetable_id, name, stops[]  — reusable route template
 PathStop:  station_id, sort_order, travel_time_from_prev (min), dwell_time (min)
-Crew:      id, timetable_id, name, color
+Crew:      id, timetable_id, name, color, guard_visible? (offered in the guard panel's crew picker; opt-in)
 TimetableSettings: clock_enabled, clock_broker_url, clock_topic, auto_assign_min_break
 ```
 
@@ -121,6 +121,7 @@ All mutation endpoints return the full updated Timetable.
 - **Entry routing:** `main.tsx` uses `resolveMode()`: `…/guard` → guard panel, `…/mobile` → crew view, `?desktop` → planner, `?choose` → mode picker; otherwise the saved mode (`localStorage['liverun.mode']`) or, with none, mobile UA → picker / desktop → planner. `/guard/` and `/mobile/` redirect to the slash-less path with a relative `Location` (works under `BASE_PATH`).
 - **Train profiles, not train types:** sounds and decoder functions for a train come from the first `layout.train_profiles` entry whose glob matches `train_id` (the JMRI roster name). Actions that resolve to a function are disabled while the throttle isn't acquired; actions that don't resolve still play sounds. The guard panel's throttle follows the *displayed* train, so a train held behind the lost-train ACK banner keeps its throttle until ACK.
 - **LOA (spec §11):** sections are directional `from`→`to` station pairs matched on a train's stops, so no train types or odd/even rules. Raw topic values are shared by the server cache; latching is client-side and per device. Each element has *Grants* (default on) and *Revokes* (default tokens) flags: all granting elements clear at once → GRANTED; a revoking element going not-clear → COMPLETE (released, e.g. staff sunk; never re-granted). **Only the safeworking elements drive it: doors, pinned stops and the fast clock never do (L6)** — doors are not a safeworking element and must not be interlocked with LOA. The guard panel shows dots and labels only, never raw MQTT values. Guard panel only, not CrewMobile (L3).
+- **Stops are stored in station order, not running order:** the planner builds a train's stops from the sorted station list, so a train running the other way (Up) is stored backwards. Anything that needs running order (guard panel, LOA direction, boarding, events) must go through `runningOrder()` / `inRunningOrder()`; `sequenceStops()` already does.
 - **Guard events vs special instructions:** `guard_events` (per stop, hidden, guard panel only) are the scripted-event feature; `special_instructions` stays a public note (printed, station board) and is never converted automatically (spec D20).
 - **Guard panel never renders `special_instructions`** — on the owner's layout that field holds hidden scripted events (to be replaced by `guard_events`, spec §10).
 - **Station name style defaults:** `stationNameStyle()` in utils.ts returns `bold:true` when none of the three flags are set — preserving legacy bold appearance for existing stations.
