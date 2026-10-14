@@ -31,7 +31,10 @@ A web app for planning and running model railway operating sessions. Features: v
 | `client/src/lib/profiles.ts` | `resolveProfile()` (first glob match on `train_id`, else fallback) and `resolveAction()` (F-number or roster label → fn, with skip reasons) |
 | `client/src/lib/boarding.ts` | Pure boarding model: demand curve, rules, `sampleCount()`, `createBoardingRun()` run-down state machine |
 | `client/src/lib/sound.ts` | `playSound()` via the shared Web Audio context (unlocked by Tap to start) |
-| `client/src/components/layout/` | Layout settings sections (JMRI, Train profiles, Sound library, Guard) |
+| `client/src/components/layout/` | Layout settings sections (JMRI, Guard, Train profiles, Boarding, Stats, Guard events, Sound library) |
+| `client/src/lib/guardEvents.ts` | Pure guard-event engine: `rollEvents`/`reconcileRolled` (once per run, survives Control re-saves), `onDoor`/`tick` scheduler (station = door trigger + real-time delay; en-route = fraction of section run time from actual departure, dropped if the train stops first) |
+| `client/src/hooks/useGuardEvents.ts` | Guard panel wiring: per-train rolled state + un-ACKed banner queue in localStorage, 1 s tick |
+| `server/events.js` | Validation for `TrainStop.guard_events` placements and `layout.events` library |
 | `client/src/components/ChangeToasts.tsx` | Reusable toast stack + `useToasts()` (with history) |
 | `server/migrations.js` | Pure startup migrations (e.g. `stripTrainType`), called from `server/index.js` |
 | `client/src/App.tsx` | Root component — single source of truth for all UI state (~1100 lines) |
@@ -111,6 +114,7 @@ All mutation endpoints return the full updated Timetable.
 - **Live sync (`server/sync.js`):** `mutateTimetable` bumps `tt.rev` and notifies `onTimetableChange` listeners; sync coalesces these (~300 ms) into `timetable-updated` notices that carry no data — clients re-fetch. Status-only mutations (`complete`, `reset-complete`) pass `{ notify: false }` and send `completions` with `rev` instead, so crew taps don't make every screen re-fetch. Clients compare `rev` in `hello` to catch anything missed while disconnected.
 - **Entry routing:** `main.tsx` uses `resolveMode()`: `…/guard` → guard panel, `…/mobile` → crew view, `?desktop` → planner, `?choose` → mode picker; otherwise the saved mode (`localStorage['liverun.mode']`) or, with none, mobile UA → picker / desktop → planner. `/guard/` and `/mobile/` redirect to the slash-less path with a relative `Location` (works under `BASE_PATH`).
 - **Train profiles, not train types:** sounds and decoder functions for a train come from the first `layout.train_profiles` entry whose glob matches `train_id` (the JMRI roster name). Actions that resolve to a function are disabled while the throttle isn't acquired; actions that don't resolve still play sounds. The guard panel's throttle follows the *displayed* train, so a train held behind the lost-train ACK banner keeps its throttle until ACK.
+- **Guard events vs special instructions:** `guard_events` (per stop, hidden, guard panel only) are the scripted-event feature; `special_instructions` stays a public note (printed, station board) and is never converted automatically (spec D20).
 - **Guard panel never renders `special_instructions`** — on the owner's layout that field holds hidden scripted events (to be replaced by `guard_events`, spec §10).
 - **Station name style defaults:** `stationNameStyle()` in utils.ts returns `bold:true` when none of the three flags are set — preserving legacy bold appearance for existing stations.
 - **`reset-complete` route ordering:** The `POST /trains/reset-complete` route is registered before `/:trainId` routes so Express doesn't match the literal string "reset-complete" as a train ID.
