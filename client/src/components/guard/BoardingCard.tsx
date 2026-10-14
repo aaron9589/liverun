@@ -19,6 +19,8 @@ interface Props {
   onStats: (trigger: 'boarding_start' | 'door_close', record: StatsRecord) => void;
   /** Set when stats are enabled but the broker connection is not up. */
   statsDown: boolean;
+  /** The boarding count reached zero by itself (not when doors were closed early). */
+  onBoardingDone?: () => void;
 }
 
 type View =
@@ -31,12 +33,14 @@ type View =
 const fmtClock = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 
 /** Passenger counter (spec §8). Rendered with a key that changes with the train, so unmount clears any run. */
-export function BoardingCard({ config, event, onStats, statsDown }: Props) {
+export function BoardingCard({ config, event, onStats, statsDown, onBoardingDone }: Props) {
   const [view, setView] = useState<View>({ k: 'idle' });
   const cfgRef = useRef(config);
   cfgRef.current = config;
   const statsRef = useRef(onStats);
   statsRef.current = onStats;
+  const doneRef = useRef(onBoardingDone);
+  doneRef.current = onBoardingDone;
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runnerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,7 +94,7 @@ export function BoardingCard({ config, event, onStats, statsDown }: Props) {
       boarded: count, leftBehind: 0, runners: 0, clock: fmtClock(ctx.clockMinutes),
       dwellSeconds: 0, at: new Date().toISOString(),
     });
-    drive(run, 'boarding', count, ctx, () => { /* stays on screen until Close */ });
+    drive(run, 'boarding', count, ctx, () => { doneRef.current?.(); /* stays on screen until Close */ });
   };
 
   const eventN = event?.n;

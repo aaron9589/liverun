@@ -6,7 +6,7 @@ import { requestWakeLock, unlockAudio } from '../../lib/audio';
 import { playSound } from '../../lib/sound';
 import { resolveProfile } from '../../lib/profiles';
 import { switchMode } from '../../lib/mode';
-import { autoSelectTrain, formsNext as findFormsNext, sequenceStops, sortByRun, type SeqStop } from '../../lib/stops';
+import { autoSelectTrain, currentStop, formsNext as findFormsNext, sequenceStops, sortByRun, type SeqStop } from '../../lib/stops';
 import { describeJobChange, diffJobs } from '../../lib/jobDiff';
 import type { Timetable, Train } from '../../types';
 import { ChangeToasts, useToasts } from '../ChangeToasts';
@@ -21,6 +21,10 @@ import { useMqttPublish } from '../../hooks/useMqttPublish';
 import { buildBoardingContext } from '../../lib/boardingContext';
 import { statsMessage } from '../../lib/stats';
 import { StopTable } from './StopTable';
+import { EventBanner } from './EventBanner';
+import { useGuardEvents } from '../../hooks/useGuardEvents';
+import { stopKeyOf, type RolledEvent } from '../../lib/guardEvents';
+import { eventPublishPayload } from '../../lib/guardEventPublish';
 
 const CREW_KEY = 'guard:crew';
 const trainKey = (ttId: string) => `guard:train:${ttId}`;
@@ -199,6 +203,10 @@ export function GuardPanel() {
   const boardingSeqN = useRef(0);
   const liveRef = useRef({ train, seq, timetable, clockShown, pinnedStopId });
   liveRef.current = { train, seq, timetable, clockShown, pinnedStopId };
+  // Guard events (spec §10): door events go to the engine at the stop the doors opened at.
+  const guardDoorRef = useRef<(type: 'door_open' | 'boarding_done' | 'door_close') => void>(() => {});
+  const onDoorsOpened = useCallback(() => guardDoorRef.current('door_open'), []);
+  const onBoardingDone = useCallback(() => guardDoorRef.current('boarding_done'), []);
   const onBoardingStart = useCallback(() => {
     const l = liveRef.current;
     const ctx = l.train && l.timetable
@@ -210,6 +218,7 @@ export function GuardPanel() {
     setBoardingEvent({ n: ++boardingSeqN.current, type: 'start', ctx });
   }, []);
   const onDoorsClosed = useCallback(() => {
+    guardDoorRef.current('door_close');
     setBoardingEvent({ n: ++boardingSeqN.current, type: 'close' });
     setPinKey(null); // a manual pin lasts until the next door close (§6.3)
   }, []);
@@ -217,13 +226,58 @@ export function GuardPanel() {
   // Stats (spec §9) over the clock broker (D2).
   const stats = layout.stats;
   const statsActive = stats.enabled && !!stats.topic.trim();
-  const mqttPub = useMqttPublish(settings?.clock_broker_url ?? '', statsActive);
+  const eventsTopic = layout.events.publish_topic.trim();
+  const mqttPub = useMqttPublish(settings?.clock_broker_url ?? '', statsActive || !!eventsTopic);
   const statsRef = useRef(stats);
   statsRef.current = stats;
   const onStats = useCallback((trigger: 'boarding_start' | 'door_close', record: Parameters<typeof statsMessage>[2]) => {
     const m = statsMessage(statsRef.current, trigger, record);
     if (m) mqttPub.publish(m.topic, m.payload);
   }, [mqttPub.publish]);
+
+  // Guard events (spec §10): hidden, scripted. The displayed train owns them (like the throttle).
+  const openStopKey = useRef<string | null>(null);
+  const eventCtx = useRef({ timetable, clockShown, eventsTopic, publish: mqttPub.publish });
+  eventCtx.current = { timetable, clockShown, eventsTopic, publish: mqttPub.publish };
+  const onEventFire = useCallback((ev: RolledEvent, t: Train) => {
+    const c = eventCtx.current;
+    void playSound(ev.sound || alertSound.current);
+    if (ev.action) {
+      // Runs before the guard acknowledges (D19); silently skipped if it doesn't resolve.
+      const r = actionsRef.current.press(ev.action);
+      if (!r.sent) console.log(`[guard events] action '${ev.action}' not run`, r.resolved);
+    }
+    if (c.eventsTopic && c.timetable) {
+      const payload = eventPublishPayload(ev, t, c.timetable.stations, c.clockShown, Date.now());
+      c.publish(c.eventsTopic, JSON.stringify(payload));
+    }
+  }, []);
+  const guardEvents = useGuardEvents({
+    timetableId: timetable?.id ?? null,
+    train,
+    library: layout.events.library,
+    clockMin: clockShown,
+    onFire: onEventFire,
+  });
+  guardDoorRef.current = (type) => {
+    const l = liveRef.current;
+    if (!l.train) return;
+    let stopId: string | null = null;
+    if (type === 'door_open') {
+      const i = currentStop(l.seq, l.clockShown, l.pinnedStopId).index;
+      stopId = i >= 0 ? l.seq[i].stop.id : null;
+      openStopKey.current = stopId ? stopKeyOf(l.train, stopId) : null;
+    } else if (!openStopKey.current) {
+      const i = currentStop(l.seq, l.clockShown, l.pinnedStopId).index;
+      stopId = i >= 0 ? l.seq[i].stop.id : null;
+      openStopKey.current = stopId ? stopKeyOf(l.train, stopId) : null;
+    }
+    if (openStopKey.current) guardEvents.door(type, openStopKey.current);
+  };
+  useEffect(() => { openStopKey.current = null; }, [shownTrainId]);
+  const resetEvents = () => {
+    if (window.confirm('Reset events for this train? They will be rolled again.')) guardEvents.reset();
+  };
 
   // React to Control's changes: toasts, flash retimed stops, hold a lost train.
   const [flash, setFlash] = useState<ReadonlySet<string>>(() => new Set());
@@ -379,6 +433,7 @@ export function GuardPanel() {
               <div className="absolute right-0 mt-1 z-30 w-48 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); setPickingCrew(true); }}>Change crew</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); setHistoryOpen(true); }}>Changes from Control</button>
+                <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); resetEvents(); }}>Reset events for this train</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={switchMode}>Switch mode</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => window.location.reload()}>Reload</button>
               </div>
@@ -434,6 +489,7 @@ export function GuardPanel() {
             hasTrainId={!!train.train_id}
             onBoardingStart={onBoardingStart}
             onDoorsClosed={onDoorsClosed}
+            onDoorsOpened={onDoorsOpened}
           />
           <BoardingCard
             key={train.id + (lost ? ':lost' : '')}
@@ -441,6 +497,7 @@ export function GuardPanel() {
             event={boardingEvent}
             onStats={onStats}
             statsDown={statsActive && mqttPub.status !== 'connected'}
+            onBoardingDone={onBoardingDone}
           />
         </section>
         <section>
@@ -478,6 +535,7 @@ export function GuardPanel() {
           <button onClick={ackActive} className="min-h-[48px] px-5 rounded-lg bg-amber-600 hover:bg-amber-500 font-bold text-slate-950">ACK</button>
         </div>
       )}
+      <EventBanner queue={guardEvents.queue} onAck={guardEvents.ack} />
       {body}
       <ChangeToasts toasts={toasts.toasts} onDismiss={toasts.dismiss} max={3} placement="bottom" />
       {historyOpen && (

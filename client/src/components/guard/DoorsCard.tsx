@@ -15,6 +15,8 @@ interface Props {
   onBoardingStart: () => void;
   /** Hook point for the boarding phase: Doors Close was pressed. */
   onDoorsClosed: () => void;
+  /** Doors Open was pressed (immediately, before the open sound). */
+  onDoorsOpened?: () => void;
 }
 
 const NO_SOUNDS = { door_open: '', door_close: '', bell: '' };
@@ -34,7 +36,7 @@ function skipChip(r: ResolvedAction, hasTrainId: boolean, soundsOnly: boolean): 
  * Doors / DOIL / Bell (spec §7.2). Rendered with key={train.id}, so unmount =
  * train change and pending timers/sounds are dropped with it.
  */
-export function DoorsCard({ profile, throttle, actions, boarding, hasTrainId, onBoardingStart, onDoorsClosed }: Props) {
+export function DoorsCard({ profile, throttle, actions, boarding, hasTrainId, onBoardingStart, onDoorsClosed, onDoorsOpened }: Props) {
   const sounds = profile?.sounds ?? NO_SOUNDS;
   const soundsOnly = !profile || Object.keys(profile.functions).length === 0;
   const open = actions.resolve('door_open');
@@ -78,6 +80,7 @@ export function DoorsCard({ profile, throttle, actions, boarding, hasTrainId, on
   const pressOpen = () => {
     cancelPending();
     actions.press('door_open');
+    onDoorsOpened?.();
     setLocalDoil(true);
     afterSound(sounds.door_open, boarding.start_delay_s, onBoardingStart);
   };
