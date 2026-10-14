@@ -3,12 +3,19 @@ import { useLiveTimetable } from '../../hooks/useLiveTimetable';
 import { api } from '../../api';
 import { useFastClock } from '../../hooks/useFastClock';
 import { requestWakeLock, unlockAudio } from '../../lib/audio';
+import { playSound } from '../../lib/sound';
+import { resolveProfile } from '../../lib/profiles';
 import { switchMode } from '../../lib/mode';
 import { autoSelectTrain, formsNext as findFormsNext, sequenceStops, sortByRun, type SeqStop } from '../../lib/stops';
 import { describeJobChange, diffJobs } from '../../lib/jobDiff';
 import type { Timetable, Train } from '../../types';
 import { ChangeToasts, useToasts } from '../ChangeToasts';
+import { useLayout, getPanelId } from '../../hooks/useLayout';
+import { useJmriRoster } from '../../hooks/useJmriRoster';
+import { useJmriThrottle } from '../../hooks/useJmriThrottle';
+import { useProfileActions } from '../../hooks/useProfileActions';
 import { CrewPicker } from './CrewPicker';
+import { DoorsCard } from './DoorsCard';
 import { StopTable } from './StopTable';
 
 const CREW_KEY = 'guard:crew';
@@ -64,6 +71,11 @@ export function GuardPanel() {
   const { timetable, activeId, status: liveStatus } = live;
 
   const toasts = useToasts();
+
+  const layout = useLayout();
+  const alertSound = useRef(layout.guard.event_alert_sound);
+  alertSound.current = layout.guard.event_alert_sound;
+  const playAlert = useCallback(() => { void playSound(alertSound.current); }, []);
 
   // Follow the server's active timetable. The first one is adopted directly;
   // a later switch by Control waits for the guard's ACK (spec §6.5).
@@ -131,6 +143,7 @@ export function GuardPanel() {
   const train = lost ? lost.train : trains.find((t) => t.id === selectedId) ?? null;
   const select = useCallback((id: string, push: boolean) => {
     if (!timetable) return;
+    actionsRef.current.stopAll();
     isAuto.current = false;
     writeStore(trainKey(timetable.id), id);
     setBackStack((s) => (push && selectedId ? [...s, selectedId] : []));
@@ -140,10 +153,37 @@ export function GuardPanel() {
   const goBack = () => {
     const prev = backStack[backStack.length - 1];
     if (!prev || !timetable) return;
+    actionsRef.current.stopAll();
     writeStore(trainKey(timetable.id), prev);
     setBackStack((s) => s.slice(0, -1));
     setSelectedId(prev);
   };
+
+  // JMRI: the displayed train drives the throttle, so a train held behind the
+  // lost-train banner keeps its throttle (Door Close still reaches it) until ACK.
+  const panelId = useMemo(getPanelId, []);
+  const roster = useJmriRoster(layout.jmri.url);
+  const trainIdName = train?.train_id || null;
+  const rosterEntry = useMemo(
+    () => (trainIdName ? roster.entries.find((e) => e.name === trainIdName) ?? null : null),
+    [roster.entries, trainIdName],
+  );
+  const profile = useMemo(
+    () => resolveProfile(layout.train_profiles, train?.train_id),
+    [layout.train_profiles, train?.train_id],
+  );
+  const throttle = useJmriThrottle(layout.jmri.url, trainIdName, 'guard-' + panelId);
+  const actions = useProfileActions(throttle, profile, rosterEntry);
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+  // Turn off anything we left on before the throttle moves to another train.
+  const shownTrainId = train?.id ?? null;
+  useEffect(() => () => actionsRef.current.stopAll(), [shownTrainId]);
+  const jmriConfigured = throttle.status !== 'unconfigured';
+
+  // Placeholders for the boarding phase.
+  const onBoardingStart = useCallback(() => { /* boarding UI: next phase */ }, []);
+  const onDoorsClosed = useCallback(() => { /* boarding UI: next phase */ }, []);
 
   const seq = useMemo(() => (train ? sequenceStops(train) : []), [train]);
 
@@ -165,6 +205,7 @@ export function GuardPanel() {
     if (!prev || !timetable || prev.id !== timetable.id || !crewValid || !crewId) return;
     const changes = diffJobs(prev, timetable, crewId === '*' ? null : [crewId]);
     if (changes.length === 0) return;
+    if (changes.some((c) => c.type === 'added')) playAlert();
     if (changes.length > 5) toasts.push(`Control changed ${changes.length} of your jobs`, 'warning');
     else for (const c of changes) { const d = describeJobChange(c); toasts.push(d.message, d.tone); }
 
@@ -175,7 +216,7 @@ export function GuardPanel() {
         c.type === 'removed' ? `Control has removed ${c.train.name} from your jobs`
         : c.type === 'reassigned' ? `Control has reassigned ${c.train.name} to ${c.crew?.name ?? 'no crew'}`
         : null;
-      if (lostMsg) { lostRef.current = { train: c.train, message: lostMsg }; setLost(lostRef.current); }
+      if (lostMsg) { playAlert(); lostRef.current = { train: c.train, message: lostMsg }; setLost(lostRef.current); }
       if (c.type === 'retimed') {
         setFlash(new Set(c.stopIds));
         if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -209,7 +250,14 @@ export function GuardPanel() {
     setSelectedId(autoSelectTrain(trains, clockShown)?.id ?? null);
   }, [lost, timetable, trains, selectedId, clockShown]);
 
+  // Control banners get the alert sound too.
+  const lostShown = lost !== null;
+  useEffect(() => { if (lostShown) playAlert(); }, [lostShown, playAlert]);
+  const activeBannerShown = pendingActive !== undefined;
+  useEffect(() => { if (activeBannerShown) playAlert(); }, [activeBannerShown, playAlert]);
+
   const ackLost = () => {
+    actions.stopAll();
     lostRef.current = null;
     setLost(null);
     setBackStack([]);
@@ -218,6 +266,7 @@ export function GuardPanel() {
     setSelectedId(autoSelectTrain(trains, clockShown)?.id ?? null);
   };
   const ackActive = () => {
+    actions.stopAll();
     const next = pendingActive ?? null;
     setPendingActive(undefined);
     lostRef.current = null;
@@ -278,6 +327,13 @@ export function GuardPanel() {
           {formatClock(clockShown)}
         </span>
         <Dot ok={liveStatus === 'live'} warn={liveStatus === 'connecting'} label={liveStatus === 'live' ? 'Live' : liveStatus === 'connecting' ? 'Connecting' : 'Reconnecting'} />
+        {jmriConfigured && (
+          <Dot
+            ok={throttle.status === 'connected' && (throttle.acquired || !trainIdName)}
+            warn={throttle.status === 'connecting' || throttle.status === 'connected'}
+            label={throttle.status !== 'connected' ? 'JMRI off' : trainIdName && !throttle.acquired ? 'JMRI…' : 'JMRI'}
+          />
+        )}
         <Dot ok={clockLive} warn={clockStatus === 'connecting'} label={clockConfigured ? (clockLive ? 'Clock' : 'Clock off') : 'No clock'} />
         <div className="relative">
           <button
@@ -337,6 +393,16 @@ export function GuardPanel() {
               <dd className="whitespace-pre-wrap">{train.notes || <span className="text-slate-500">—</span>}</dd>
             </dl>
           </div>
+          <DoorsCard
+            key={train.id}
+            profile={profile}
+            throttle={throttle}
+            actions={actions}
+            boarding={layout.boarding}
+            hasTrainId={!!train.train_id}
+            onBoardingStart={onBoardingStart}
+            onDoorsClosed={onDoorsClosed}
+          />
         </section>
         <section>
           <StopTable
