@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LoaConfig, LoaValue, Station, Train } from '../types';
 import {
-  departureWarning, initialLoaState, parseLoaState, sectionsForTrain, stepLoa,
+  initialLoaState, parseLoaState, sectionsForTrain, stepLoa,
   type LoaTrainState, type SectionMatch, type SectionView,
 } from '../lib/loa';
 
@@ -24,8 +24,6 @@ interface Args {
   config: LoaConfig | null | undefined;
   /** Topic cache from useLiveTimetable().loaValues. */
   values: Record<string, LoaValue>;
-  /** train.stops index of the §6.3 current stop (lib/loa `routeStopIndex`), or null. */
-  currentStopIndex: number | null;
 }
 
 export interface UseLoa {
@@ -34,16 +32,6 @@ export interface UseLoa {
   sections: SectionView[];
   /** First section that isn't complete, or null. */
   current: SectionView | null;
-  /**
-   * Doors Close at train.stops[stopIndex] (the stop the doors were opened at):
-   * the section starting there without authority, or null. Always null when
-   * `config.warn_on_depart` is off. Uses the sections from the latest render.
-   */
-  warnOnDepart: (stopIndex: number) => SectionView | null;
-  /** Doors Open at train.stops[stopIndex]: marks sections left behind, completes ones the train has moved past. */
-  onDoorOpen: (stopIndex: number) => void;
-  /** Doors Close at train.stops[stopIndex] (where the doors were opened): the train is leaving sections that start there. */
-  onDoorClose: (stopIndex: number) => void;
   /** "Reset LOA for this train": forget grants and completions. */
   reset: () => void;
 }
@@ -51,9 +39,9 @@ export interface UseLoa {
 /**
  * Limit of Authority for the displayed train (spec §11.4): latch + complete
  * state kept in localStorage per timetable + train, re-stepped whenever the
- * train, config, topic values or current stop change.
+ * train, config or topic values change. Nothing else (doors, clock) feeds it.
  */
-export function useLoa({ timetableId, train, stations, config, values, currentStopIndex }: Args): UseLoa {
+export function useLoa({ timetableId, train, stations, config, values }: Args): UseLoa {
   const matches = useMemo(
     () => (train && config ? sectionsForTrain(train, stations, config) : []),
     [train, stations, config],
@@ -69,8 +57,8 @@ export function useLoa({ timetableId, train, stations, config, values, currentSt
   );
 
   const result = useMemo(
-    () => (state ? stepLoa(state, matches, values, { currentStopIndex }) : null),
-    [state, matches, values, currentStopIndex],
+    () => (state ? stepLoa(state, matches, values) : null),
+    [state, matches, values],
   );
 
   // Persist and hold whatever the step changed (stepLoa returns the same object when nothing did).
@@ -84,25 +72,8 @@ export function useLoa({ timetableId, train, stations, config, values, currentSt
   const sections = useMemo(() => result?.sections ?? [], [result]);
   const current = useMemo(() => sections.find((s) => s.current) ?? null, [sections]);
 
-  const live = useRef({ key, timetableId, state: result?.state ?? null, matches, values, currentStopIndex, sections, config });
-  live.current = { key, timetableId, state: result?.state ?? null, matches, values, currentStopIndex, sections, config };
-
-  const doorStep = useCallback((door: { doorOpenStopIndex: number } | { doorCloseStopIndex: number }) => {
-    const l = live.current;
-    if (!l.key || !l.timetableId || !l.state) return;
-    const next = stepLoa(l.state, l.matches, l.values, { currentStopIndex: l.currentStopIndex, ...door }).state;
-    if (next === l.state) return;
-    save(l.timetableId, next);
-    setHeld({ key: l.key, state: next });
-  }, []);
-  const onDoorOpen = useCallback((stopIndex: number) => doorStep({ doorOpenStopIndex: stopIndex }), [doorStep]);
-  const onDoorClose = useCallback((stopIndex: number) => doorStep({ doorCloseStopIndex: stopIndex }), [doorStep]);
-
-  const warnOnDepart = useCallback((stopIndex: number) => {
-    const l = live.current;
-    if (!l.config?.warn_on_depart) return null;
-    return departureWarning(l.sections, stopIndex);
-  }, []);
+  const live = useRef({ key, timetableId, state: result?.state ?? null });
+  live.current = { key, timetableId, state: result?.state ?? null };
 
   const reset = useCallback(() => {
     const l = live.current;
@@ -112,5 +83,5 @@ export function useLoa({ timetableId, train, stations, config, values, currentSt
     setHeld({ key: l.key, state: fresh });
   }, []);
 
-  return { matches, sections, current, warnOnDepart, onDoorOpen, onDoorClose, reset };
+  return { matches, sections, current, reset };
 }

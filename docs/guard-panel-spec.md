@@ -442,7 +442,7 @@ Flashing banner + alert sound until **ACK**; multiple pending events queue. Opti
 
 ## 11. Limit of Authority (LOA)
 
-Decisions L1–L5 are recorded inline below. The guard panel shows dots and labels only, never raw MQTT values.
+Decisions L1–L6 are recorded inline below. The guard panel shows dots and labels only, never raw MQTT values.
 
 ### 11.1 What the old panel did
 
@@ -506,17 +506,15 @@ Each element shows a dot: green = clear, amber = caution, red = not clear, grey 
 ### 11.4 Section state
 
 ```
-UNKNOWN ──first values──▶ AWAIT ──all granting elements──▶ GRANTED ──revoking element goes not-clear──▶ COMPLETE
-                            ▲      clear at once            │        (train has left `from`)
-                            └── revoking element goes ──────┘
-                                not-clear before departure
+UNKNOWN ──first values──▶ AWAIT ──all granting elements──▶ GRANTED ──revoking element──▶ COMPLETE
+                                    clear at once                    goes not-clear       (released)
 ```
 
+LOA is driven **only by the safeworking elements (L6)**. The guard's doors are not a safeworking element, so they are never interlocked with LOA in either direction. Pinned stops and the fast clock play no part either.
+
 - **Grant rule (L1)**: GRANTED only when **every granting element is clear at the same moment** (caution counts as clear). Elements not ticked *Grants* are shown but never hold the grant up.
-- **Revoke (L5)**: a GRANTED section is released when a *Revokes* element goes not-clear ('no value' never revokes). What that means depends on whether the train has **left `from`** (Doors Close there, or any later Doors Open or pinned stop):
-  - **Not yet left:** the authority was withdrawn. Back to AWAIT, and the departure warning (§11.6) still fires. If only a revoke-only element dropped, the section waits for a fresh all-clear rather than re-granting from the same one.
-  - **Left:** the authority is finished, e.g. the staff sunk back in at Berry. The section is COMPLETE.
-- **Complete, fallbacks**: so the panel never sticks, a section also completes when doors open at `to` and nothing will revoke it (never granted, or no *Revokes* element), or when the train moves on past `to` (doors opened at, or a stop pinned at, a later stop). **Never from the fast clock**: a late train would lose its authority display. A completed section freezes.
+- **Revoke (L5)**: a GRANTED section is released when a *Revokes* element goes not-clear ('no value' never revokes), e.g. the staff sunk at Berry. The section is then COMPLETE and the panel moves to the next section. In the field, the interlocking stops the departure signal re-clearing while the staff is out, so the train keeps its authority all the way to the staff being sunk.
+- **Frozen**: a completed section is never re-granted, so a following train getting the same staff can't bring it back. If Control cancels an authority and then re-issues it, the guard uses **Reset LOA for this train**.
 - **Current section**: the first section on the train's route that isn't COMPLETE.
 - **Persistence**: latch and complete state are stored per device under timetable + train id, the same as guard events, so a reload keeps them. The ☰ menu gets **Reset LOA for this train**.
 
@@ -535,7 +533,7 @@ Latching stays client-side (§11.4). Only raw topic values are shared.
 
 - **Strip:** the current section is always visible under the header, e.g. `Kiama → Berry · AUTHORITY GRANTED` or `AWAIT: Kiama–Berry staff, Sig 7`. It names whatever isn't clear yet.
 - **Authority tab:** sits next to *Stops* and shows every section on the train's route in order, with element dots. Completed sections are greyed out, and the current one is highlighted.
-- **Warning on departure (L2):** if the guard presses Doors Close at a section's `from` station while that section is AWAIT, show a warning banner with the alert sound ("No authority: Kiama → Berry"). It's a warning, not a block. On by default, and can be turned off in `loa.warn_on_depart`.
+- **No departure warning (L2 withdrawn, L6):** the doors are not interlocked with LOA, so Doors Close never checks authority.
 - A train with no matching sections shows no strip and no tab.
 
 ### 11.7 Editor (D4)

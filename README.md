@@ -135,7 +135,7 @@ The **guard panel** is built for a tablet riding with the train:
 - **Doors, bell and DOIL** — sent straight to the loco's decoder through JMRI. **Train profiles** (glob patterns on the JMRI roster name) choose the tablet sounds and the function keys per loco
 - **Passenger boarding** — a configurable demand model counts passengers on at each stop and can publish stats over MQTT
 - **Guard events** — hidden scripted events (station or en-route) fire as a banner with a sound, and can trigger a loco function
-- **Limit of Authority** — directional sections between stations, each watching MQTT topics for signals, staffs and other conditions. The panel shows the current section (`AWAIT` / `AUTHORITY GRANTED`), an Authority tab with every element, and warns if the doors close at a section's start without authority. The server caches topic values so a reloaded tablet sees them straight away
+- **Limit of Authority** — directional sections between stations, each watching MQTT topics for signals, staffs and other conditions. Each element can be ticked to *grant* (all granting elements clear at once) and to *revoke* (e.g. the staff sunk at the far end releases the section). The panel shows the current section (`AWAIT` / `AUTHORITY GRANTED`) and an Authority tab with every element. LOA follows the safeworking elements only, never the doors. The server caches topic values so a reloaded tablet sees them straight away
 
 ### Live API for External Systems
 

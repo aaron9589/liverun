@@ -228,7 +228,6 @@
           }
         ]
       }
-    ],
-    "warn_on_depart": true
+    ]
   }
 }

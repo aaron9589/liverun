@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stripText, warningText } from './loaDisplay';
+import { stripText } from './loaDisplay';
 import type { ElementView, SectionView } from './loa';
 
 const cond = (label: string) => ({ type: 'signal' as const, label, topic: 't', clear: ['clear'] });
@@ -24,8 +24,5 @@ describe('loaDisplay', () => {
     const sel = { type: 'selector' as const, label: 'Points', topic: 'p', options: {}, default: 'A' };
     const e: ElementView = { element: sel, condition: cond('Sig 9'), option: 'CLOSED', optionFrom: 'value', value: null, state: 'stop', grants: true, revokes: false };
     expect(stripText(sv('await', [e])).text).toBe('AWAIT: Sig 9');
-  });
-  it('warning text', () => {
-    expect(warningText(sv('await', [ev('Staff', 'stop')]))).toEqual({ title: 'No authority: Kiama-Berry', detail: 'Staff' });
   });
 });

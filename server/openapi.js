@@ -72,7 +72,6 @@ const spec = {
                       type: 'object',
                       description: 'Limit of Authority: directional sections between stations, each with signal/token/condition/selector elements watching MQTT topics.',
                       properties: {
-                        warn_on_depart: { type: 'boolean', description: "Warn (not block) when doors close at a section's start without authority" },
                         sections: {
                           type: 'array',
                           items: {

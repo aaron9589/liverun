@@ -16,7 +16,7 @@ describe('mergeLayoutPatch', () => {
     const merged = mergeLayoutPatch(DEFAULT_LAYOUT, { stats: { enabled: true }, loa: { sections: [] } });
     expect(merged.stats).toEqual({ ...DEFAULT_LAYOUT.stats, enabled: true });
     expect(merged.boarding).toBe(DEFAULT_LAYOUT.boarding);
-    expect(merged.loa.warn_on_depart).toBe(true);
+    expect(merged.loa.sections).toEqual([]);
   });
   it('replaces arrays and ignores prototype keys', () => {
     const merged = mergeLayoutPatch({ a: [1, 2], b: { c: 1 } }, JSON.parse('{"a":[3],"__proto__":{"x":1}}'));

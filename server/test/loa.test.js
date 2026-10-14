@@ -18,17 +18,16 @@ const sel = (over = {}) => ({
   options: { CLOSED: sig({ topic: 'a/c' }), THROWN: sig({ topic: 'a/t' }) }, default: 'CLOSED', ...over,
 });
 const sec = (over = {}) => ({ id: 's1', name: 'A to B', from: 'A', to: 'B', only: [], except: [], elements: [sig()], ...over });
-const loa = (sections, over = {}) => ({ sections, warn_on_depart: true, ...over });
+const loa = (sections, over = {}) => ({ sections, ...over });
 
 test('valid configs pass', () => {
-  assert.strictEqual(validateLoaConfig({ sections: [], warn_on_depart: true }), null);
+  assert.strictEqual(validateLoaConfig({ sections: [] }), null);
   assert.strictEqual(validateLoaConfig(loa([sec(), sec({ id: 's2', elements: [sel(), sig({ type: 'token', grants: false, revokes: false, caution: ['X'] })] })])), null);
 });
 
 test('rejects bad top-level shapes', () => {
   for (const v of [null, [], 'x', 5]) assert.ok(validateLoaConfig(v));
   assert.ok(validateLoaConfig({ sections: {} }));
-  assert.ok(validateLoaConfig({ sections: [], warn_on_depart: 'yes' }));
   assert.ok(validateLoaConfig(loa(Array.from({ length: 201 }, (_, i) => sec({ id: `s${i}` })))));
 });
 
@@ -61,7 +60,7 @@ test('validateLayout runs LOA validation', () => {
 });
 
 test('GET/PUT layout storage round-trips loa', () => {
-  const body = loa([sec({ elements: [sel(), sig({ caution: ['WARN'], revokes: true })] })], { warn_on_depart: false });
+  const body = loa([sec({ elements: [sel(), sig({ caution: ['WARN'], revokes: true })] })]);
   setLayout(validateLayout({ loa: body }).layout);
   assert.deepStrictEqual(getLayout().loa, body);
 });

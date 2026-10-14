@@ -2,10 +2,9 @@ import { describe, it, expect } from 'vitest';
 import type { LoaCondition, LoaConfig, LoaSection, LoaSelector, LoaValue, Station, Train, TrainStop } from '../types';
 import {
   conditionState, evaluateElement, sectionsForTrain, stepLoa, initialLoaState, parseLoaState,
-  departureWarning, currentSection, routeStopIndex, stopIndexOf, applyLoaValues, hasUnlatch,
+  currentSection, applyLoaValues, hasRevoke,
   type LoaTrainState, type SectionMatch,
 } from './loa';
-import { sequenceStops, currentStop } from './stops';
 
 const station = (id: string, name: string): Station =>
   ({ id, timetable_id: 'x', name, short_code: id, distance: null, graph_pos: 0, sort_order: 0, branch_name: null });
@@ -23,7 +22,7 @@ const token = (topic: string, over: Partial<LoaCondition> = {}): LoaCondition =>
   ({ type: 'token', label: topic, topic, clear: ['CATS'], ...over });
 const section = (id: string, from: string, to: string, over: Partial<LoaSection> = {}): LoaSection =>
   ({ id, name: `${from} → ${to}`, from, to, only: [], except: [], elements: [], ...over });
-const config = (...sections: LoaSection[]): LoaConfig => ({ sections, warn_on_depart: true });
+const config = (...sections: LoaSection[]): LoaConfig => ({ sections });
 const vals = (o: Record<string, string>): Record<string, LoaValue> =>
   Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { value: v, at: '2026-01-01T00:00:00Z' }]));
 const spans = (ms: SectionMatch[]) => ms.map((m) => [m.key, m.fromIndex, m.toIndex]);
@@ -137,15 +136,14 @@ describe('stepLoa latch', () => {
   const bk = section('bk', 'Berry', 'Kiama', { elements: [sig('up'), token('staff')] });
   const t = train([st('kia'), st('bry'), st('kia')]);
   const matches = sectionsForTrain(t, STATIONS, config(kb, bk));
-  const at0 = { currentStopIndex: 0 };
   const phases = (r: ReturnType<typeof stepLoa>) => r.sections.map((s) => s.phase);
 
   /** Steps through a list of value snapshots, threading state. */
-  function run(snaps: Record<string, string>[], pos = at0, start: LoaTrainState = initialLoaState('t1')) {
+  function run(snaps: Record<string, string>[], start: LoaTrainState = initialLoaState('t1'), ms = matches) {
     let state = start;
     let last!: ReturnType<typeof stepLoa>;
     for (const v of snaps) {
-      last = stepLoa(state, matches, vals(v), pos);
+      last = stepLoa(state, ms, vals(v));
       state = last.state;
     }
     return last;
@@ -175,143 +173,76 @@ describe('stepLoa latch', () => {
   it('caution counts as clear for the grant', () => {
     const c = section('kb', 'Kiama', 'Berry', { elements: [sig('down', { clear: ['G'], caution: ['Y'] })] });
     const ms = sectionsForTrain(train([st('kia'), st('bry')]), STATIONS, config(c));
-    const r = stepLoa(initialLoaState('t1'), ms, vals({ down: 'Y' }), at0);
+    const r = stepLoa(initialLoaState('t1'), ms, vals({ down: 'Y' }));
     expect(r.sections[0].phase).toBe('granted');
     expect(r.sections[0].elements[0].state).toBe('caution');
   });
 
-  it('signal back to stop does not revoke; unknown does not revoke', () => {
-    const r = run([{ down: 'THROWN', staff: 'CATS' }, { down: 'CLOSED', staff: 'CATS' }, {}]);
-    expect(r.sections[0].phase).toBe('granted');
-    expect(r.sections[0].pending.map((e) => e.state)).toEqual(['unknown', 'unknown']);
+  it('the old Kiama → Berry run: departure signal back to stop holds, staff sunk at Berry releases', () => {
+    let r = run([{ down: 'THROWN', staff: 'CATS' }]);
+    // The train passes the departure signal; it returns to stop (and can't re-clear while the staff is out)
+    r = run([{ down: 'CLOSED', staff: 'CATS' }, {}], r.state);
+    expect(phases(r)[0]).toBe('granted');
+    // Staff sunk at Berry: released, the panel moves on to the next section
+    r = run([{ down: 'CLOSED', staff: 'IN', up: 'CLOSED' }], r.state);
+    expect(phases(r)).toEqual(['complete', 'await']);
+    expect(r.state).toMatchObject({ granted: [], complete: ['kb#0'] });
+    expect(currentSection(r.sections)?.match.key).toBe('bk#0');
+    // Back toward Kiama: the staff is issued again with the up signal clear
+    r = run([{ down: 'CLOSED', staff: 'CATS', up: 'THROWN' }], r.state);
+    expect(phases(r)).toEqual(['complete', 'granted']);
   });
 
-  it('token going stop revokes back to await; a later all-clear re-grants', () => {
+  it('a released section is frozen: a following train getting the same staff cannot re-grant it', () => {
     let r = run([{ down: 'THROWN', staff: 'CATS' }, { down: 'CLOSED', staff: 'IN' }]);
-    expect(r.sections[0].phase).toBe('await');
-    expect(r.state.granted).toEqual([]);
-    r = run([{ down: 'THROWN', staff: 'CATS' }], at0, r.state);
-    expect(r.sections[0].phase).toBe('granted');
+    expect(phases(r)[0]).toBe('complete');
+    r = run([{ down: 'THROWN', staff: 'CATS' }], r.state);
+    expect(phases(r)[0]).toBe('complete');
   });
 
   it('explicit revokes on a signal; revokes: false on a token', () => {
     const c = section('kb', 'Kiama', 'Berry', { elements: [sig('down', { revokes: true }), token('staff', { revokes: false })] });
     const ms = sectionsForTrain(train([st('kia'), st('bry')]), STATIONS, config(c));
-    let r = stepLoa(initialLoaState('t1'), ms, vals({ down: 'THROWN', staff: 'CATS' }), at0);
-    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'IN' }), at0);
+    let r = run([{ down: 'THROWN', staff: 'CATS' }, { down: 'THROWN', staff: 'IN' }], undefined, ms);
     expect(r.sections[0].phase).toBe('granted');
-    r = stepLoa(r.state, ms, vals({ down: 'CLOSED', staff: 'IN' }), at0);
-    expect(r.sections[0].phase).toBe('await');
-  });
-
-  it('a granted section holds past doors open at to until the staff is returned, then completes', () => {
-    let r = run([{ down: 'THROWN', staff: 'CATS' }]);
-    // Depart Kiama (doors were opened and closed there), signal back to stop behind the train
-    r = stepLoa(r.state, matches, vals({ down: 'THROWN', staff: 'CATS' }), { currentStopIndex: null, doorCloseStopIndex: 0 });
-    expect(r.state.departed).toEqual(['kb#0']);
-    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'CATS' }), { currentStopIndex: null });
-    expect(phases(r)[0]).toBe('granted');
-    // Doors open at Berry: still granted, the staff is still out
-    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'CATS' }), { currentStopIndex: null, doorOpenStopIndex: 1 });
-    expect(phases(r)[0]).toBe('granted');
-    // Staff handed back: authority ends
-    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'IN', up: 'CLOSED' }), { currentStopIndex: null });
-    expect(phases(r)).toEqual(['complete', 'await']);
-    expect(r.state.complete).toEqual(['kb#0']);
-    expect(r.state.granted).toEqual([]);
-    expect(r.sections.map((s) => s.current)).toEqual([false, true]);
-    // Back toward Kiama: the staff is issued again with the up signal clear
-    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'CATS', up: 'THROWN' }), { currentStopIndex: null });
-    expect(phases(r)).toEqual(['complete', 'granted']);
-    expect(currentSection(r.sections)?.match.key).toBe('bk#0');
-  });
-
-  it('an unlatch before leaving from withdraws the authority instead of ending it', () => {
-    let r = run([{ down: 'THROWN', staff: 'CATS' }]);
-    r = stepLoa(r.state, matches, vals({ down: 'THROWN', staff: 'IN' }), { currentStopIndex: null, doorOpenStopIndex: 0 });
-    expect(phases(r)[0]).toBe('await');
-    expect(r.state.complete).toEqual([]);
-    expect(departureWarning(r.sections, 0)?.match.key).toBe('kb#0');
-  });
-
-  it('a later door event or pin also counts as leaving from (train ran through it)', () => {
-    let r = run([{ down: 'THROWN', staff: 'CATS' }]);
-    const ms = sectionsForTrain(train([st('kia'), st('gw'), st('bry')]), STATIONS, config(kb));
-    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS' }), { currentStopIndex: null, doorOpenStopIndex: 1 });
-    expect(r.state.departed).toEqual(['kb#0']);
-    r = stepLoa(r.state, ms, vals({ down: 'CLOSED', staff: 'IN' }), { currentStopIndex: null });
+    r = run([{ down: 'CLOSED', staff: 'IN' }], r.state, ms);
     expect(r.sections[0].phase).toBe('complete');
   });
 
-  it('doors open at to completes when nothing will unlatch: never granted, or no unlatch element', () => {
-    let r = run([{ down: 'CLOSED', staff: 'IN' }]);
-    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'IN' }), { currentStopIndex: null, doorOpenStopIndex: 1 });
-    expect(phases(r)[0]).toBe('complete');
-    const sigOnly = section('kb', 'Kiama', 'Berry', { elements: [sig('down')] });
-    const ms = sectionsForTrain(train([st('kia'), st('bry')]), STATIONS, config(sigOnly));
-    expect(hasUnlatch(sigOnly)).toBe(false);
-    let q = stepLoa(initialLoaState('t1'), ms, vals({ down: 'THROWN' }), at0);
-    expect(q.sections[0].phase).toBe('granted');
-    q = stepLoa(q.state, ms, vals({ down: 'CLOSED' }), { currentStopIndex: null, doorOpenStopIndex: 1 });
-    expect(q.sections[0].phase).toBe('complete');
-  });
-
-  it('arriving at to is not complete; moving past it is', () => {
-    let r = run([{ down: 'THROWN', staff: 'CATS' }], { currentStopIndex: 1 });
-    expect(r.sections[0].phase).toBe('granted');
-    r = stepLoa(r.state, matches, {}, { currentStopIndex: 2 });
-    expect(phases(r)).toEqual(['complete', 'unknown']);
-  });
-
-  it('doors open past to also completes; no position completes nothing', () => {
-    const r = stepLoa(initialLoaState('t1'), matches, {}, { currentStopIndex: null, doorOpenStopIndex: 2 });
-    expect(phases(r)).toEqual(['complete', 'complete']);
-    expect(currentSection(r.sections)).toBeNull();
-    expect(phases(stepLoa(initialLoaState('t1'), matches, {}, { currentStopIndex: null }))).toEqual(['unknown', 'unknown']);
-  });
-
   it('only "grants" elements gate the grant; a revoke-only element still releases it', () => {
-    // Old Illawarra logic as config: all three grant, only the staff revokes (the default for tokens).
     const c = section('kb', 'Kiama', 'Berry', { elements: [sig('down'), token('staff'), sig('home', { grants: false, revokes: true })] });
     const ms = sectionsForTrain(train([st('kia'), st('bry')]), STATIONS, config(c));
     // 'home' is red and has no say in the grant, nor in the AWAIT list
-    let r = stepLoa(initialLoaState('t1'), ms, vals({ down: 'CLOSED', staff: 'CATS', home: 'CLOSED' }), at0);
+    let r = run([{ down: 'CLOSED', staff: 'CATS', home: 'CLOSED' }], undefined, ms);
     expect(r.sections[0].phase).toBe('await');
     expect(r.sections[0].pending.map((e) => e.element.label)).toEqual(['down']);
-    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS', home: 'CLOSED' }), at0);
+    r = run([{ down: 'THROWN', staff: 'CATS', home: 'CLOSED' }], r.state, ms);
     expect(r.sections[0].phase).toBe('granted');
-    // ...but it does revoke: clear then back to stop, before departure → await
-    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS', home: 'THROWN' }), at0);
-    expect(r.sections[0].phase).toBe('granted');
-    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS', home: 'CLOSED' }), at0);
-    expect(r.sections[0].phase).toBe('await');
-    expect(r.sections[0].pending.map((e) => e.element.label)).toEqual(['home']);
-    // The granting elements are still clear, but that is the old grant: no instant re-grant...
-    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS', home: 'CLOSED' }), at0);
-    expect(r.sections[0].phase).toBe('await');
-    // ...until a granting element drops and everything clears again
-    r = stepLoa(r.state, ms, vals({ down: 'CLOSED', staff: 'CATS', home: 'CLOSED' }), at0);
-    expect(r.sections[0].pending.map((e) => e.element.label)).toEqual(['down']);
-    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS', home: 'CLOSED' }), at0);
-    expect(r.sections[0].phase).toBe('granted');
+    // ...but it revokes when it goes back to stop after clearing
+    r = run([{ down: 'THROWN', staff: 'CATS', home: 'THROWN' }, { down: 'CLOSED', staff: 'CATS', home: 'CLOSED' }], r.state, ms);
+    expect(r.sections[0].phase).toBe('complete');
     // No granting element at all: never granted
     const none = section('kb', 'Kiama', 'Berry', { elements: [sig('down', { grants: false })] });
     const ms2 = sectionsForTrain(train([st('kia'), st('bry')]), STATIONS, config(none));
-    expect(stepLoa(initialLoaState('t1'), ms2, vals({ down: 'THROWN' }), at0).sections[0].phase).toBe('unknown');
+    expect(stepLoa(initialLoaState('t1'), ms2, vals({ down: 'THROWN' })).sections[0].phase).toBe('unknown');
   });
 
-  it('a later occurrence of the same section cannot latch until the earlier one completes', () => {
-    const k = section('kb', 'Kiama', 'Berry', { elements: [sig('down')] });
-    const back = section('bk', 'Berry', 'Kiama', { elements: [sig('up')] });
-    const ms = sectionsForTrain(train([st('kia'), st('bry'), st('kia'), st('bry')]), STATIONS, config(k, back));
-    let r = stepLoa(initialLoaState('t1'), ms, vals({ down: 'THROWN', up: 'CLOSED' }), at0);
-    // kb#1 waits for kb#0 even though its signal is clear: that clear is kb#0's authority
-    expect(r.sections.map((s) => [s.match.key, s.phase])).toEqual([['kb#0', 'granted'], ['bk#0', 'await'], ['kb#1', 'await']]);
-    expect(r.sections[2].pending).toEqual([]);
-    r = stepLoa(r.state, ms, vals({ down: 'CLOSED', up: 'CLOSED' }), { currentStopIndex: 2 });
-    expect(r.sections.map((s) => s.phase)).toEqual(['complete', 'await', 'await']);
-    r = stepLoa(r.state, ms, vals({ down: 'THROWN', up: 'CLOSED' }), { currentStopIndex: 2 });
-    expect(r.sections.map((s) => s.phase)).toEqual(['complete', 'await', 'granted']);
+  it('hasRevoke looks through selector options', () => {
+    expect(hasRevoke(kb)).toBe(true);
+    expect(hasRevoke(section('x', 'A', 'B', { elements: [sig('a')] }))).toBe(false);
+    const sel: LoaSelector = { type: 'selector', label: 's', topic: 'p', default: 'A', options: { A: sig('a'), B: sig('b', { revokes: true }) } };
+    expect(hasRevoke(section('x', 'A', 'B', { elements: [sel] }))).toBe(true);
+  });
+
+  it('a later occurrence of the same section cannot latch until the earlier one is released', () => {
+    const k = section('kb', 'Kiama', 'Berry', { elements: [sig('down'), token('staff')] });
+    const ms = sectionsForTrain(train([st('kia'), st('bry'), st('kia'), st('bry')]), STATIONS, config(k));
+    let r = run([{ down: 'THROWN', staff: 'CATS' }], undefined, ms);
+    // kb#1 waits for kb#0 even though everything is clear: that clear is kb#0's authority
+    expect(r.sections.map((s) => [s.match.key, s.phase])).toEqual([['kb#0', 'granted'], ['kb#1', 'await']]);
+    expect(r.sections[1].pending).toEqual([]);
+    r = run([{ down: 'CLOSED', staff: 'IN' }, { down: 'THROWN', staff: 'CATS' }], r.state, ms);
+    expect(r.sections.map((s) => s.phase)).toEqual(['complete', 'granted']);
   });
 
   it('different sections may latch ahead of the train', () => {
@@ -321,59 +252,28 @@ describe('stepLoa latch', () => {
 
   it('a section with no elements is never granted', () => {
     const ms = sectionsForTrain(train([st('kia'), st('bry')]), STATIONS, config(section('kb', 'Kiama', 'Berry')));
-    expect(stepLoa(initialLoaState('t1'), ms, {}, at0).sections[0].phase).toBe('unknown');
+    expect(stepLoa(initialLoaState('t1'), ms, {}).sections[0].phase).toBe('unknown');
   });
 
   it('returns the same state object when nothing changed', () => {
     const s0 = initialLoaState('t1');
-    expect(stepLoa(s0, matches, vals({ down: 'CLOSED' }), at0).state).toBe(s0);
-    const g = stepLoa(s0, matches, vals({ down: 'THROWN', staff: 'CATS' }), at0).state;
+    expect(stepLoa(s0, matches, vals({ down: 'CLOSED' })).state).toBe(s0);
+    const g = stepLoa(s0, matches, vals({ down: 'THROWN', staff: 'CATS' })).state;
     expect(g).not.toBe(s0);
-    expect(stepLoa(g, matches, vals({ down: 'CLOSED', staff: 'CATS' }), at0).state).toBe(g);
-  });
-});
-
-describe('departureWarning', () => {
-  const kb = section('kb', 'Kiama', 'Berry', { elements: [token('staff')] });
-  const bn = section('bn', 'Berry', 'Nowra', { elements: [token('staff2')] });
-  const ms = sectionsForTrain(train([st('kia'), st('bry'), st('now')]), STATIONS, config(kb, bn));
-  it('warns for an await or unknown section starting at the stop', () => {
-    expect(departureWarning(stepLoa(initialLoaState('t1'), ms, vals({ staff: 'IN' }), { currentStopIndex: 0 }).sections, 0)?.match.key).toBe('kb#0');
-    expect(departureWarning(stepLoa(initialLoaState('t1'), ms, {}, { currentStopIndex: 0 }).sections, 0)?.match.key).toBe('kb#0');
-  });
-  it('no warning when granted, or at a stop that starts no section', () => {
-    const r = stepLoa(initialLoaState('t1'), ms, vals({ staff: 'CATS' }), { currentStopIndex: 0 });
-    expect(departureWarning(r.sections, 0)).toBeNull();
-    expect(departureWarning(r.sections, 2)).toBeNull();
-    expect(departureWarning(r.sections, 1)?.match.key).toBe('bn#0');
-  });
-  it('no warning for a completed section', () => {
-    const r = stepLoa(initialLoaState('t1'), ms, {}, { currentStopIndex: null, doorOpenStopIndex: 1 });
-    expect(departureWarning(r.sections, 0)).toBeNull();
+    expect(stepLoa(g, matches, vals({ down: 'CLOSED', staff: 'CATS' })).state).toBe(g);
   });
 });
 
 describe('helpers', () => {
-  it('parseLoaState validates', () => {
-    const s = { v: 2, trainId: 't1', granted: ['a#0'], departed: ['a#0'], revoked: ['b#0'], complete: [] };
+  it('parseLoaState validates and upgrades older versions', () => {
+    const s = { v: 3, trainId: 't1', granted: ['a#0'], complete: ['b#0'] };
     expect(parseLoaState(s, 't1')).toEqual(s);
     expect(parseLoaState(s, 't2')).toBeNull();
-    expect(parseLoaState({ ...s, v: 3 }, 't1')).toBeNull();
-    // v1 (before `departed`) is upgraded
-    expect(parseLoaState({ v: 1, trainId: 't1', granted: ['a#0'], complete: [] }, 't1')).toEqual({ ...s, departed: [], revoked: [] });
+    expect(parseLoaState({ ...s, v: 4 }, 't1')).toBeNull();
+    expect(parseLoaState({ v: 1, trainId: 't1', granted: ['a#0'], complete: ['b#0'] }, 't1')).toEqual(s);
+    expect(parseLoaState({ v: 2, trainId: 't1', granted: ['a#0'], departed: [], revoked: [], complete: ['b#0'] }, 't1')).toEqual(s);
     expect(parseLoaState({ ...s, granted: [1] }, 't1')).toBeNull();
     expect(parseLoaState(null, 't1')).toBeNull();
-  });
-  it('routeStopIndex maps a sequenceStops index to train.stops (untimed stops skipped by seq)', () => {
-    const t = train([st('kia', null, '10:00'), st('gw'), st('bry', '10:20', '10:22'), st('now', '10:40', null)]);
-    const seq = sequenceStops(t);
-    expect(routeStopIndex(t, seq, currentStop(seq, 621, null).index)).toBe(2);
-    expect(routeStopIndex(t, seq, currentStop(seq, 630, null).index)).toBe(3);
-    expect(routeStopIndex(t, seq, currentStop(seq, null, null).index)).toBeNull();
-    // copies of the stop objects still resolve by id
-    expect(routeStopIndex({ ...t, stops: t.stops.map((s) => ({ ...s })) }, seq, 1)).toBe(2);
-    expect(stopIndexOf(t, t.stops[3].id)).toBe(3);
-    expect(stopIndexOf(t, 'nope')).toBeNull();
   });
 });
 

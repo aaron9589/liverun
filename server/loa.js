@@ -98,7 +98,6 @@ function validateSection(s, i, ids) {
 
 function validateLoaConfig(loa) {
   if (!isPlainObject(loa)) return 'loa must be an object';
-  if (loa.warn_on_depart !== undefined && typeof loa.warn_on_depart !== 'boolean') return 'loa.warn_on_depart must be true or false';
   if (loa.sections === undefined) return null;
   if (!Array.isArray(loa.sections)) return 'loa.sections must be an array';
   if (loa.sections.length > MAX_SECTIONS) return `loa.sections may have at most ${MAX_SECTIONS} entries`;

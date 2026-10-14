@@ -53,7 +53,6 @@ function elementError(el: unknown, at: string): string | null {
 /** Error message for a loa config (any shape), or null. */
 export function loaError(loa: unknown): string | null {
   if (!isObj(loa)) return 'LOA config must be an object';
-  if (loa.warn_on_depart !== undefined && typeof loa.warn_on_depart !== 'boolean') return 'warn_on_depart must be true or false';
   if (!Array.isArray(loa.sections)) return 'sections must be an array';
   if (loa.sections.length > MAX_SECTIONS) return `At most ${MAX_SECTIONS} sections`;
   const ids = new Set<string>();
@@ -552,15 +551,10 @@ export function LoaSection({ draft, onChange, timetable }: LayoutSectionProps) {
       <div>
         <h3 className="text-base font-semibold text-white">Limit of authority</h3>
         <p className="text-sm text-slate-400 mt-1">
-          Directional sections between stations. The guard panel shows authority once every element in a section is clear.
+          Directional sections between stations. The guard panel shows authority once every Grants element in a section is clear at the same time; a Revokes element going back to not clear (e.g. the staff sunk) releases it.
           Live values come from the server's MQTT topic cache.
         </p>
       </div>
-
-      <label className="flex items-center gap-2 text-sm text-slate-200">
-        <input type="checkbox" checked={loa.warn_on_depart} onChange={(e) => setLoa({ warn_on_depart: e.target.checked })} />
-        Warn when the doors close at a section's start without authority
-      </label>
 
       {problem && <p className="text-sm text-red-400">{problem}</p>}
 

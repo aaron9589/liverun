@@ -271,8 +271,6 @@ export interface LoaSection {
 
 export interface LoaConfig {
   sections: LoaSection[];
-  /** Warn (not block) when doors close at a section's start without authority. */
-  warn_on_depart: boolean;
 }
 
 /** Last known value of an LOA topic, from the server-side topic cache. */
