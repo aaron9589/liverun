@@ -22,7 +22,7 @@ const loa = (sections, over = {}) => ({ sections, warn_on_depart: true, ...over 
 
 test('valid configs pass', () => {
   assert.strictEqual(validateLoaConfig({ sections: [], warn_on_depart: true }), null);
-  assert.strictEqual(validateLoaConfig(loa([sec(), sec({ id: 's2', elements: [sel(), sig({ type: 'token', revokes: false, caution: ['X'] })] })])), null);
+  assert.strictEqual(validateLoaConfig(loa([sec(), sec({ id: 's2', elements: [sel(), sig({ type: 'token', grants: false, revokes: false, caution: ['X'] })] })])), null);
 });
 
 test('rejects bad top-level shapes', () => {
@@ -44,7 +44,7 @@ test('rejects bad elements', () => {
   const bad = (el) => assert.ok(validateLoaConfig(loa([sec({ elements: [el] })])), JSON.stringify(el));
   bad(null); bad(sig({ type: 'lamp' })); bad(sig({ label: '' })); bad(sig({ topic: '' })); bad(sig({ topic: 'a/+/b' }));
   bad(sig({ topic: 'a/#' })); bad(sig({ clear: [] })); bad(sig({ clear: ['  '] })); bad(sig({ clear: 'THROWN' }));
-  bad(sig({ clear: [1] })); bad(sig({ caution: 'x' })); bad(sig({ revokes: 'yes' })); bad(sig({ label: 'x'.repeat(201) }));
+  bad(sig({ clear: [1] })); bad(sig({ caution: 'x' })); bad(sig({ revokes: 'yes' })); bad(sig({ grants: 'no' })); bad(sig({ label: 'x'.repeat(201) }));
 });
 
 test('rejects bad selectors', () => {

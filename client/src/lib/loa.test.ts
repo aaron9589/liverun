@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { LoaCondition, LoaConfig, LoaSection, LoaSelector, LoaValue, Station, Train, TrainStop } from '../types';
 import {
   conditionState, evaluateElement, sectionsForTrain, stepLoa, initialLoaState, parseLoaState,
-  departureWarning, currentSection, routeStopIndex, stopIndexOf, applyLoaValues,
+  departureWarning, currentSection, routeStopIndex, stopIndexOf, applyLoaValues, hasUnlatch,
   type LoaTrainState, type SectionMatch,
 } from './loa';
 import { sequenceStops, currentStop } from './stops';
@@ -45,10 +45,11 @@ describe('conditionState', () => {
 });
 
 describe('evaluateElement', () => {
-  it('plain condition with revokes defaults', () => {
+  it('plain condition with grants / revokes defaults', () => {
     expect(evaluateElement(sig('a'), vals({ a: 'THROWN' }))).toEqual({
-      element: sig('a'), condition: sig('a'), value: 'THROWN', state: 'clear', revokes: false,
+      element: sig('a'), condition: sig('a'), value: 'THROWN', state: 'clear', grants: true, revokes: false,
     });
+    expect(evaluateElement(sig('a', { grants: false }), {}).grants).toBe(false);
     expect(evaluateElement(token('s'), {})).toMatchObject({ value: null, state: 'unknown', revokes: true });
     expect(evaluateElement(token('s', { revokes: false }), {}).revokes).toBe(false);
     expect(evaluateElement(sig('a', { revokes: true }), {}).revokes).toBe(true);
@@ -203,18 +204,56 @@ describe('stepLoa latch', () => {
     expect(r.sections[0].phase).toBe('await');
   });
 
-  it('doors open at to completes and freezes against the staff being returned', () => {
+  it('a granted section holds past doors open at to until the staff is returned, then completes', () => {
     let r = run([{ down: 'THROWN', staff: 'CATS' }]);
-    r = stepLoa(r.state, matches, vals({ down: 'THROWN', staff: 'CATS' }), { currentStopIndex: 1, doorOpenStopIndex: 1 });
-    expect(phases(r)).toEqual(['complete', 'unknown']);
-    expect(r.sections.map((s) => s.current)).toEqual([false, true]);
-    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'IN', up: 'CLOSED' }), { currentStopIndex: 1 });
+    // Depart Kiama (doors were opened and closed there), signal back to stop behind the train
+    r = stepLoa(r.state, matches, vals({ down: 'THROWN', staff: 'CATS' }), { currentStopIndex: null, doorCloseStopIndex: 0 });
+    expect(r.state.departed).toEqual(['kb#0']);
+    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'CATS' }), { currentStopIndex: null });
+    expect(phases(r)[0]).toBe('granted');
+    // Doors open at Berry: still granted, the staff is still out
+    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'CATS' }), { currentStopIndex: null, doorOpenStopIndex: 1 });
+    expect(phases(r)[0]).toBe('granted');
+    // Staff handed back: authority ends
+    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'IN', up: 'CLOSED' }), { currentStopIndex: null });
     expect(phases(r)).toEqual(['complete', 'await']);
     expect(r.state.complete).toEqual(['kb#0']);
+    expect(r.state.granted).toEqual([]);
+    expect(r.sections.map((s) => s.current)).toEqual([false, true]);
     // Back toward Kiama: the staff is issued again with the up signal clear
-    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'CATS', up: 'THROWN' }), { currentStopIndex: 1 });
+    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'CATS', up: 'THROWN' }), { currentStopIndex: null });
     expect(phases(r)).toEqual(['complete', 'granted']);
     expect(currentSection(r.sections)?.match.key).toBe('bk#0');
+  });
+
+  it('an unlatch before leaving from withdraws the authority instead of ending it', () => {
+    let r = run([{ down: 'THROWN', staff: 'CATS' }]);
+    r = stepLoa(r.state, matches, vals({ down: 'THROWN', staff: 'IN' }), { currentStopIndex: null, doorOpenStopIndex: 0 });
+    expect(phases(r)[0]).toBe('await');
+    expect(r.state.complete).toEqual([]);
+    expect(departureWarning(r.sections, 0)?.match.key).toBe('kb#0');
+  });
+
+  it('a later door event or pin also counts as leaving from (train ran through it)', () => {
+    let r = run([{ down: 'THROWN', staff: 'CATS' }]);
+    const ms = sectionsForTrain(train([st('kia'), st('gw'), st('bry')]), STATIONS, config(kb));
+    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS' }), { currentStopIndex: null, doorOpenStopIndex: 1 });
+    expect(r.state.departed).toEqual(['kb#0']);
+    r = stepLoa(r.state, ms, vals({ down: 'CLOSED', staff: 'IN' }), { currentStopIndex: null });
+    expect(r.sections[0].phase).toBe('complete');
+  });
+
+  it('doors open at to completes when nothing will unlatch: never granted, or no unlatch element', () => {
+    let r = run([{ down: 'CLOSED', staff: 'IN' }]);
+    r = stepLoa(r.state, matches, vals({ down: 'CLOSED', staff: 'IN' }), { currentStopIndex: null, doorOpenStopIndex: 1 });
+    expect(phases(r)[0]).toBe('complete');
+    const sigOnly = section('kb', 'Kiama', 'Berry', { elements: [sig('down')] });
+    const ms = sectionsForTrain(train([st('kia'), st('bry')]), STATIONS, config(sigOnly));
+    expect(hasUnlatch(sigOnly)).toBe(false);
+    let q = stepLoa(initialLoaState('t1'), ms, vals({ down: 'THROWN' }), at0);
+    expect(q.sections[0].phase).toBe('granted');
+    q = stepLoa(q.state, ms, vals({ down: 'CLOSED' }), { currentStopIndex: null, doorOpenStopIndex: 1 });
+    expect(q.sections[0].phase).toBe('complete');
   });
 
   it('arriving at to is not complete; moving past it is', () => {
@@ -229,6 +268,36 @@ describe('stepLoa latch', () => {
     expect(phases(r)).toEqual(['complete', 'complete']);
     expect(currentSection(r.sections)).toBeNull();
     expect(phases(stepLoa(initialLoaState('t1'), matches, {}, { currentStopIndex: null }))).toEqual(['unknown', 'unknown']);
+  });
+
+  it('only "grants" elements gate the grant; a revoke-only element still releases it', () => {
+    // Old Illawarra logic as config: all three grant, only the staff revokes (the default for tokens).
+    const c = section('kb', 'Kiama', 'Berry', { elements: [sig('down'), token('staff'), sig('home', { grants: false, revokes: true })] });
+    const ms = sectionsForTrain(train([st('kia'), st('bry')]), STATIONS, config(c));
+    // 'home' is red and has no say in the grant, nor in the AWAIT list
+    let r = stepLoa(initialLoaState('t1'), ms, vals({ down: 'CLOSED', staff: 'CATS', home: 'CLOSED' }), at0);
+    expect(r.sections[0].phase).toBe('await');
+    expect(r.sections[0].pending.map((e) => e.element.label)).toEqual(['down']);
+    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS', home: 'CLOSED' }), at0);
+    expect(r.sections[0].phase).toBe('granted');
+    // ...but it does revoke: clear then back to stop, before departure → await
+    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS', home: 'THROWN' }), at0);
+    expect(r.sections[0].phase).toBe('granted');
+    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS', home: 'CLOSED' }), at0);
+    expect(r.sections[0].phase).toBe('await');
+    expect(r.sections[0].pending.map((e) => e.element.label)).toEqual(['home']);
+    // The granting elements are still clear, but that is the old grant: no instant re-grant...
+    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS', home: 'CLOSED' }), at0);
+    expect(r.sections[0].phase).toBe('await');
+    // ...until a granting element drops and everything clears again
+    r = stepLoa(r.state, ms, vals({ down: 'CLOSED', staff: 'CATS', home: 'CLOSED' }), at0);
+    expect(r.sections[0].pending.map((e) => e.element.label)).toEqual(['down']);
+    r = stepLoa(r.state, ms, vals({ down: 'THROWN', staff: 'CATS', home: 'CLOSED' }), at0);
+    expect(r.sections[0].phase).toBe('granted');
+    // No granting element at all: never granted
+    const none = section('kb', 'Kiama', 'Berry', { elements: [sig('down', { grants: false })] });
+    const ms2 = sectionsForTrain(train([st('kia'), st('bry')]), STATIONS, config(none));
+    expect(stepLoa(initialLoaState('t1'), ms2, vals({ down: 'THROWN' }), at0).sections[0].phase).toBe('unknown');
   });
 
   it('a later occurrence of the same section cannot latch until the earlier one completes', () => {
@@ -286,10 +355,12 @@ describe('departureWarning', () => {
 
 describe('helpers', () => {
   it('parseLoaState validates', () => {
-    const s = { v: 1, trainId: 't1', granted: ['a#0'], complete: [] };
+    const s = { v: 2, trainId: 't1', granted: ['a#0'], departed: ['a#0'], revoked: ['b#0'], complete: [] };
     expect(parseLoaState(s, 't1')).toEqual(s);
     expect(parseLoaState(s, 't2')).toBeNull();
-    expect(parseLoaState({ ...s, v: 2 }, 't1')).toBeNull();
+    expect(parseLoaState({ ...s, v: 3 }, 't1')).toBeNull();
+    // v1 (before `departed`) is upgraded
+    expect(parseLoaState({ v: 1, trainId: 't1', granted: ['a#0'], complete: [] }, 't1')).toEqual({ ...s, departed: [], revoked: [] });
     expect(parseLoaState({ ...s, granted: [1] }, 't1')).toBeNull();
     expect(parseLoaState(null, 't1')).toBeNull();
   });

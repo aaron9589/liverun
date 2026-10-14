@@ -10,6 +10,7 @@
  *   matches = sectionsForTrain(train, stations, layout.loa)
  *   ({ state, sections } = stepLoa(state, matches, values, { currentStopIndex }))   on every change
  *   ({ state, sections } = stepLoa(state, matches, values, { currentStopIndex, doorOpenStopIndex }))   on Doors Open
+ *   ({ state, sections } = stepLoa(state, matches, values, { currentStopIndex, doorCloseStopIndex }))  on Doors Close
  *   warn = departureWarning(sections, doorStopIndex)                                on Doors Close
  *
  * Stop indices are indices into `train.stops` (every stop, timed or not), not
@@ -17,15 +18,24 @@
  * converts the §6.3 current stop (`currentStop()` over `sequenceStops()`).
  *
  * Section phases:
- *   unknown   not granted; nothing is definitely not clear, but at least one
- *             element has no value yet (or the section has no elements)
- *   await     not granted; at least one element is 'stop', or an earlier
+ *   unknown   not granted; no granting element is definitely not clear, but
+ *             at least one has no value yet (or the section has none)
+ *   await     not granted; a granting element is 'stop', or an earlier
  *             occurrence of the same section is still open (see below)
- *   granted   latched: every element was clear-or-caution in the same step
- *             (L1). Only an element with effective `revokes` going 'stop'
- *             sends it back ('unknown' never revokes)
- *   complete  doors opened at `to` (or at any later stop), or the current
- *             stop moved past `to`. Frozen: never re-evaluated or revoked
+ *   granted   latched: every "grants" element (all by default) was
+ *             clear-or-caution in the same step (L1). It holds until a
+ *             "revokes" element (tokens by default) goes 'stop' ('unknown'
+ *             never revokes):
+ *             before the train has left `from` that withdraws the authority
+ *             (back to await); after, it ends it (complete), e.g. the staff
+ *             handed back at the far end
+ *   complete  unlatched after departure (above); or, as fallbacks, doors
+ *             opened at `to` when nothing will unlatch (never granted, or no
+ *             unlatch element), or the train moved on past `to` (doors opened
+ *             or a stop pinned beyond it). Frozen: never re-evaluated
+ *
+ * "Left `from`": Doors Close at `from`, or any later Doors Open / pinned stop.
+ * Never the fast clock: a late train would otherwise lose its authority.
  *
  * Only the first not-complete occurrence of each section id can be granted:
  * a later occurrence (the same section again on the way back out) shares its
@@ -50,6 +60,8 @@ export interface ElementView {
   /** Payload of the applied condition's topic, or null if none received yet. */
   value: string | null;
   state: ElementState;
+  /** Effective `grants` (default true): counts toward the grant and the strip's "AWAIT:" list. */
+  grants: boolean;
   /** Effective `revokes` (defaults: token → true, others → false). */
   revokes: boolean;
 }
@@ -72,6 +84,10 @@ function effectiveRevokes(cond: LoaCondition | null): boolean {
   return cond.revokes ?? cond.type === 'token';
 }
 
+function effectiveGrants(cond: LoaCondition | null): boolean {
+  return cond ? cond.grants ?? true : true;
+}
+
 /** Option key for a selector payload: exact key first, then trimmed case-insensitive. */
 function findOption(options: Record<string, LoaCondition>, value: string): string | null {
   if (Object.prototype.hasOwnProperty.call(options, value)) return value;
@@ -89,7 +105,7 @@ function findOption(options: Record<string, LoaCondition>, value: string): strin
 export function evaluateElement(el: LoaElement, values: Record<string, LoaValue>): ElementView {
   if (el.type !== 'selector') {
     const v = values[el.topic]?.value;
-    return { element: el, condition: el, value: v ?? null, state: conditionState(el, v), revokes: effectiveRevokes(el) };
+    return { element: el, condition: el, value: v ?? null, state: conditionState(el, v), grants: effectiveGrants(el), revokes: effectiveRevokes(el) };
   }
   const options = el.options ?? {};
   const sel = values[el.topic]?.value;
@@ -103,11 +119,11 @@ export function evaluateElement(el: LoaElement, values: Record<string, LoaValue>
     optionFrom = 'value';
   }
   const condition = Object.prototype.hasOwnProperty.call(options, option) ? options[option] : null;
-  if (!condition) return { element: el, condition: null, option, optionFrom, value: null, state: 'unknown', revokes: false };
+  if (!condition) return { element: el, condition: null, option, optionFrom, value: null, state: 'unknown', grants: true, revokes: false };
   const v = values[condition.topic]?.value;
   return {
     element: el, condition, option, optionFrom,
-    value: v ?? null, state: conditionState(condition, v), revokes: effectiveRevokes(condition),
+    value: v ?? null, state: conditionState(condition, v), grants: effectiveGrants(condition), revokes: effectiveRevokes(condition),
   };
 }
 
@@ -181,10 +197,17 @@ export type SectionPhase = 'unknown' | 'await' | 'granted' | 'complete';
 
 /** Persisted per device under timetable + train id. Keys are SectionMatch.key. */
 export interface LoaTrainState {
-  v: 1;
+  v: 2;
   /** Train.id (the LiveRun id, not the JMRI train_id). */
   trainId: string;
   granted: string[];
+  /** Sections whose `from` the train has left (Doors Close there, or any later door event / pin). */
+  departed: string[];
+  /**
+   * Revoked before departure while every granting element was still clear: they
+   * need a fresh all-clear (some granting element drops first) to grant again.
+   */
+  revoked: string[];
   complete: string[];
 }
 
@@ -193,7 +216,7 @@ export interface SectionView {
   phase: SectionPhase;
   /** Live element states, in config order (also for granted / complete sections). */
   elements: ElementView[];
-  /** Elements not clear-or-caution ('stop' or 'unknown'): what the strip names after "AWAIT:". */
+  /** Granting elements not clear-or-caution ('stop' or 'unknown'): what the strip names after "AWAIT:". */
   pending: ElementView[];
   /** The first section on the route that isn't complete. */
   current: boolean;
@@ -204,19 +227,31 @@ export interface LoaPosition {
   currentStopIndex: number | null;
   /** Set only on the step for a Doors Open: the train.stops index the doors opened at. */
   doorOpenStopIndex?: number | null;
+  /** Set only on the step for a Doors Close: the train.stops index the doors were opened at. */
+  doorCloseStopIndex?: number | null;
 }
 
 export function initialLoaState(trainId: string): LoaTrainState {
-  return { v: 1, trainId, granted: [], complete: [] };
+  return { v: 2, trainId, granted: [], departed: [], revoked: [], complete: [] };
 }
 
-/** Accepts stored JSON only if it is a v1 state for this train. */
+/** Accepts stored JSON only if it is a state for this train (v1 had no `departed`). */
 export function parseLoaState(raw: unknown, trainId: string): LoaTrainState | null {
   if (!raw || typeof raw !== 'object') return null;
-  const s = raw as Partial<LoaTrainState>;
+  const s = raw as { v?: unknown; trainId?: unknown; granted?: unknown; departed?: unknown; revoked?: unknown; complete?: unknown };
   const strings = (a: unknown): a is string[] => Array.isArray(a) && a.every((x) => typeof x === 'string');
-  if (s.v !== 1 || s.trainId !== trainId || !strings(s.granted) || !strings(s.complete)) return null;
-  return { v: 1, trainId, granted: s.granted, complete: s.complete };
+  if ((s.v !== 1 && s.v !== 2) || s.trainId !== trainId || !strings(s.granted) || !strings(s.complete)) return null;
+  const departed = s.v === 2 && strings(s.departed) ? s.departed : [];
+  const revoked = s.v === 2 && strings(s.revoked) ? s.revoked : [];
+  return { v: 2, trainId, granted: s.granted, departed, revoked, complete: s.complete };
+}
+
+/** Whether any element can unlatch the section's authority (a selector counts if any option can). */
+export function hasUnlatch(section: LoaSection): boolean {
+  return section.elements.some((el) =>
+    el.type === 'selector'
+      ? Object.values(el.options ?? {}).some((o) => effectiveRevokes(o))
+      : effectiveRevokes(el));
 }
 
 /**
@@ -231,24 +266,44 @@ export function stepLoa(
   pos: LoaPosition,
 ): { state: LoaTrainState; sections: SectionView[] } {
   const granted = new Set(state.granted);
+  const departed = new Set(state.departed);
+  const revoked = new Set(state.revoked);
   const complete = new Set(state.complete);
   let changed = false;
-  const { currentStopIndex, doorOpenStopIndex } = pos;
+  const { currentStopIndex, doorOpenStopIndex, doorCloseStopIndex } = pos;
   // Section ids with an earlier not-complete occurrence: later ones can't latch yet.
   const openIds = new Set<string>();
 
   const sections: SectionView[] = matches.map((match) => {
     const elements = match.section.elements.map((el) => evaluateElement(el, values));
-    const pending = elements.filter((e) => e.state === 'stop' || e.state === 'unknown');
+    // Only "grants" elements gate the grant; the others are shown (and may revoke) but never hold it up.
+    const gating = elements.filter((e) => e.grants);
+    let pending = gating.filter((e) => e.state === 'stop' || e.state === 'unknown');
     const view = (phase: SectionPhase): SectionView => ({ match, phase, elements, pending, current: false });
 
     if (complete.has(match.key)) return view('complete');
-    const passed = currentStopIndex != null && currentStopIndex > match.toIndex;
-    const doorsOpened = doorOpenStopIndex != null && doorOpenStopIndex >= match.toIndex;
-    if (passed || doorsOpened) {
+    const finish = (): SectionView => {
       complete.add(match.key);
+      granted.delete(match.key);
+      revoked.delete(match.key);
       changed = true;
       return view('complete');
+    };
+
+    // Fallbacks, so the panel never sticks on a section: the train has clearly
+    // moved on past `to` (doors opened beyond it, or a stop beyond it pinned), or
+    // doors opened at `to` and nothing will unlatch (never granted, or no
+    // unlatch element). Otherwise a granted section waits for its unlatch.
+    const beyond = (doorOpenStopIndex != null && doorOpenStopIndex > match.toIndex)
+      || (currentStopIndex != null && currentStopIndex > match.toIndex);
+    const atTo = doorOpenStopIndex != null && doorOpenStopIndex === match.toIndex;
+    if (beyond || (atTo && !(granted.has(match.key) && hasUnlatch(match.section)))) return finish();
+
+    if (!departed.has(match.key)) {
+      const left = (doorCloseStopIndex != null && doorCloseStopIndex === match.fromIndex)
+        || (doorOpenStopIndex != null && doorOpenStopIndex > match.fromIndex)
+        || (currentStopIndex != null && currentStopIndex > match.fromIndex);
+      if (left) { departed.add(match.key); changed = true; }
     }
 
     const firstOpen = !openIds.has(match.section.id);
@@ -256,20 +311,39 @@ export function stepLoa(
 
     if (granted.has(match.key)) {
       if (!elements.some((e) => e.revokes && e.state === 'stop')) return view('granted');
+      // An unlatch element went back to not clear: after the train has left
+      // `from` that ends the authority (e.g. staff returned at the far end);
+      // before, the authority was withdrawn and the section awaits again.
+      if (departed.has(match.key)) return finish();
       granted.delete(match.key);
+      if (pending.length === 0) revoked.add(match.key);
       changed = true;
-    } else if (firstOpen && elements.length > 0 && pending.length === 0) {
+    }
+    // A revoke by an element that doesn't grant leaves the granting ones clear:
+    // hold until one of them drops, so the old all-clear can't re-grant at once.
+    if (revoked.has(match.key)) {
+      if (pending.length > 0) { revoked.delete(match.key); changed = true; }
+      else {
+        // Name what revoked it; if that has cleared again, the granting elements must re-clear.
+        const revokers = elements.filter((e) => e.revokes && e.state === 'stop');
+        pending = revokers.length ? revokers : gating;
+        return view('await');
+      }
+    }
+    if (!granted.has(match.key) && firstOpen && gating.length > 0 && pending.length === 0) {
       granted.add(match.key);
       changed = true;
       return view('granted');
     }
-    if (!firstOpen || elements.some((e) => e.state === 'stop')) return view('await');
+    if (!firstOpen || gating.some((e) => e.state === 'stop')) return view('await');
     return view('unknown');
   });
 
   const cur = sections.find((s) => s.phase !== 'complete');
   if (cur) cur.current = true;
-  const next = changed ? { v: 1 as const, trainId: state.trainId, granted: [...granted], complete: [...complete] } : state;
+  const next: LoaTrainState = changed
+    ? { v: 2, trainId: state.trainId, granted: [...granted], departed: [...departed], revoked: [...revoked], complete: [...complete] }
+    : state;
   return { state: next, sections };
 }
 

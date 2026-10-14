@@ -40,8 +40,10 @@ export interface UseLoa {
    * `config.warn_on_depart` is off. Uses the sections from the latest render.
    */
   warnOnDepart: (stopIndex: number) => SectionView | null;
-  /** Doors Open at train.stops[stopIndex]: completes sections ending there (or earlier). */
+  /** Doors Open at train.stops[stopIndex]: marks sections left behind, completes ones the train has moved past. */
   onDoorOpen: (stopIndex: number) => void;
+  /** Doors Close at train.stops[stopIndex] (where the doors were opened): the train is leaving sections that start there. */
+  onDoorClose: (stopIndex: number) => void;
   /** "Reset LOA for this train": forget grants and completions. */
   reset: () => void;
 }
@@ -85,14 +87,16 @@ export function useLoa({ timetableId, train, stations, config, values, currentSt
   const live = useRef({ key, timetableId, state: result?.state ?? null, matches, values, currentStopIndex, sections, config });
   live.current = { key, timetableId, state: result?.state ?? null, matches, values, currentStopIndex, sections, config };
 
-  const onDoorOpen = useCallback((stopIndex: number) => {
+  const doorStep = useCallback((door: { doorOpenStopIndex: number } | { doorCloseStopIndex: number }) => {
     const l = live.current;
     if (!l.key || !l.timetableId || !l.state) return;
-    const next = stepLoa(l.state, l.matches, l.values, { currentStopIndex: l.currentStopIndex, doorOpenStopIndex: stopIndex }).state;
+    const next = stepLoa(l.state, l.matches, l.values, { currentStopIndex: l.currentStopIndex, ...door }).state;
     if (next === l.state) return;
     save(l.timetableId, next);
     setHeld({ key: l.key, state: next });
   }, []);
+  const onDoorOpen = useCallback((stopIndex: number) => doorStep({ doorOpenStopIndex: stopIndex }), [doorStep]);
+  const onDoorClose = useCallback((stopIndex: number) => doorStep({ doorCloseStopIndex: stopIndex }), [doorStep]);
 
   const warnOnDepart = useCallback((stopIndex: number) => {
     const l = live.current;
@@ -108,5 +112,5 @@ export function useLoa({ timetableId, train, stations, config, values, currentSt
     setHeld({ key: l.key, state: fresh });
   }, []);
 
-  return { matches, sections, current, warnOnDepart, onDoorOpen, reset };
+  return { matches, sections, current, warnOnDepart, onDoorOpen, onDoorClose, reset };
 }

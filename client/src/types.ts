@@ -237,7 +237,9 @@ export interface LoaCondition {
   topic: string;
   clear: string[];
   caution?: string[];
-  /** Losing this element before the section completes revokes GRANTED. Default: true for tokens, false otherwise. */
+  /** Must be clear (with every other granting element, at the same moment) for the section to be granted. Default: true. */
+  grants?: boolean;
+  /** Going back to not clear releases the authority (e.g. the staff returned). Default: true for tokens, false otherwise. */
   revokes?: boolean;
 }
 

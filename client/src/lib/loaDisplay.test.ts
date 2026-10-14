@@ -5,7 +5,7 @@ import type { ElementView, SectionView } from './loa';
 const cond = (label: string) => ({ type: 'signal' as const, label, topic: 't', clear: ['clear'] });
 const ev = (label: string, state: ElementView['state'], extra: Partial<ElementView> = {}): ElementView => {
   const element = cond(label);
-  return { element, condition: element, value: null, state, revokes: false, ...extra };
+  return { element, condition: element, value: null, state, grants: true, revokes: false, ...extra };
 };
 const sv = (phase: SectionView['phase'], elements: ElementView[]): SectionView => ({
   match: { section: { id: 's', name: 'Kiama-Berry', from: 'Kiama', to: 'Berry', only: [], except: [], elements: [] }, key: 's#0', fromIndex: 0, toIndex: 1 },
@@ -22,7 +22,7 @@ describe('loaDisplay', () => {
   });
   it('uses the applied condition label for selectors', () => {
     const sel = { type: 'selector' as const, label: 'Points', topic: 'p', options: {}, default: 'A' };
-    const e: ElementView = { element: sel, condition: cond('Sig 9'), option: 'CLOSED', optionFrom: 'value', value: null, state: 'stop', revokes: false };
+    const e: ElementView = { element: sel, condition: cond('Sig 9'), option: 'CLOSED', optionFrom: 'value', value: null, state: 'stop', grants: true, revokes: false };
     expect(stripText(sv('await', [e])).text).toBe('AWAIT: Sig 9');
   });
   it('warning text', () => {

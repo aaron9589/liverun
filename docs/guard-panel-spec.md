@@ -442,7 +442,7 @@ Flashing banner + alert sound until **ACK**; multiple pending events queue. Opti
 
 ## 11. Limit of Authority (LOA)
 
-Decisions L1–L4 are recorded inline below.
+Decisions L1–L5 are recorded inline below. The guard panel shows dots and labels only, never raw MQTT values.
 
 ### 11.1 What the old panel did
 
@@ -474,12 +474,18 @@ There are no train types, odd/even rules or Up/Down lists. LOA is a layout-level
 
 Everything an element watches is an MQTT topic, and its state is decided by comparing the topic's payload against lists of values (globs allowed, e.g. `R28?; Lit; Unheld`).
 
-| Type | Meaning | Default `revokes` |
-|------|---------|-------------------|
-| `signal` | Signal, mast, or a signal modelled as a turnout | false |
-| `token` | Staff, ticket or token instrument | **true** |
-| `condition` | Anything else: track circuit, block instrument, controller release | false |
-| `selector` | Picks **which** element applies from another topic, e.g. a turnout choosing the departure road. Generalises the old switch pair to N options | — |
+| Type | Meaning | Default `grants` | Default `revokes` |
+|------|---------|------------------|-------------------|
+| `signal` | Signal, mast, or a signal modelled as a turnout | true | false |
+| `token` | Staff, ticket or token instrument | true | **true** |
+| `condition` | Anything else: track circuit, block instrument, controller release | true | false |
+| `selector` | Picks **which** element applies from another topic, e.g. a turnout choosing the departure road. Generalises the old switch pair to N options. The flags come from the option that applies | — | — |
+
+Two tick boxes per element (L5) say what it does:
+- **Grants**: must be clear, together with every other granting element, for the section to be granted.
+- **Revokes**: going back to not-clear releases the authority.
+
+The defaults reproduce the old panel: all three dots grant, only the staff revokes.
 
 ```jsonc
 { "type": "selector", "label": "Kiama departure",
@@ -500,15 +506,17 @@ Each element shows a dot: green = clear, amber = caution, red = not clear, grey 
 ### 11.4 Section state
 
 ```
-UNKNOWN ──first values──▶ AWAIT ──all clear at once─▶ GRANTED ──train reaches `to`──▶ COMPLETE
-                            ▲                          │
-                            └──── revoking element ────┘
-                                  goes not-clear
+UNKNOWN ──first values──▶ AWAIT ──all granting elements──▶ GRANTED ──revoking element goes not-clear──▶ COMPLETE
+                            ▲      clear at once            │        (train has left `from`)
+                            └── revoking element goes ──────┘
+                                not-clear before departure
 ```
 
-- **Grant rule (L1)**: GRANTED only when **every element is clear at the same moment**, which guarantees a clear path end to end. This is the old behaviour, and there is no alternative rule.
-- **Revoke**: before COMPLETE, an element marked `revokes: true` going not-clear sends GRANTED back to AWAIT. By default only tokens do this, so a staff withdrawn before arrival cancels authority, while a signal returning to stop behind the train doesn't.
-- **Complete**: when the guard opens the doors at `to`, or the current stop (§6.3) moves past `to`. A completed section freezes, so the staff being returned at Berry doesn't flip it back to AWAIT. Only sections not yet completed react to changes.
+- **Grant rule (L1)**: GRANTED only when **every granting element is clear at the same moment** (caution counts as clear). Elements not ticked *Grants* are shown but never hold the grant up.
+- **Revoke (L5)**: a GRANTED section is released when a *Revokes* element goes not-clear ('no value' never revokes). What that means depends on whether the train has **left `from`** (Doors Close there, or any later Doors Open or pinned stop):
+  - **Not yet left:** the authority was withdrawn. Back to AWAIT, and the departure warning (§11.6) still fires. If only a revoke-only element dropped, the section waits for a fresh all-clear rather than re-granting from the same one.
+  - **Left:** the authority is finished, e.g. the staff sunk back in at Berry. The section is COMPLETE.
+- **Complete, fallbacks**: so the panel never sticks, a section also completes when doors open at `to` and nothing will revoke it (never granted, or no *Revokes* element), or when the train moves on past `to` (doors opened at, or a stop pinned at, a later stop). **Never from the fast clock**: a late train would lose its authority display. A completed section freezes.
 - **Current section**: the first section on the train's route that isn't COMPLETE.
 - **Persistence**: latch and complete state are stored per device under timetable + train id, the same as guard events, so a reload keeps them. The ☰ menu gets **Reset LOA for this train**.
 

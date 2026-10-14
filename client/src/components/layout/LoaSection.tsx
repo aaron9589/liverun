@@ -24,6 +24,7 @@ function conditionError(c: unknown, at: string): string | null {
   if (/[+#]/.test(c.topic)) return `${at}: topic must not contain MQTT wildcards (+ or #)`;
   if (!strList(c.clear) || !c.clear.some((s) => s.trim() !== '')) return `${at}: needs at least one clear value`;
   if (c.caution !== undefined && !strList(c.caution)) return `${at}: caution must be a list of strings`;
+  if (c.grants !== undefined && typeof c.grants !== 'boolean') return `${at}: grants must be true or false`;
   if (c.revokes !== undefined && typeof c.revokes !== 'boolean') return `${at}: revokes must be true or false`;
   return null;
 }
@@ -172,8 +173,8 @@ function ConditionFields({ cond, values, onChange, fixedType }: {
 }) {
   const live = cond.topic ? values[cond.topic]?.value : undefined;
   const state = conditionState(cond, live);
-  const effectiveRevokes = cond.revokes ?? cond.type === 'token';
-  const revokesValue = cond.revokes === undefined ? 'default' : cond.revokes ? 'yes' : 'no';
+  const grants = cond.grants ?? true;
+  const revokes = cond.revokes ?? cond.type === 'token';
   const set = (patch: Partial<LoaCondition>) => onChange({ ...cond, ...patch });
   const canCapture = live !== undefined && live !== '';
 
@@ -220,15 +221,15 @@ function ConditionFields({ cond, values, onChange, fixedType }: {
           <label className={LABEL_CLS}>Caution values (optional, amber)</label>
           <ListInput label="Caution values" value={cond.caution ?? []} separator={'\n'} rows={2}
             onChange={(caution) => set({ caution: caution.length ? caution : undefined })} />
-          <div className="mt-2 flex items-center gap-2">
-            <label className="text-xs text-slate-400" htmlFor={undefined}>Revokes authority</label>
-            <select aria-label="Revokes" value={revokesValue} className={FIELD_CLS}
-              onChange={(e) => set({ revokes: e.target.value === 'default' ? undefined : e.target.value === 'yes' })}>
-              <option value="default">Default ({cond.type === 'token' ? 'yes' : 'no'})</option>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-            <span className="text-[11px] text-slate-500">effective: {effectiveRevokes ? 'yes' : 'no'}</span>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
+            <label className="flex items-center gap-1.5" title="Must be clear, together with every other granting element, for the section to be granted">
+              <input type="checkbox" aria-label="Grants" checked={grants} onChange={(e) => set({ grants: e.target.checked })} />
+              Grants
+            </label>
+            <label className="flex items-center gap-1.5" title="Going back to not clear releases the authority (e.g. the staff returned)">
+              <input type="checkbox" aria-label="Revokes" checked={revokes} onChange={(e) => set({ revokes: e.target.checked })} />
+              Revokes
+            </label>
           </div>
         </div>
       </div>

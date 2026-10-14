@@ -263,8 +263,7 @@ export function GuardPanel() {
   // Limit of Authority (spec §11). currentStopIndex is deliberately the PINNED
   // stop only, not the clock's current stop: on a late train the fast clock
   // passes a section's `to` while the train is still at `from`, which would
-  // complete the section and hide the authority. Completion comes from actual
-  // Doors Open events (loa.onDoorOpen) instead.
+  // end the section and hide the authority. Position comes from door events.
   const loa = useLoa({
     timetableId: timetable?.id ?? null,
     train,
@@ -301,6 +300,8 @@ export function GuardPanel() {
       loaOpenIdx.current = null;
       const w = idx !== null ? loa.warnOnDepart(idx) : null;
       if (w) { setLoaWarn({ trainId: l.train.id, ...warningText(w) }); playAlert(); }
+      // The train is leaving: from here an unlatch element ends the authority instead of withdrawing it.
+      if (idx !== null) loa.onDoorClose(idx);
     }
     let stopId: string | null = null;
     if (type === 'door_open') {

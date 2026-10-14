@@ -46,6 +46,7 @@ function validateCondition(el, at) {
   if ((e = stringList(el.clear, `${at}.clear`))) return e;
   if (!el.clear.some((s) => s.trim() !== '')) return `${at}.clear needs at least one non-blank value`;
   if (el.caution !== undefined && (e = stringList(el.caution, `${at}.caution`))) return e;
+  if (el.grants !== undefined && typeof el.grants !== 'boolean') return `${at}.grants must be true or false`;
   if (el.revokes !== undefined && typeof el.revokes !== 'boolean') return `${at}.revokes must be true or false`;
   return null;
 }
