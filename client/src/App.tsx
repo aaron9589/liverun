@@ -1001,6 +1001,7 @@ export default function App() {
           existingColors={timetable.trains.map((t) => t.color)}
           distanceUnit={distanceUnit}
           jmriUrl={layout?.jmri.url}
+          profiles={layout?.train_profiles ?? []}
           onDraftChange={setDraftTrain}
           onSave={handleSaveTrain}
           onDelete={modal.type === 'editTrain' ? () => handleDeleteTrain(modal.train.id) : undefined}
@@ -1026,6 +1027,7 @@ export default function App() {
       {modal.type === 'layoutSettings' && (
         <LayoutSettings
           layout={layout ?? DEFAULT_LAYOUT}
+          timetable={timetable}
           onSaved={setLayout}
           onClose={() => setModal({ type: 'none' })}
         />

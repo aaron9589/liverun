@@ -154,4 +154,9 @@ function setLayout(layout) {
   return db.layout;
 }
 
-module.exports = { readDB, writeDB, getTimetable, mutateTimetable, onTimetableChange, uuidv4, getLayout, setLayout, LAYOUT_DEFAULTS };
+/** Directory holding the DB file (the Docker data volume); sounds/ lives here. */
+function dataDir() {
+  return path.dirname(DB_PATH);
+}
+
+module.exports = { dataDir, readDB, writeDB, getTimetable, mutateTimetable, onTimetableChange, uuidv4, getLayout, setLayout, LAYOUT_DEFAULTS };

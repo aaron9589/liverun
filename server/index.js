@@ -153,6 +153,7 @@ app.put('/api/active-timetable', (req, res) => {
 // ── Layout-wide config (see server/layout.js) ────────────────
 
 layoutRoutes.register(app, { getLayout, setLayout });
+require('./sounds').register(app, { dataDir: require('./db').dataDir });
 
 // Must be defined before /:id routes to avoid 'import' being matched as an id
 app.post('/api/timetables/import', (req, res) => {

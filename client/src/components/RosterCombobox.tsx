@@ -7,12 +7,14 @@ interface Props {
   onChange: (v: string) => void;
   roster: JmriRoster;
   placeholder?: string;
+  /** Resolved train-profile name for the chip: string = badge, null = no profile matches, undefined = no profiles configured (hidden). */
+  profileName?: string | null;
 }
 
 const INPUT_CLS =
   'w-full rounded-lg bg-slate-800 border border-slate-600 px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 text-sm';
 
-export function RosterCombobox({ value, onChange, roster, placeholder }: Props) {
+export function RosterCombobox({ value, onChange, roster, placeholder, profileName }: Props) {
   const uid = useId();
   const listId = `${uid}-list`;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +87,16 @@ export function RosterCombobox({ value, onChange, roster, placeholder }: Props) 
               ×
             </button>
           </span>
+          {profileName !== undefined && (
+            <span
+              title={profileName ? 'Train profile this ID resolves to' : 'No train profile matches this ID'}
+              className={`rounded-full px-2 py-0.5 text-[11px] border ${
+                profileName ? 'bg-blue-950/50 text-blue-300 border-blue-800' : 'bg-slate-800 text-slate-500 border-slate-700'
+              }`}
+            >
+              {profileName ?? 'no profile'}
+            </span>
+          )}
           {notInRoster && <span className="text-xs text-amber-400/80">not in roster</span>}
         </div>
       ) : (

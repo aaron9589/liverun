@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
-import type { LayoutConfig } from '../types';
+import type { LayoutConfig, Timetable } from '../types';
 import { api } from '../api';
 import { JmriSection, validateJmriUrl } from './layout/JmriSection';
-import type { SectionProps } from './layout/JmriSection';
+import { GuardSection } from './layout/GuardSection';
+import { TrainProfilesSection } from './layout/TrainProfilesSection';
+import { SoundLibrarySection } from './layout/SoundLibrarySection';
+import { validateGuard, validateProfiles, type LayoutSectionProps } from './layout/shared';
 
 interface SectionDef {
   id: string;
   label: string;
-  component: ComponentType<SectionProps>;
+  component: ComponentType<LayoutSectionProps>;
   /** Returns an error message when the draft is invalid for this section. */
   validate?: (draft: LayoutConfig) => string | null;
 }
@@ -16,10 +19,15 @@ interface SectionDef {
 // To add a layout-wide settings section, add an entry here.
 const SECTIONS: SectionDef[] = [
   { id: 'jmri', label: 'JMRI', component: JmriSection, validate: (d) => validateJmriUrl(d.jmri.url) },
+  { id: 'guard', label: 'Guard panel', component: GuardSection, validate: validateGuard },
+  { id: 'profiles', label: 'Train profiles', component: TrainProfilesSection, validate: validateProfiles },
+  { id: 'sounds', label: 'Sound library', component: SoundLibrarySection },
 ];
 
 interface Props {
   layout: LayoutConfig;
+  /** The currently open timetable, used by the train profile preview. */
+  timetable?: Timetable | null;
   onSaved: (layout: LayoutConfig) => void;
   onClose: () => void;
 }
@@ -36,7 +44,7 @@ function friendlyError(e: unknown): string {
   return raw || 'Save failed';
 }
 
-export function LayoutSettings({ layout, onSaved, onClose }: Props) {
+export function LayoutSettings({ layout, timetable, onSaved, onClose }: Props) {
   const [saved, setSaved] = useState<LayoutConfig>(layout);
   const [draft, setDraft] = useState<LayoutConfig>(layout);
   const [sectionId, setSectionId] = useState(SECTIONS[0].id);
@@ -46,7 +54,11 @@ export function LayoutSettings({ layout, onSaved, onClose }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
-  const invalid = SECTIONS.some((s) => s.validate?.(draft));
+  const problems = SECTIONS.flatMap((s) => {
+    const m = s.validate?.(draft);
+    return m ? [`${s.label}: ${m}`] : [];
+  });
+  const invalid = problems.length > 0;
   const section = SECTIONS.find((s) => s.id === sectionId) ?? SECTIONS[0];
   const Section = section.component;
 
@@ -140,13 +152,18 @@ export function LayoutSettings({ layout, onSaved, onClose }: Props) {
               ))}
             </nav>
             <div className="flex-1 overflow-y-auto px-6 py-5">
-              <Section draft={draft} onChange={setDraft} />
+              <Section draft={draft} onChange={setDraft} timetable={timetable} />
             </div>
           </div>
 
           <div className="px-6 py-3 border-t border-slate-800 shrink-0 space-y-2">
             {error && (
               <div className="rounded-lg bg-red-950/40 border border-red-800 px-3 py-2 text-sm text-red-300">{error}</div>
+            )}
+            {invalid && (
+              <div className="rounded-lg bg-red-950/40 border border-red-800 px-3 py-2 text-sm text-red-300">
+                Cannot save: {problems[0]}{problems.length > 1 ? ` (+${problems.length - 1} more)` : ''}
+              </div>
             )}
             {importError && (
               <div className="rounded-lg bg-red-950/40 border border-red-800 px-3 py-2 text-sm text-red-300">{importError}</div>

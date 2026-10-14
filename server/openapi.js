@@ -85,6 +85,59 @@ const spec = {
         },
       },
     },
+    '/api/sounds': {
+      get: {
+        tags: ['Sounds'],
+        summary: 'List the sound library',
+        description: 'Audio files used by train profiles and the guard alert. Seeded with default sounds on first start; stored in the data volume.',
+        responses: {
+          200: {
+            description: 'Files sorted by name',
+            content: { 'application/json': { schema: { type: 'array', items: { type: 'object', properties: { file: { type: 'string', example: 'bell.mp3' }, size: { type: 'integer', description: 'Bytes' } } } } } },
+          },
+        },
+      },
+      post: {
+        tags: ['Sounds'],
+        summary: 'Upload a sound',
+        description: 'Raw file as the request body (Content-Type audio/* or application/octet-stream, max 2 MB). The name must be a plain file name (letters, digits, space, . _ -, max 100 chars, no leading dot) ending in .mp3, .ogg or .wav; contents are checked against the type.',
+        parameters: [
+          { name: 'name', in: 'query', required: true, schema: { type: 'string' }, description: 'File name to store' },
+          { name: 'overwrite', in: 'query', required: false, schema: { type: 'string', enum: ['1'] }, description: 'Set to 1 to replace an existing file' },
+        ],
+        requestBody: { required: true, content: { 'audio/mpeg': { schema: { type: 'string', format: 'binary' } } } },
+        responses: {
+          201: { description: 'Stored' },
+          400: { description: 'Invalid name or contents' },
+          409: { description: 'File exists and overwrite was not requested' },
+          413: { description: 'Larger than 2 MB' },
+          415: { description: 'Unsupported Content-Type' },
+        },
+      },
+    },
+    '/api/sounds/{file}': {
+      parameters: [
+        { name: 'file', in: 'path', required: true, schema: { type: 'string' }, description: 'Sound file name' },
+      ],
+      get: {
+        tags: ['Sounds'],
+        summary: 'Download a sound',
+        responses: {
+          200: { description: 'Audio file', content: { 'audio/mpeg': { schema: { type: 'string', format: 'binary' } } } },
+          400: { description: 'Invalid name' },
+          404: { description: 'Not found' },
+        },
+      },
+      delete: {
+        tags: ['Sounds'],
+        summary: 'Delete a sound',
+        responses: {
+          200: { description: 'Deleted' },
+          400: { description: 'Invalid name' },
+          404: { description: 'Not found' },
+        },
+      },
+    },
     '/api/timetables/{id}/live/trains': {
       parameters: [
         { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' }, description: 'Timetable ID' },

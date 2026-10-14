@@ -32,6 +32,11 @@ export function soundUrl(file: string): string {
   return `${BASE}/sounds/${encodeURIComponent(file)}`;
 }
 
+export interface SoundFile {
+  file: string;
+  size: number;
+}
+
 // ── Timetables ────────────────────────────────────────────────
 
 export const api = {
@@ -44,6 +49,21 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(layout),
     }),
+
+  // ── Sound library (acts immediately; not part of the layout draft) ──
+  listSounds: () =>
+    req<SoundFile[]>('/sounds'),
+
+  /** Raw body with the file's own content type (not JSON). Rejects with a 409 body if it exists and !overwrite. */
+  uploadSound: (file: File, overwrite = false) =>
+    req<SoundFile>(`/sounds?name=${encodeURIComponent(file.name)}${overwrite ? '&overwrite=1' : ''}`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    }),
+
+  deleteSound: (name: string) =>
+    req<{ ok: true }>(`/sounds/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 
   listTimetables: () =>
     req<TimetableSummary[]>('/timetables'),

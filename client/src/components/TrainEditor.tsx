@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback, type InputHTMLAttributes } from 'react';
 import { useJmriRoster } from '../hooks/useJmriRoster';
 import { RosterCombobox } from './RosterCombobox';
-import type { Station, Train, TrainStop, TrainRequest, Path, PathStop, Crew } from '../types';
+import { resolveProfile } from '../lib/profiles';
+import type { TrainProfile, Station, Train, TrainStop, TrainRequest, Path, PathStop, Crew } from '../types';
 
 interface StopForm {
   stationId: string;
@@ -26,6 +27,8 @@ interface Props {
   onDelete?: () => void;
   onClose: () => void;
   jmriUrl?: string;
+  /** Layout train profiles, to show which one the Train ID resolves to. */
+  profiles?: TrainProfile[];
 }
 
 const PRESET_COLORS = [
@@ -51,7 +54,7 @@ const PRESET_COLORS = [
   '#c084fc', // purple-400 (soft purple)
 ];
 
-export function TrainEditor({ train, stations, paths, crews = [], existingColors, distanceUnit = 'km', onDraftChange, onSave, onDelete, onClose, jmriUrl }: Props) {
+export function TrainEditor({ train, stations, paths, crews = [], existingColors, distanceUnit = 'km', onDraftChange, onSave, onDelete, onClose, jmriUrl, profiles = [] }: Props) {
   const roster = useJmriRoster(jmriUrl);
   // Escape closes the editor like Cancel. Inner controls that use Escape
   // themselves (e.g. an open roster dropdown) stop propagation first.
@@ -441,6 +444,7 @@ export function TrainEditor({ train, stations, paths, crews = [], existingColors
                 value={trainIdField}
                 onChange={setTrainIdField}
                 roster={roster}
+                profileName={profiles.length ? resolveProfile(profiles, trainIdField)?.name ?? null : undefined}
                 placeholder="JMRI roster entry"
               />
             </div>
