@@ -25,8 +25,15 @@ import { EventBanner } from './EventBanner';
 import { useGuardEvents } from '../../hooks/useGuardEvents';
 import { stopKeyOf, type RolledEvent } from '../../lib/guardEvents';
 import { eventPublishPayload } from '../../lib/guardEventPublish';
+import { useLoa } from '../../hooks/useLoa';
+import { stopIndexOf } from '../../lib/loa';
+import { warningText } from '../../lib/loaDisplay';
+import { LoaStrip } from './LoaStrip';
+import { AuthorityTab } from './AuthorityTab';
+import { LoaWarningBanner } from './LoaWarningBanner';
 
 const CREW_KEY = 'guard:crew';
+const TAB_KEY = 'guard:rightTab';
 const trainKey = (ttId: string) => `guard:train:${ttId}`;
 
 function readStore(key: string): string | null {
@@ -259,9 +266,49 @@ export function GuardPanel() {
     clockMin: clockShown,
     onFire: onEventFire,
   });
+
+  // Limit of Authority (spec §11). currentStopIndex is deliberately the PINNED
+  // stop only, not the clock's current stop: on a late train the fast clock
+  // passes a section's `to` while the train is still at `from`, which would
+  // complete the section and hide the authority. Completion comes from actual
+  // Doors Open events (loa.onDoorOpen) instead.
+  const loa = useLoa({
+    timetableId: timetable?.id ?? null,
+    train,
+    stations: timetable?.stations ?? [],
+    config: layout.loa,
+    values: live.loaValues,
+    currentStopIndex: train && pinnedStopId ? stopIndexOf(train, pinnedStopId) : null,
+  });
+  const hasLoa = loa.matches.length > 0;
+  const [loaWarn, setLoaWarn] = useState<{ trainId: string; title: string; detail: string } | null>(null);
+  const loaOpenIdx = useRef<number | null>(null);
+  useEffect(() => { setLoaWarn(null); loaOpenIdx.current = null; }, [shownTrainId]);
+  const [rightTab, setRightTab] = useState<'stops' | 'authority'>(() => (readStore(TAB_KEY) === 'authority' ? 'authority' : 'stops'));
+  const pickTab = (t: 'stops' | 'authority') => { setRightTab(t); writeStore(TAB_KEY, t); };
+  const resetLoa = () => {
+    if (window.confirm('Reset LOA for this train? Grants and completed sections are forgotten.')) loa.reset();
+  };
+
   guardDoorRef.current = (type) => {
     const l = liveRef.current;
     if (!l.train) return;
+    // The stop the doors are at: pinned wins, else the clock's current stop (same as guard events).
+    const atStopIdx = (): number | null => {
+      const i = currentStop(l.seq, l.clockShown, l.pinnedStopId).index;
+      return i >= 0 ? stopIndexOf(l.train!, l.seq[i].stop.id) : null;
+    };
+    if (type === 'door_open') {
+      const idx = atStopIdx();
+      loaOpenIdx.current = idx;
+      if (idx !== null) loa.onDoorOpen(idx);
+    } else if (type === 'door_close') {
+      // Warn about the stop the doors were OPENED at, never delaying the close itself.
+      const idx = loaOpenIdx.current ?? atStopIdx();
+      loaOpenIdx.current = null;
+      const w = idx !== null ? loa.warnOnDepart(idx) : null;
+      if (w) { setLoaWarn({ trainId: l.train.id, ...warningText(w) }); playAlert(); }
+    }
     let stopId: string | null = null;
     if (type === 'door_open') {
       const i = currentStop(l.seq, l.clockShown, l.pinnedStopId).index;
@@ -434,6 +481,7 @@ export function GuardPanel() {
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); setPickingCrew(true); }}>Change crew</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); setHistoryOpen(true); }}>Changes from Control</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); resetEvents(); }}>Reset events for this train</button>
+                {hasLoa && <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); resetLoa(); }}>Reset LOA for this train</button>}
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={switchMode}>Switch mode</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => window.location.reload()}>Reload</button>
               </div>
@@ -492,7 +540,7 @@ export function GuardPanel() {
             onDoorsOpened={onDoorsOpened}
           />
           <BoardingCard
-            key={train.id + (lost ? ':lost' : '')}
+            key={`boarding:${train.id}${lost ? ':lost' : ''}`}
             config={layout.boarding}
             event={boardingEvent}
             onStats={onStats}
@@ -500,8 +548,21 @@ export function GuardPanel() {
             onBoardingDone={onBoardingDone}
           />
         </section>
-        <section>
-          <StopTable
+        <section className="flex flex-col gap-3">
+          {hasLoa && (
+            <div role="tablist" className="grid grid-cols-2 gap-1 rounded-xl bg-slate-900 border border-slate-800 p-1">
+              {(['stops', 'authority'] as const).map((t) => (
+                <button
+                  key={t}
+                  role="tab"
+                  aria-selected={rightTab === t}
+                  onClick={() => pickTab(t)}
+                  className={`min-h-[48px] rounded-lg font-semibold ${rightTab === t ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800'}`}
+                >{t === 'stops' ? 'Stops' : 'Authority'}</button>
+              ))}
+            </div>
+          )}
+          {hasLoa && rightTab === 'authority' ? <AuthorityTab sections={loa.sections} /> : <StopTable
             seq={seq}
             stations={timetable.stations}
             clock={clockShown}
@@ -510,7 +571,7 @@ export function GuardPanel() {
             highlightStopIds={flash}
             formsNext={forms}
             onForms={(id) => select(id, true)}
-          />
+          />}
         </section>
       </main>
     );
@@ -519,6 +580,7 @@ export function GuardPanel() {
   return (
     <div className="h-[100dvh] flex flex-col bg-slate-950 text-slate-100">
       {header}
+      {hasLoa && <LoaStrip sections={loa.sections} current={loa.current} />}
       {lost && (
         <div role="alert" className="flex items-center gap-3 px-4 py-3 bg-red-900/60 border-b border-red-700 text-red-100">
           <span className="flex-1 font-medium">{lost.message}. Close doors if open, then acknowledge.</span>
@@ -534,6 +596,9 @@ export function GuardPanel() {
           </span>
           <button onClick={ackActive} className="min-h-[48px] px-5 rounded-lg bg-amber-600 hover:bg-amber-500 font-bold text-slate-950">ACK</button>
         </div>
+      )}
+      {loaWarn && loaWarn.trainId === shownTrainId && (
+        <LoaWarningBanner title={loaWarn.title} detail={loaWarn.detail} onAck={() => setLoaWarn(null)} />
       )}
       <EventBanner queue={guardEvents.queue} onAck={guardEvents.ack} />
       {body}
