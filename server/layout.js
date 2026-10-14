@@ -69,6 +69,122 @@ function validateProfile(p, i, seen) {
   return null;
 }
 
+
+// ── Boarding (spec §8) and stats (spec §9) ─────────────────────────────────
+
+const HHMM_RE = /^(\d{1,2}):(\d{2})$/;
+
+/** "HH:MM" within 00:00-24:00 (24:00 allowed only exactly). */
+function isClock(v) {
+  if (typeof v !== 'string') return false;
+  const m = HHMM_RE.exec(v.trim());
+  if (!m) return false;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  return min <= 59 && (h < 24 || (h === 24 && min === 0));
+}
+
+function numberIn(v, min, max, label) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return `${label} must be a number`;
+  if (v < min || v > max) return `${label} must be between ${min} and ${max}`;
+  return null;
+}
+
+function validateRange(v, min, max, label) {
+  if (!Array.isArray(v) || v.length !== 2) return `${label} must be a [min, max] pair`;
+  const e = numberIn(v[0], min, max, `${label}[0]`) || numberIn(v[1], min, max, `${label}[1]`);
+  if (e) return e;
+  return v[0] > v[1] ? `${label}: min must not exceed max` : null;
+}
+
+const RULE_TEXT_KEYS = ['direction', 'train_id', 'train_name'];
+
+function validateBoardingModel(m, at) {
+  if (!isPlainObject(m)) return `${at} must be an object`;
+  let e;
+  if (m.max_passengers !== undefined && (e = numberIn(m.max_passengers, 0, 1000, `${at}.max_passengers`))) return e;
+  if (m.spread !== undefined && (e = numberIn(m.spread, 0, 2, `${at}.spread`))) return e;
+  if (m.demand_curve !== undefined) {
+    const c = m.demand_curve;
+    if (!Array.isArray(c) || c.length === 0) return `${at}.demand_curve must be an array with at least one point`;
+    for (let i = 0; i < c.length; i++) {
+      const p = c[i];
+      if (!Array.isArray(p) || p.length !== 2) return `${at}.demand_curve[${i}] must be ["HH:MM", factor]`;
+      if (!isClock(p[0])) return `${at}.demand_curve[${i}]: time must be HH:MM between 00:00 and 24:00`;
+      if ((e = numberIn(p[1], 0, Infinity, `${at}.demand_curve[${i}] factor`))) return e;
+    }
+  }
+  if (m.rules !== undefined) {
+    if (!Array.isArray(m.rules)) return `${at}.rules must be an array`;
+    for (let i = 0; i < m.rules.length; i++) {
+      const r = m.rules[i];
+      const ra = `${at}.rules[${i}]`;
+      if (!isPlainObject(r)) return `${ra} must be an object`;
+      if (typeof r.name !== 'string') return `${ra}.name must be a string`;
+      if ((e = numberIn(r.factor, 0, Infinity, `${ra}.factor`))) return e;
+      if (!isPlainObject(r.when)) return `${ra}.when must be an object`;
+      for (const [k, v] of Object.entries(r.when)) {
+        if (RULE_TEXT_KEYS.includes(k)) {
+          if (typeof v !== 'string') return `${ra}.when.${k} must be a string`;
+        } else if (k === 'from' || k === 'to') {
+          if (!isClock(v)) return `${ra}.when.${k} must be HH:MM`;
+        } else {
+          return `${ra}.when has unknown key "${k}"`;
+        }
+      }
+    }
+  }
+  if (m.position !== undefined) {
+    if (!isPlainObject(m.position)) return `${at}.position must be an object`;
+    for (const k of ['origin', 'intermediate', 'terminus']) {
+      if (m.position[k] !== undefined && (e = numberIn(m.position[k], 0, Infinity, `${at}.position.${k}`))) return e;
+    }
+  }
+  return null;
+}
+
+function validateBoarding(b) {
+  if (!isPlainObject(b)) return 'boarding must be an object';
+  let e = validateBoardingModel(b, 'boarding');
+  if (e) return e;
+  const nums = [
+    ['tick_s', 0.1, 10], ['jitter', 0, 1], ['flow_rate', 0.1, 100], ['straggler_threshold', 0, 100],
+    ['straggler_rate', 0.1, 100], ['runner_chance', 0, 1], ['start_delay_s', 0, 60], ['doil_off_delay_s', 0, 60],
+  ];
+  for (const [k, lo, hi] of nums) {
+    if (b[k] !== undefined && (e = numberIn(b[k], lo, hi, `boarding.${k}`))) return e;
+  }
+  if (b.runner_count !== undefined && (e = validateRange(b.runner_count, 0, 100, 'boarding.runner_count'))) return e;
+  if (b.runner_delay_s !== undefined && (e = validateRange(b.runner_delay_s, 0, 60, 'boarding.runner_delay_s'))) return e;
+  if (b.show_alighting !== undefined && typeof b.show_alighting !== 'boolean') return 'boarding.show_alighting must be true or false';
+  if (b.alighting !== undefined) return validateBoardingModel(b.alighting, 'boarding.alighting');
+  return null;
+}
+
+const STATS_PLACEHOLDERS = ['train', 'trainId', 'station'];
+
+function validateStats(s) {
+  if (!isPlainObject(s)) return 'stats must be an object';
+  if (s.enabled !== undefined && typeof s.enabled !== 'boolean') return 'stats.enabled must be true or false';
+  if (s.topic !== undefined) {
+    if (typeof s.topic !== 'string') return 'stats.topic must be a string';
+    if (s.topic.length > 200) return 'stats.topic must be 200 characters or fewer';
+    for (const m of s.topic.matchAll(/\{([^{}]*)\}/g)) {
+      if (!STATS_PLACEHOLDERS.includes(m[1])) return `stats.topic: unknown placeholder {${m[1]}} (use ${STATS_PLACEHOLDERS.map((p) => `{${p}}`).join(', ')})`;
+    }
+    const bare = s.topic.replace(/\{[^{}]*\}/g, '');
+    if (/[+#]/.test(bare)) return 'stats.topic must not contain MQTT wildcards (+ or #)';
+    if (/[{}]/.test(bare)) return 'stats.topic has an unmatched brace';
+  }
+  if (s.payload !== undefined && !['count', 'json'].includes(s.payload)) return 'stats.payload must be "count" or "json"';
+  if (s.publish_on !== undefined && !['boarding_start', 'door_close'].includes(s.publish_on)) {
+    return 'stats.publish_on must be "boarding_start" or "door_close"';
+  }
+  // A partial body that omits topic keeps the stored one (merged by setLayout), so only an explicit empty topic is an error.
+  if (s.enabled === true && s.topic !== undefined && !s.topic.trim()) return 'stats.topic is required when stats are enabled';
+  return null;
+}
+
 /**
  * Validates a PUT body. Returns { error } on the first problem found, or
  * { layout } with the sections it understands (getLayout/setLayout drop the rest).
@@ -101,6 +217,16 @@ function validateLayout(body) {
       const e = validateProfile(body.train_profiles[i], i, seen);
       if (e) return { error: e };
     }
+  }
+
+  if (body.boarding !== undefined) {
+    const e = validateBoarding(body.boarding);
+    if (e) return { error: e };
+  }
+
+  if (body.stats !== undefined) {
+    const e = validateStats(body.stats);
+    if (e) return { error: e };
   }
 
   return { layout: body };

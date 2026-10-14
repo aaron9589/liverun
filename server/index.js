@@ -195,6 +195,7 @@ app.post('/api/timetables/import', (req, res) => {
       bold_name: Boolean(s.bold_name),
       italic_name: Boolean(s.italic_name),
       underline_name: Boolean(s.underline_name),
+      ...(parseBoardingWeight(s.boarding_weight) !== undefined && { boarding_weight: parseBoardingWeight(s.boarding_weight) }),
     })),
     trains: (data.trains || []).map((tr) => {
       const trainId = uuidv4();
@@ -311,6 +312,7 @@ app.post('/api/timetables/:id/restore', (req, res) => {
       bold_name: Boolean(s.bold_name),
       italic_name: Boolean(s.italic_name),
       underline_name: Boolean(s.underline_name),
+      ...(parseBoardingWeight(s.boarding_weight) !== undefined && { boarding_weight: parseBoardingWeight(s.boarding_weight) }),
     }));
     if (Array.isArray(trains)) tt.trains = trains.map((tr) => ({
       id: String(tr.id),
@@ -380,9 +382,20 @@ app.put('/api/timetables/:id/settings', (req, res) => {
   res.json(normalise(updated));
 });
 
+/** Boarding weight: finite number 0-2, else undefined (= unset, treated as 1.0). */
+function parseBoardingWeight(v) {
+  if (v == null || v === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n <= 2 ? n : undefined;
+}
+function boardingWeightInvalid(v) {
+  return v != null && v !== '' && parseBoardingWeight(v) === undefined;
+}
+
 app.post('/api/timetables/:id/stations', (req, res) => {
-  const { name, shortCode, distance, graphPos, branchName, pushDown, aliasEnabled, boldName, italicName, underlineName } = req.body;
+  const { name, shortCode, distance, graphPos, branchName, pushDown, aliasEnabled, boldName, italicName, underlineName, boardingWeight } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
+  if (boardingWeightInvalid(boardingWeight)) return res.status(400).json({ error: 'boardingWeight must be a number 0-2' });
   if (graphPos == null || graphPos === '') return res.status(400).json({ error: 'graphPos is required' });
   const updated = mutateTimetable(req.params.id, (tt) => {
     const newPos = Number(graphPos);
@@ -403,6 +416,7 @@ app.post('/api/timetables/:id/stations', (req, res) => {
       bold_name: Boolean(boldName),
       italic_name: Boolean(italicName),
       underline_name: Boolean(underlineName),
+      ...(parseBoardingWeight(boardingWeight) !== undefined && { boarding_weight: parseBoardingWeight(boardingWeight) }),
     });
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -410,8 +424,9 @@ app.post('/api/timetables/:id/stations', (req, res) => {
 });
 
 app.put('/api/timetables/:id/stations/:stationId', (req, res) => {
-  const { name, shortCode, distance, graphPos, sortOrder, branchName, pushDown, aliasEnabled, boldName, italicName, underlineName } = req.body;
+  const { name, shortCode, distance, graphPos, sortOrder, branchName, pushDown, aliasEnabled, boldName, italicName, underlineName, boardingWeight } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
+  if (boardingWeightInvalid(boardingWeight)) return res.status(400).json({ error: 'boardingWeight must be a number 0-2' });
   const updated = mutateTimetable(req.params.id, (tt) => {
     const st = tt.stations.find((s) => s.id === req.params.stationId);
     if (st) {
@@ -438,6 +453,8 @@ app.put('/api/timetables/:id/stations/:stationId', (req, res) => {
       st.bold_name = Boolean(boldName);
       st.italic_name = Boolean(italicName);
       st.underline_name = Boolean(underlineName);
+      const bw = parseBoardingWeight(boardingWeight);
+      if (bw === undefined) delete st.boarding_weight; else st.boarding_weight = bw;
     }
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });

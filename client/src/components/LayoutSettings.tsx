@@ -6,6 +6,8 @@ import { JmriSection, validateJmriUrl } from './layout/JmriSection';
 import { GuardSection } from './layout/GuardSection';
 import { TrainProfilesSection } from './layout/TrainProfilesSection';
 import { SoundLibrarySection } from './layout/SoundLibrarySection';
+import { BoardingSection, validateBoarding } from './layout/BoardingSection';
+import { StatsSection, validateStats } from './layout/StatsSection';
 import { validateGuard, validateProfiles, type LayoutSectionProps } from './layout/shared';
 
 interface SectionDef {
@@ -21,6 +23,8 @@ const SECTIONS: SectionDef[] = [
   { id: 'jmri', label: 'JMRI', component: JmriSection, validate: (d) => validateJmriUrl(d.jmri.url) },
   { id: 'guard', label: 'Guard panel', component: GuardSection, validate: validateGuard },
   { id: 'profiles', label: 'Train profiles', component: TrainProfilesSection, validate: validateProfiles },
+  { id: 'boarding', label: 'Boarding', component: BoardingSection, validate: validateBoarding },
+  { id: 'stats', label: 'Stats', component: StatsSection, validate: validateStats },
   { id: 'sounds', label: 'Sound library', component: SoundLibrarySection },
 ];
 

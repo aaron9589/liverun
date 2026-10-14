@@ -7,10 +7,10 @@ interface Props {
   open?: boolean;
   onToggle?: () => void;
   distanceUnit?: 'km' | 'mi';
-  onAdd: (data: { name: string; shortCode: string; distance: number | null; graphPos: number; branchName: string | null; pushDown: boolean; aliasEnabled: boolean; boldName: boolean; italicName: boolean; underlineName: boolean }) => void;
+  onAdd: (data: { name: string; shortCode: string; distance: number | null; graphPos: number; branchName: string | null; pushDown: boolean; aliasEnabled: boolean; boldName: boolean; italicName: boolean; underlineName: boolean; boardingWeight: number | null }) => void;
   onUpdate: (
     id: string,
-    data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName: string | null; pushDown: boolean; aliasEnabled: boolean; boldName: boolean; italicName: boolean; underlineName: boolean }
+    data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName: string | null; pushDown: boolean; aliasEnabled: boolean; boldName: boolean; italicName: boolean; underlineName: boolean; boardingWeight: number | null }
   ) => void;
   onDelete: (id: string) => void;
 }
@@ -25,9 +25,10 @@ interface StationFormData {
   boldName: boolean;
   italicName: boolean;
   underlineName: boolean;
+  boardingWeight: string; // blank = unset (1.0)
 }
 
-const EMPTY: StationFormData = { name: '', shortCode: '', distance: '', graphPos: '', branchName: '', aliasEnabled: false, boldName: false, italicName: false, underlineName: false };
+const EMPTY: StationFormData = { name: '', shortCode: '', distance: '', graphPos: '', branchName: '', aliasEnabled: false, boldName: false, italicName: false, underlineName: false, boardingWeight: '' };
 
 export function StationPanel({ stations, open, onToggle, distanceUnit = 'km', onAdd, onUpdate, onDelete }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export function StationPanel({ stations, open, onToggle, distanceUnit = 'km', on
       boldName: s.bold_name ?? false,
       italicName: s.italic_name ?? false,
       underlineName: s.underline_name ?? false,
+      boardingWeight: s.boarding_weight != null ? String(s.boarding_weight) : '',
     });
     setAddForm(null);
     setError('');
@@ -73,6 +75,7 @@ export function StationPanel({ stations, open, onToggle, distanceUnit = 'km', on
     if (!f.name.trim()) return 'Name is required';
     if (f.graphPos === '' || isNaN(Number(f.graphPos))) return 'Graph position must be a number';
     if (f.distance !== '' && isNaN(Number(f.distance))) return 'Km label must be a number if set';
+    if (f.boardingWeight !== '' && !(Number(f.boardingWeight) >= 0 && Number(f.boardingWeight) <= 2)) return 'Boarding weight must be 0 to 2';
     return '';
   }
 
@@ -91,6 +94,7 @@ export function StationPanel({ stations, open, onToggle, distanceUnit = 'km', on
       boldName: addForm.boldName,
       italicName: addForm.italicName,
       underlineName: addForm.underlineName,
+      boardingWeight: addForm.boardingWeight !== '' ? Number(addForm.boardingWeight) : null,
     });
     setAddForm(null);
     setError('');
@@ -111,6 +115,7 @@ export function StationPanel({ stations, open, onToggle, distanceUnit = 'km', on
       boldName: editForm.boldName,
       italicName: editForm.italicName,
       underlineName: editForm.underlineName,
+      boardingWeight: editForm.boardingWeight !== '' ? Number(editForm.boardingWeight) : null,
     });
     setEditingId(null);
     setError('');
@@ -207,6 +212,17 @@ export function StationPanel({ stations, open, onToggle, distanceUnit = 'km', on
                 />
                 Allow per-train location alias
               </label>
+              <label className="flex items-center gap-2 text-xs text-slate-400">
+                Boarding weight
+                <input
+                  type="number" min={0} max={2} step={0.1}
+                  value={editForm.boardingWeight}
+                  onChange={(e) => setEditForm({ ...editForm, boardingWeight: e.target.value })}
+                  placeholder="1.0"
+                  className="w-16 rounded bg-slate-900 border border-slate-600 px-2 py-1 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                />
+                <span className="text-slate-500">0-2, blank = 1.0 (guard panel boarding)</span>
+              </label>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400">Name style:</span>
                 <button type="button" onClick={() => setEditForm({ ...editForm, boldName: !editForm.boldName })} className={`w-6 h-6 rounded text-xs font-bold transition-colors ${editForm.boldName ? 'bg-slate-200 text-slate-900' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>B</button>
@@ -254,7 +270,7 @@ export function StationPanel({ stations, open, onToggle, distanceUnit = 'km', on
                 <span className={`text-sm text-slate-300 truncate block${stationNameStyle(s).bold ? ' font-bold' : ''}${s.italic_name ? ' italic' : ''}${s.underline_name ? ' underline' : ''}`}>{s.name}</span>
                 <span className="text-xs text-slate-600">
                   {s.short_code ? `${s.short_code} · ` : ''}pos {s.graph_pos ?? 0}
-                  {s.distance != null ? ` · ${s.distance} ${distanceUnit ?? 'km'}` : ''}{s.branch_name ? ` · ${s.branch_name}` : ''}{s.alias_enabled ? ' · alias ✓' : ''}{(s.bold_name || s.italic_name || s.underline_name) ? ' · ' + [s.bold_name && 'B', s.italic_name && 'I', s.underline_name && 'U'].filter(Boolean).join('') : ''}
+                  {s.distance != null ? ` · ${s.distance} ${distanceUnit ?? 'km'}` : ''}{s.branch_name ? ` · ${s.branch_name}` : ''}{s.alias_enabled ? ' · alias ✓' : ''}{s.boarding_weight != null ? ` · wt ${s.boarding_weight}` : ''}{(s.bold_name || s.italic_name || s.underline_name) ? ' · ' + [s.bold_name && 'B', s.italic_name && 'I', s.underline_name && 'U'].filter(Boolean).join('') : ''}
                 </span>
               </div>
               <button
@@ -323,6 +339,17 @@ export function StationPanel({ stations, open, onToggle, distanceUnit = 'km', on
                 className="accent-sky-500"
               />
               Allow per-train location alias
+            </label>
+            <label className="flex items-center gap-2 text-xs text-slate-400">
+              Boarding weight
+              <input
+                type="number" min={0} max={2} step={0.1}
+                value={addForm.boardingWeight}
+                onChange={(e) => setAddForm({ ...addForm, boardingWeight: e.target.value })}
+                placeholder="1.0"
+                className="w-16 rounded bg-slate-900 border border-slate-600 px-2 py-1 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+              />
+              <span className="text-slate-500">0-2, blank = 1.0 (guard panel boarding)</span>
             </label>
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-400">Name style:</span>

@@ -399,6 +399,7 @@ export default function App() {
     boldName?: boolean;
     italicName?: boolean;
     underlineName?: boolean;
+    boardingWeight?: number | null;
   }) {
     if (!selectedId) return;
     const updated = await api.addStation(selectedId, data);
@@ -407,7 +408,7 @@ export default function App() {
 
   async function handleUpdateStation(
     stationId: string,
-    data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean }
+    data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean; boardingWeight?: number | null }
   ) {
     if (!selectedId) return;
     const updated = await api.updateStation(selectedId, stationId, data);

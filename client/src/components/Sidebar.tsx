@@ -15,8 +15,8 @@ interface Props {
   onDeleteTimetable: (id: string) => void;
   onDuplicateTimetable: (id: string) => void;
   onSetActiveTimetable: (id: string | null) => void;
-  onAddStation: (data: { name: string; shortCode: string; distance: number | null; graphPos: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean }) => void;
-  onUpdateStation: (id: string, data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean }) => void;
+  onAddStation: (data: { name: string; shortCode: string; distance: number | null; graphPos: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean; boardingWeight?: number | null }) => void;
+  onUpdateStation: (id: string, data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean; boardingWeight?: number | null }) => void;
   onDeleteStation: (id: string) => void;
   onNewPath: () => void;
   onEditPath: (path: Path) => void;
