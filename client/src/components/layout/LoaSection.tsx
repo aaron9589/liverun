@@ -436,7 +436,7 @@ function SectionCard({ section, index, count, stations, values, open, onToggle, 
             </div>
           </div>
           <div className="space-y-2">
-            {section.elements.length === 0 && <p className="text-xs text-slate-500">No elements yet. A section with no elements is granted immediately.</p>}
+            {section.elements.length === 0 && <p className="text-xs text-slate-500">No elements yet. A section is never granted until it has at least one element ticked Grants.</p>}
             {section.elements.map((el, j) => (
               <ElementRow key={j} el={el} index={j} count={section.elements.length} values={values}
                 onChange={(e) => setEl(j, e)}
