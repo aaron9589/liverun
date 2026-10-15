@@ -76,7 +76,7 @@ Under **Stations**, click **+ Add**. Each station has:
 
 A path is a reusable stopping pattern with running times, so you don't type every stop time by hand.
 
-Under **Paths**, click **+ Add**, name the path, then add stations in the order the train runs. For each stop set the **travel time from the previous stop** and the **Dwell time (min)**; use the arrows to reorder.
+Under **Paths**, click **+ Add**, name the path, then add stations in the order the train runs. For each stop set **Travel time from prev (min)** (ignored for the first stop) and **Dwell time (min)**; use the arrows to reorder.
 
 To use one, pick it under **Path (optional)** at the top of the train editor. The stop list narrows to the path's stations; enter the first departure and press the auto-fill button (**Auto-fill stops from first departure using path timings**) to fill in every stop.
 
