@@ -265,6 +265,8 @@ export function GuardPanel() {
     config: layout.loa,
     values: live.loaValues,
   });
+  // A layout that uses LOA shows it on every train (even "no sections for this train"); one that doesn't, never.
+  const loaInUse = layout.loa.sections.length > 0;
 
   guardDoorRef.current = (type) => {
     const l = liveRef.current;
@@ -529,7 +531,7 @@ export function GuardPanel() {
             highlightStopIds={flash}
           />
           {/* LOA is always on screen (not behind a tab), even when no section applies. */}
-          <AuthorityTab sections={loa.sections} />
+          {loaInUse && <AuthorityTab sections={loa.sections} />}
         </section>
       </main>
     );
@@ -538,7 +540,7 @@ export function GuardPanel() {
   return (
     <div className="h-[100dvh] flex flex-col bg-slate-950 text-slate-100">
       {header}
-      {train && <LoaStrip sections={loa.sections} current={loa.current} />}
+      {train && loaInUse && <LoaStrip sections={loa.sections} current={loa.current} />}
       {lost && (
         <div role="alert" className="flex items-center gap-3 px-4 py-3 bg-red-900/60 border-b border-red-700 text-red-100">
           <span className="flex-1 font-medium">{lost.message}. Close doors if open, then acknowledge.</span>

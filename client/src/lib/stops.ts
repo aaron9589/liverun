@@ -41,7 +41,7 @@ export function inRunningOrder(train: Train): Train {
  * Timed stops in running order (runningOrder) with minutes unwrapped across midnight
  * (anchored on the first timed stop). Stops with neither time are skipped.
  */
-export function sequenceStops(train: Train): SeqStop[] {
+export function sequenceStops(train: Pick<Train, 'stops'>): SeqStop[] {
   const out: SeqStop[] = [];
   let prev: number | null = null;
   // Smallest value >= prev congruent to m mod 1440.

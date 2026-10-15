@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { LayoutConfig, LoaCondition, LoaConfig, LoaElement, LoaSection as LoaSectionDef, LoaSelector, LoaValue } from '../../types';
 import { api } from '../../api';
-import { conditionState, evaluateElement, sectionsForTrain, type ElementState } from '../../lib/loa';
+import { conditionState, evaluateElement, hasGrant, hasRevoke, sectionsForTrain, type ElementState } from '../../lib/loa';
 import { FIELD_CLS, type LayoutSectionProps } from './shared';
 
 // ── Validation (mirrors server/loa.js; the server is authoritative) ─────────
@@ -407,6 +407,13 @@ function SectionCard({ section, index, count, stations, values, open, onToggle, 
             onClick={() => { if (window.confirm(`Delete section "${section.name || 'unnamed'}"?`)) onRemove(); }}>Remove</button>
         </span>
       </div>
+      {section.elements.length > 0 && (!hasGrant(section) || !hasRevoke(section)) && (
+        <p className="px-3 pb-2 -mt-1 text-xs text-amber-400" data-testid="loa-section-warning">
+          {!hasGrant(section)
+            ? 'No element is ticked Grants, so this section can never be granted.'
+            : 'No element is ticked Revokes, so once granted this section is never released and the guard panel stays on it.'}
+        </p>
+      )}
       {open && (
         <div className="px-3 pb-3 space-y-3 border-t border-slate-800 pt-3">
           <div className="flex flex-wrap items-end gap-3">

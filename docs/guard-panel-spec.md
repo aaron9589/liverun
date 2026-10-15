@@ -532,10 +532,11 @@ Latching stays client-side (§11.4). Only raw topic values are shared.
 
 ### 11.6 Guard panel display
 
-- **Strip:** the current section is always visible under the header, e.g. `Kiama → Berry · AUTHORITY GRANTED` or `AWAIT: Kiama–Berry staff, Sig 7`. It names whatever isn't clear yet.
-- **Authority tab:** sits next to *Stops* and shows every section on the train's route in order, with element dots. Completed sections are greyed out, and the current one is highlighted.
+- **Always on screen** when the layout has any LOA sections (a layout without LOA shows none of this):
+  - **Strip** under the header: the current section, e.g. `Kiama → Berry · AUTHORITY GRANTED` or `AWAIT: Kiama–Berry staff, Sig 7`, naming whatever isn't clear yet. A train with no matching sections says so ("no sections for this train").
+  - **Authority panel** below the stop list (not a tab): every section on the train's route in order, with element dots and labels only — never raw MQTT values. Completed sections are greyed out, and the current one is highlighted.
 - **No departure warning (L2 withdrawn, L6):** the doors are not interlocked with LOA, so Doors Close never checks authority.
-- A train with no matching sections shows no strip and no tab.
+- **Stored state expires**: a tablet's grants and completions are kept for 12 hours after they last changed, so the same timetable run again another day starts clean (there is no manual reset).
 
 ### 11.7 Editor (D4)
 

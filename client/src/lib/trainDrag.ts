@@ -9,36 +9,23 @@
  * Running times between stations are fixed by the path, so the graph only ever
  * moves whole trains or changes dwells; it never changes a line's angle.
  *
- * Works in running order (stops are stored in station order, see runningOrder)
- * with minutes unwrapped across midnight, and returns the stops in their stored
+ * Works in running order with minutes unwrapped across midnight (sequenceStops), and returns the stops in their stored
  * order with only the times changed. Times are whole minutes.
  */
 import type { TrainStop } from '../types';
-import { runningOrder } from './stops';
+import { sequenceStops } from './stops';
 import { minutesToTime, timeToMinutes } from '../utils';
 
 export type TimeKind = 'arr' | 'dep';
 
 interface Point { stopId: string; kind: TimeKind; t: number }
 
-/** Every time on the run, in running order, unwrapped so they never go backwards. */
+/** Every time on the run, in running order, unwrapped across midnight (from sequenceStops). */
 function timePoints(stops: TrainStop[]): Point[] {
   const out: Point[] = [];
-  let prev: number | null = null;
-  const unwrap = (m: number): number => {
-    if (prev === null) return m;
-    let v = m;
-    while (v < prev) v += 1440;
-    return v;
-  };
-  for (const s of runningOrder(stops)) {
-    for (const kind of ['arr', 'dep'] as const) {
-      const raw = kind === 'arr' ? s.arrival : s.departure;
-      if (!raw) continue;
-      const t = unwrap(timeToMinutes(raw));
-      prev = t;
-      out.push({ stopId: s.id, kind, t });
-    }
+  for (const s of sequenceStops({ stops })) {
+    if (s.stop.arrival) out.push({ stopId: s.stop.id, kind: 'arr', t: s.arr });
+    if (s.stop.departure) out.push({ stopId: s.stop.id, kind: 'dep', t: s.dep });
   }
   return out;
 }
@@ -106,8 +93,15 @@ export function dwellOf(stop: Pick<TrainStop, 'arrival' | 'departure'>): number 
   return (((timeToMinutes(stop.departure) - timeToMinutes(stop.arrival)) % 1440) + 1440) % 1440;
 }
 
-/** Whether two versions of a train's stops have the same times. */
+/**
+ * Whether two versions of a train's stops have the same times, matched by
+ * station (stop ids are re-minted whenever a train is saved).
+ */
 export function sameTimes(a: TrainStop[], b: TrainStop[]): boolean {
   if (a.length !== b.length) return false;
-  return a.every((s, i) => s.id === b[i].id && s.arrival === b[i].arrival && s.departure === b[i].departure);
+  const byStation = new Map(b.map((s) => [s.station_id, s]));
+  return a.every((s) => {
+    const o = byStation.get(s.station_id);
+    return !!o && s.arrival === o.arrival && s.departure === o.departure;
+  });
 }

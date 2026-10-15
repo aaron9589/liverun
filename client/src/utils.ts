@@ -185,9 +185,18 @@ export function generateTicks(
   return ticks;
 }
 
-/** Short crew label for badges: first letter of each word, numbers kept whole ("Local Operator 12" → "LO12"). */
+/**
+ * Short crew label for badges: the first letter of up to three words, plus any
+ * numbers kept whole, so numbered crews never collide ("Local Operator 124" →
+ * "LO124"). Words that start with punctuation (e.g. "-") are skipped.
+ */
 export function crewInitials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const out = words.map((w) => (/^\d+$/.test(w) ? w : w[0].toUpperCase())).join('');
-  return out.slice(0, 4) || '?';
+  let letters = 0;
+  const out = name.trim().split(/\s+/).map((w) => {
+    if (/^\d+$/.test(w)) return w;
+    if (!/^[\p{L}\p{N}]/u.test(w) || letters >= 3) return '';
+    letters++;
+    return w[0].toUpperCase();
+  }).join('');
+  return out || '?';
 }

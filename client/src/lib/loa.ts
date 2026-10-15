@@ -19,7 +19,10 @@
  *             occurrence of the same section is still open (see below)
  *   granted   latched: every "grants" element (all by default) was
  *             clear-or-caution in the same step (L1). Holds until a "revokes"
- *             element (tokens by default) goes 'stop' ('unknown' never revokes)
+ *             element (tokens by default) goes from clear to 'stop'. An element
+ *             only revokes once it has been seen clear since the grant, so one
+ *             already at stop when the section is granted can't release it at
+ *             once ('unknown' never revokes)
  *   complete  revoked: the authority is released (e.g. the staff sunk at the
  *             far end) and the panel moves on. Frozen: never re-granted, so a
  *             following train getting the same staff can't bring it back
@@ -182,10 +185,12 @@ export type SectionPhase = 'unknown' | 'await' | 'granted' | 'complete';
 
 /** Persisted per device under timetable + train id. Keys are SectionMatch.key. */
 export interface LoaTrainState {
-  v: 3;
+  v: 4;
   /** Train.id (the LiveRun id, not the JMRI train_id). */
   trainId: string;
   granted: string[];
+  /** Granted section key → indices of its revoking elements seen clear since the grant. */
+  armed: Record<string, number[]>;
   complete: string[];
 }
 
@@ -201,16 +206,30 @@ export interface SectionView {
 }
 
 export function initialLoaState(trainId: string): LoaTrainState {
-  return { v: 3, trainId, granted: [], complete: [] };
+  return { v: 4, trainId, granted: [], armed: {}, complete: [] };
 }
 
 /** Accepts stored JSON only if it is a state for this train (older versions keep their grants and completions). */
 export function parseLoaState(raw: unknown, trainId: string): LoaTrainState | null {
   if (!raw || typeof raw !== 'object') return null;
-  const s = raw as { v?: unknown; trainId?: unknown; granted?: unknown; complete?: unknown };
+  const s = raw as { v?: unknown; trainId?: unknown; granted?: unknown; armed?: unknown; complete?: unknown };
   const strings = (a: unknown): a is string[] => Array.isArray(a) && a.every((x) => typeof x === 'string');
-  if (![1, 2, 3].includes(s.v as number) || s.trainId !== trainId || !strings(s.granted) || !strings(s.complete)) return null;
-  return { v: 3, trainId, granted: s.granted, complete: s.complete };
+  if (![1, 2, 3, 4].includes(s.v as number) || s.trainId !== trainId || !strings(s.granted) || !strings(s.complete)) return null;
+  const armed: Record<string, number[]> = {};
+  if (s.v === 4 && s.armed && typeof s.armed === 'object') {
+    for (const [k, v] of Object.entries(s.armed as Record<string, unknown>)) {
+      if (Array.isArray(v) && v.every((n) => Number.isInteger(n))) armed[k] = v as number[];
+    }
+  }
+  return { v: 4, trainId, granted: s.granted, armed, complete: s.complete };
+}
+
+/** Whether any element counts toward the grant (a selector counts if any option does). */
+export function hasGrant(section: LoaSection): boolean {
+  return section.elements.some((el) =>
+    el.type === 'selector'
+      ? Object.values(el.options ?? {}).some((o) => effectiveGrants(o))
+      : effectiveGrants(el));
 }
 
 /** Whether any element can revoke the section's authority (a selector counts if any option can). */
@@ -233,7 +252,18 @@ export function stepLoa(
 ): { state: LoaTrainState; sections: SectionView[] } {
   const granted = new Set(state.granted);
   const complete = new Set(state.complete);
+  const armed: Record<string, number[]> = { ...state.armed };
   let changed = false;
+  const isClear = (e: ElementView) => e.state === 'clear' || e.state === 'caution';
+  /** Arms every revoking element that is clear now; true if that added any. */
+  const arm = (key: string, elements: ElementView[]): boolean => {
+    const have = new Set(armed[key] ?? []);
+    const before = have.size;
+    elements.forEach((e, i) => { if (e.revokes && isClear(e)) have.add(i); });
+    if (have.size === before && armed[key]) return false;
+    armed[key] = [...have].sort((a, b) => a - b);
+    return true;
+  };
   // Section ids with an earlier not-complete occurrence: later ones can't latch yet.
   const openIds = new Set<string>();
 
@@ -249,15 +279,21 @@ export function stepLoa(
     openIds.add(match.section.id);
 
     if (granted.has(match.key)) {
-      if (!elements.some((e) => e.revokes && e.state === 'stop')) return view('granted');
-      // Revoked: the authority is released and the section is done.
+      const was = new Set(armed[match.key] ?? []);
+      if (!elements.some((e, i) => e.revokes && e.state === 'stop' && was.has(i))) {
+        if (arm(match.key, elements)) changed = true;
+        return view('granted');
+      }
+      // Revoked (an armed element went back to stop): the authority is released and the section is done.
       granted.delete(match.key);
+      delete armed[match.key];
       complete.add(match.key);
       changed = true;
       return view('complete');
     }
     if (firstOpen && gating.length > 0 && pending.length === 0) {
       granted.add(match.key);
+      arm(match.key, elements);
       changed = true;
       return view('granted');
     }
@@ -268,7 +304,7 @@ export function stepLoa(
   const cur = sections.find((s) => s.phase !== 'complete');
   if (cur) cur.current = true;
   const next: LoaTrainState = changed
-    ? { v: 3, trainId: state.trainId, granted: [...granted], complete: [...complete] }
+    ? { v: 4, trainId: state.trainId, granted: [...granted], armed, complete: [...complete] }
     : state;
   return { state: next, sections };
 }

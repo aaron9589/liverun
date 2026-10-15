@@ -165,6 +165,8 @@ app.put('/api/active-timetable', (req, res) => {
 
 layoutRoutes.register(app, { getLayout, setLayout: (layout) => { const saved = setLayout(layout); loaCache.refresh(); return saved; } });
 require('./sounds').register(app, { dataDir: require('./db').dataDir });
+// Graph editing: times-only, all-or-nothing batch retime (before the /trains/:trainId routes)
+require('./retime').register(app, { getTimetable, mutateTimetable, normalise });
 
 // Must be defined before /:id routes to avoid 'import' being matched as an id
 app.post('/api/timetables/import', (req, res) => {

@@ -207,10 +207,10 @@ interface Props {
   onScaleChange?: (scale: number | null) => void;
   /**
    * Enables graph editing (✎ Edit). Moves are held on the graph until Done,
-   * then handed over together; resolves to the ids of trains that failed to
-   * save (they stay as drafts). Cancel discards everything.
+   * then handed over together (every draft, shown or hidden); resolves false if
+   * nothing was saved, and the drafts stay. Cancel discards everything.
    */
-  onTrainTimesCommit?: (changes: { train: Train; stops: TrainStop[] }[]) => Promise<string[]>;
+  onTrainTimesCommit?: (changes: { trainId: string; stops: TrainStop[] }[]) => Promise<boolean>;
 }
 
 /** A drag in progress (edit mode): the whole train, or one stop's dwell. */
@@ -259,18 +259,13 @@ export function TrainGraph({
   }, [draftCount]);
 
   async function finishEditing(save: boolean) {
-    const list = save
-      ? timetable.trains.filter((t) => drafts[t.id]).map((t) => ({ train: t, stops: drafts[t.id] }))
-      : [];
+    // Every draft, including trains hidden or filtered out since they were moved.
+    const list = save ? Object.entries(drafts).map(([trainId, stops]) => ({ trainId, stops })) : [];
     if (list.length > 0 && onTrainTimesCommit) {
       setSaving(true);
-      const failed = await onTrainTimesCommit(list).catch(() => list.map((c) => c.train.id));
+      const ok = await onTrainTimesCommit(list).catch(() => false);
       setSaving(false);
-      if (failed.length > 0) {
-        // Keep what didn't save so nothing is lost; the rest are done.
-        setDrafts((d) => Object.fromEntries(Object.entries(d).filter(([id]) => failed.includes(id))));
-        return;
-      }
+      if (!ok) return; // nothing saved: keep every draft and stay in edit mode
     }
     setDrafts({});
     setEditMode(false);

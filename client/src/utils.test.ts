@@ -8,8 +8,11 @@ describe('crewInitials', () => {
     expect(crewInitials('  aaron   stinson ')).toBe('AS');
     expect(crewInitials('Driver')).toBe('D');
   });
-  it('caps the length and handles blanks', () => {
-    expect(crewInitials('A B C D E')).toBe('ABCD');
+  it('caps the letters, never the numbers, and handles blanks', () => {
+    expect(crewInitials('A B C D E')).toBe('ABC');
+    expect(crewInitials('Local Operator 123')).toBe('LO123');
+    expect(crewInitials('Local Operator 124')).not.toBe(crewInitials('Local Operator 123'));
+    expect(crewInitials('SSYM - Phil')).toBe('SP');
     expect(crewInitials('   ')).toBe('?');
   });
 });

@@ -163,6 +163,16 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  /** Graph editing: new times only, matched by station; all-or-nothing (409 if a train's stops changed since). */
+  retimeTrains: (
+    timetableId: string,
+    changes: { trainId: string; times: { stationId: string; arrival: string | null; departure: string | null }[] }[],
+  ) =>
+    req<Timetable>(`/timetables/${timetableId}/trains/retime`, {
+      method: 'POST',
+      body: JSON.stringify({ changes }),
+    }),
+
   updateTrain: (timetableId: string, trainId: string, data: Omit<TrainRequest, 'id'>) =>
     req<Timetable>(`/timetables/${timetableId}/trains/${trainId}`, {
       method: 'PUT',

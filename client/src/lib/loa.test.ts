@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { LoaCondition, LoaConfig, LoaSection, LoaSelector, LoaValue, Station, Train, TrainStop } from '../types';
 import {
   conditionState, evaluateElement, sectionsForTrain, stepLoa, initialLoaState, parseLoaState,
-  currentSection, applyLoaValues, hasRevoke,
+  currentSection, applyLoaValues, hasGrant, hasRevoke,
   type LoaTrainState, type SectionMatch,
 } from './loa';
 
@@ -227,11 +227,29 @@ describe('stepLoa latch', () => {
     expect(stepLoa(initialLoaState('t1'), ms2, vals({ down: 'THROWN' })).sections[0].phase).toBe('unknown');
   });
 
+  it('a revoking element already at stop when granted does not release it until it has cleared', () => {
+    // signal S grants; token T only revokes and is at stop when S clears
+    const c = section('kb', 'Kiama', 'Berry', { elements: [sig('s'), token('t', { grants: false })] });
+    const ms = sectionsForTrain(train([st('kia'), st('bry')]), STATIONS, config(c));
+    let r = run([{ s: 'THROWN', t: 'IN' }], undefined, ms);
+    expect(r.sections[0].phase).toBe('granted');
+    expect(r.state.armed['kb#0']).toEqual([]);
+    r = run([{ s: 'THROWN', t: 'IN' }, { s: 'CLOSED', t: 'IN' }], r.state, ms); // re-stepped: still granted
+    expect(r.sections[0].phase).toBe('granted');
+    r = run([{ s: 'CLOSED', t: 'CATS' }], r.state, ms); // T clears: armed
+    expect(r.state.armed['kb#0']).toEqual([1]);
+    r = run([{ s: 'CLOSED', t: 'IN' }], r.state, ms); // ...and back to stop: released
+    expect(r.sections[0].phase).toBe('complete');
+    expect(r.state.armed['kb#0']).toBeUndefined();
+  });
+
   it('hasRevoke looks through selector options', () => {
     expect(hasRevoke(kb)).toBe(true);
     expect(hasRevoke(section('x', 'A', 'B', { elements: [sig('a')] }))).toBe(false);
     const sel: LoaSelector = { type: 'selector', label: 's', topic: 'p', default: 'A', options: { A: sig('a'), B: sig('b', { revokes: true }) } };
     expect(hasRevoke(section('x', 'A', 'B', { elements: [sel] }))).toBe(true);
+    expect(hasGrant(section('x', 'A', 'B', { elements: [sig('a', { grants: false })] }))).toBe(false);
+    expect(hasGrant(kb)).toBe(true);
   });
 
   it('a later occurrence of the same section cannot latch until the earlier one is released', () => {
@@ -266,12 +284,15 @@ describe('stepLoa latch', () => {
 
 describe('helpers', () => {
   it('parseLoaState validates and upgrades older versions', () => {
-    const s = { v: 3, trainId: 't1', granted: ['a#0'], complete: ['b#0'] };
+    const s = { v: 4, trainId: 't1', granted: ['a#0'], armed: { 'a#0': [1] }, complete: ['b#0'] };
     expect(parseLoaState(s, 't1')).toEqual(s);
     expect(parseLoaState(s, 't2')).toBeNull();
-    expect(parseLoaState({ ...s, v: 4 }, 't1')).toBeNull();
-    expect(parseLoaState({ v: 1, trainId: 't1', granted: ['a#0'], complete: ['b#0'] }, 't1')).toEqual(s);
-    expect(parseLoaState({ v: 2, trainId: 't1', granted: ['a#0'], departed: [], revoked: [], complete: ['b#0'] }, 't1')).toEqual(s);
+    expect(parseLoaState({ ...s, v: 5 }, 't1')).toBeNull();
+    // Older versions keep grants and completions; nothing is armed yet (re-armed when next seen clear)
+    const old = { ...s, armed: {} };
+    expect(parseLoaState({ v: 1, trainId: 't1', granted: ['a#0'], complete: ['b#0'] }, 't1')).toEqual(old);
+    expect(parseLoaState({ v: 2, trainId: 't1', granted: ['a#0'], departed: [], revoked: [], complete: ['b#0'] }, 't1')).toEqual(old);
+    expect(parseLoaState({ v: 3, trainId: 't1', granted: ['a#0'], complete: ['b#0'] }, 't1')).toEqual(old);
     expect(parseLoaState({ ...s, granted: [1] }, 't1')).toBeNull();
     expect(parseLoaState(null, 't1')).toBeNull();
   });

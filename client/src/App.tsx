@@ -527,26 +527,24 @@ export default function App() {
     recordAndSet(updated);
   }
 
-  // Graph editing: Done hands over every moved train. Saved one by one, recorded
-  // as one undo step. Returns the ids that failed (the graph keeps them as drafts).
-  async function handleTrainTimesCommit(changes: { train: Train; stops: TrainStop[] }[]): Promise<string[]> {
-    if (!selectedId || !timetable) return changes.map((c) => c.train.id);
-    const failed: { id: string; name: string; why: string }[] = [];
-    let latest: Timetable | null = null;
-    for (const { train: dragged, stops } of changes) {
-      const train = timetable.trains.find((t) => t.id === dragged.id);
-      if (!train) { failed.push({ id: dragged.id, name: dragged.name, why: 'no longer in the timetable' }); continue; }
-      try {
-        latest = await api.updateTrain(selectedId, train.id, trainRequest(train, { stops }));
-      } catch (e) {
-        failed.push({ id: train.id, name: train.name, why: e instanceof Error ? e.message : 'save failed' });
-      }
+  // Graph editing: Done hands over every moved train. The server applies only the
+  // new times to each train's current stops, all-or-nothing, as one change (one
+  // undo step, one notice to crews). False = nothing saved; the graph keeps the drafts.
+  async function handleTrainTimesCommit(changes: { trainId: string; stops: TrainStop[] }[]): Promise<boolean> {
+    if (!selectedId) return false;
+    try {
+      const updated = await api.retimeTrains(selectedId, changes.map((c) => ({
+        trainId: c.trainId,
+        times: c.stops.map((s) => ({ stationId: s.station_id, arrival: s.arrival, departure: s.departure })),
+      })));
+      recordAndSet(updated);
+      return true;
+    } catch (e) {
+      let msg = e instanceof Error ? e.message : 'Save failed';
+      try { msg = (JSON.parse(msg) as { error?: string }).error ?? msg; } catch { /* plain text */ }
+      window.alert(`${msg}\n\nYour moves are still on the graph: Done to try again, or Cancel to discard them.`);
+      return false;
     }
-    if (latest) recordAndSet(latest);
-    if (failed.length > 0) {
-      window.alert(`Could not save ${failed.map((f) => `${f.name} (${f.why})`).join(', ')}. They are still on the graph; press Done to try again or Cancel to discard.`);
-    }
-    return failed.map((f) => f.id);
   }
 
   async function handleToggleTrainComplete(trainId: string) {
@@ -998,6 +996,7 @@ export default function App() {
           )}
           {displayTimetable && !loading && (
             <TrainGraph
+              key={displayTimetable.id}
               timetable={displayTimetable}
               onTrainClick={(train) => setModal({ type: 'editTrain', train })}
               labelMode={labelMode}
