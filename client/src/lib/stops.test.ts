@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Train, TrainStop } from '../types';
-import { sequenceStops, currentStop, autoSelectTrain, sortByRun, formsNext, runningOrder, inRunningOrder } from './stops';
+import { sequenceStops, currentStop, autoSelectTrain, sortByRun, runningOrder, inRunningOrder } from './stops';
 
 const st = (id: string, arrival: string | null, departure: string | null): TrainStop =>
   ({ id, train_id: 't', station_id: id, arrival, departure });
@@ -47,10 +47,6 @@ describe('train selection', () => {
     expect(autoSelectTrain([a, b], 12 * 60)?.id).toBe('a');
     expect(autoSelectTrain([a, b], null)?.id).toBe('a');
     expect(autoSelectTrain([late], 15)?.id).toBe('late');
-  });
-  it('forms next', () => {
-    expect(formsNext(a, [a, b])?.id).toBe('b');
-    expect(formsNext(b, [a, b])).toBeNull();
   });
 });
 

@@ -136,10 +136,3 @@ export function autoSelectTrain(trains: Train[], clockMinutes: number | null): T
   return next ? next.t : trains[0];
 }
 
-/** The same crew's next train by start time after `train`, or null. */
-export function formsNext(train: Train, all: Train[]): Train | null {
-  if (!train.crew_id) return null;
-  const mine = sortByRun(all.filter((t) => t.crew_id === train.crew_id));
-  const i = mine.findIndex((t) => t.id === train.id);
-  return i >= 0 && i < mine.length - 1 ? mine[i + 1] : null;
-}

@@ -1,4 +1,4 @@
-import type { Station, Train } from '../../types';
+import type { Station } from '../../types';
 import { currentStop, type SeqStop } from '../../lib/stops';
 
 interface Props {
@@ -7,14 +7,12 @@ interface Props {
   clock: number | null;
   pinnedStopId: string | null;
   onTogglePin: (stopId: string) => void;
-  formsNext: Train | null;
-  onForms: (trainId: string) => void;
   /** Stops Control just changed; their rows flash briefly. */
   highlightStopIds?: ReadonlySet<string>;
 }
 
 /** Stop list for the selected train. Deliberately never renders special_instructions. */
-export function StopTable({ seq, stations, clock, pinnedStopId, onTogglePin, formsNext, onForms, highlightStopIds }: Props) {
+export function StopTable({ seq, stations, clock, pinnedStopId, onTogglePin, highlightStopIds }: Props) {
   const cur = currentStop(seq, clock, pinnedStopId);
   const name = (id: string) => stations.find((s) => s.id === id)?.name ?? id;
 
@@ -61,14 +59,6 @@ export function StopTable({ seq, stations, clock, pinnedStopId, onTogglePin, for
           </button>
         );
       })}
-      {formsNext && (
-        <button
-          onClick={() => onForms(formsNext.id)}
-          className="w-full min-h-[52px] px-4 text-left text-blue-400 hover:bg-slate-800 font-medium"
-        >
-          → forms {formsNext.name}
-        </button>
-      )}
     </div>
   );
 }

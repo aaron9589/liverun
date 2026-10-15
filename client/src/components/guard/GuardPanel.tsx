@@ -6,7 +6,7 @@ import { requestWakeLock, unlockAudio } from '../../lib/audio';
 import { playSound } from '../../lib/sound';
 import { resolveProfile } from '../../lib/profiles';
 import { switchMode } from '../../lib/mode';
-import { autoSelectTrain, currentStop, formsNext as findFormsNext, inRunningOrder, sequenceStops, sortByRun } from '../../lib/stops';
+import { autoSelectTrain, currentStop, inRunningOrder, sequenceStops, sortByRun } from '../../lib/stops';
 import { describeJobChange, diffJobs } from '../../lib/jobDiff';
 import type { Timetable, Train } from '../../types';
 import { ChangeToasts, useToasts } from '../ChangeToasts';
@@ -108,7 +108,6 @@ export function GuardPanel() {
     setCrewId(id);
     setPickingCrew(false);
     setSelectedId(null);
-    setBackStack([]);
     isAuto.current = true;
     clockSeen.current = false;
   };
@@ -121,7 +120,6 @@ export function GuardPanel() {
   }, [timetable, crewId, crewValid]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [backStack, setBackStack] = useState<string[]>([]);
   const isAuto = useRef(true);
   const clockSeen = useRef(false);
 
@@ -135,23 +133,19 @@ export function GuardPanel() {
   // Stops in running order: the planner stores them in station order, so Up trains
   // arrive backwards. Everything below (stop list, boarding, events, LOA) uses this.
   const train = useMemo(() => (rawTrain ? inRunningOrder(rawTrain) : null), [rawTrain]);
-  const select = useCallback((id: string, push: boolean) => {
+  const select = useCallback((id: string) => {
     if (!timetable) return;
     actionsRef.current.stopAll();
     isAuto.current = false;
     writeStore(trainKey(timetable.id), id);
-    setBackStack((s) => (push && selectedId ? [...s, selectedId] : []));
     setSelectedId(id);
-  }, [timetable, selectedId]);
+  }, [timetable]);
 
-  const goBack = () => {
-    const prev = backStack[backStack.length - 1];
-    if (!prev || !timetable) return;
-    actionsRef.current.stopAll();
-    writeStore(trainKey(timetable.id), prev);
-    setBackStack((s) => s.slice(0, -1));
-    setSelectedId(prev);
-  };
+  // The crew's previous / next job in run order (the same list as the selector).
+  // A crew changes trains between jobs: this is not what the set itself forms.
+  const jobIndex = trains.findIndex((t) => t.id === selectedId);
+  const prevJob = !lost && jobIndex > 0 ? trains[jobIndex - 1] : null;
+  const nextJob = !lost && jobIndex >= 0 && jobIndex < trains.length - 1 ? trains[jobIndex + 1] : null;
 
   // JMRI: the displayed train drives the throttle, so a train held behind the
   // lost-train banner keeps its throttle (Door Close still reaches it) until ACK.
@@ -359,7 +353,6 @@ export function GuardPanel() {
     actions.stopAll();
     lostRef.current = null;
     setLost(null);
-    setBackStack([]);
     isAuto.current = true;
     clockSeen.current = clockShown !== null;
     setSelectedId(autoSelectTrain(trains, clockShown)?.id ?? null);
@@ -371,7 +364,6 @@ export function GuardPanel() {
     lostRef.current = null;
     setLost(null);
     setSelectedId(null);
-    setBackStack([]);
     isAuto.current = true;
     clockSeen.current = false;
     setTtId(next);
@@ -387,7 +379,6 @@ export function GuardPanel() {
     return () => { cancelled = true; };
   }, [pendingActive]);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const forms = train && timetable ? findFormsNext(train, timetable.trains) : null;
 
   // Tap to start
   const [started, setStarted] = useState(false);
@@ -399,19 +390,34 @@ export function GuardPanel() {
 
   const header = (
     <header className="flex items-center gap-2 sm:gap-3 px-3 py-2 border-b border-slate-800 bg-slate-900 shrink-0">
-      {backStack.length > 0 && (
-        <button onClick={goBack} className="min-h-[48px] px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm">◀ Back</button>
+      {timetable && trains.length > 0 && (
+        <button
+          onClick={() => prevJob && select(prevJob.id)}
+          disabled={!prevJob}
+          aria-label={prevJob ? `Previous job: ${prevJob.name}` : 'No previous job'}
+          title={prevJob ? `Previous job: ${prevJob.name}` : 'No previous job'}
+          className="min-h-[48px] min-w-[48px] px-3 rounded-lg bg-slate-800 enabled:hover:bg-slate-700 disabled:opacity-30 text-sm whitespace-nowrap"
+        >◀<span className="hidden md:inline ml-1.5">{prevJob?.name}</span></button>
       )}
       {timetable && trains.length > 0 && (
         <select
           value={selectedId ?? ''}
-          onChange={(e) => select(e.target.value, false)}
+          onChange={(e) => select(e.target.value)}
           aria-label="Train"
           className="min-h-[48px] min-w-0 max-w-[40vw] rounded-lg bg-slate-800 border border-slate-700 px-3 text-base"
         >
           {lost && <option value={lost.train.id} disabled>{lost.train.name} (removed)</option>}
           {trains.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
+      )}
+      {timetable && trains.length > 0 && (
+        <button
+          onClick={() => nextJob && select(nextJob.id)}
+          disabled={!nextJob}
+          aria-label={nextJob ? `Next job: ${nextJob.name}` : 'No next job'}
+          title={nextJob ? `Next job: ${nextJob.name}` : 'No next job'}
+          className="min-h-[48px] min-w-[48px] px-3 rounded-lg bg-slate-800 enabled:hover:bg-slate-700 disabled:opacity-30 text-sm whitespace-nowrap"
+        ><span className="hidden md:inline mr-1.5">{nextJob?.name}</span>▶</button>
       )}
       {crewValid && crewId && timetable && (
         <span className="text-sm text-slate-400 truncate hidden sm:inline">
@@ -482,7 +488,6 @@ export function GuardPanel() {
           <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
             <div className="flex items-baseline gap-3">
               <h1 className="text-2xl font-bold">{train.name}</h1>
-              {forms && <span className="text-sm text-slate-400">→ forms {forms.name}</span>}
             </div>
             <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
               <dt className="text-slate-500">Train ID</dt>
@@ -522,8 +527,6 @@ export function GuardPanel() {
             pinnedStopId={pinnedStopId}
             onTogglePin={(id) => setPinKey((k) => { const key = train ? stopKeyOf(train, id) : null; return k === key ? null : key; })}
             highlightStopIds={flash}
-            formsNext={forms}
-            onForms={(id) => select(id, true)}
           />
           {/* LOA is always on screen (not behind a tab), even when no section applies. */}
           <AuthorityTab sections={loa.sections} />
