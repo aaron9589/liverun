@@ -1,4 +1,4 @@
-# Path Requests — Design Spec (draft 2)
+# Path Requests — Design Spec (draft 3)
 
 Status: **draft 2, decisions recorded**. Nothing implemented yet. Draft 1's open questions are answered and logged in §0 (P11–P20).
 
@@ -45,6 +45,7 @@ New job card ◀─ timetable- accepted + train created ◀── Accept (+ note
 | P18 (Q8) | Crew list in Crew jobs | **No filter**: every crew in the timetable is listed |
 | P19 (Q9) | `special_instructions` | **Shown** in the Crew jobs app. No migration or moves into `guard_events` |
 | P20 (Q10) | Other trains in Crew jobs | **No.** Crews see their own jobs only |
+| P21 | Audit log | Every path-request action, accepted or rejected, is logged with time, IP, device, acting crew or Control, and what changed (§4.4). Kept in an append-only file, not the timetable. Visible to Control only |
 
 ## 1. Request lifecycle
 
@@ -228,6 +229,51 @@ Validation on submit:
 - Request-only mutations (`submit`, `withdraw`, `acknowledge`, `release`, `decline`, `clear`) use `{ notify: false }`, as `complete` does. Accept is a normal notifying mutation, because a train was created.
 - `openapi.js`, `ws-inspector.html` and the `SyncMessage` type are updated.
 
+### 4.4 Audit log (P21)
+
+Records who did what to path requests: which IP, which device, as which crew (or Control), and what changed.
+
+**Identity.** There is no auth, so "user" means:
+- **IP**: `req.ip`. This is already correct behind the reverse proxy (`trust proxy` is set for loopback/private ranges in `index.js`).
+- **Device**: a random id generated once per browser (`localStorage['liverun.deviceId']`), sent as an `X-LiveRun-Device` header on path-request calls. It tells apart phones behind the same NAT or Wi-Fi.
+- **User agent**: shortened (e.g. "Safari iOS 18").
+- **Actor**: `crew` (with the crew id and the crew's name at that moment) for Crew jobs actions; `control` for planner actions.
+
+The crew is self-declared (whoever picked it on that phone). The log shows what each device *claimed*, which is what makes mistakes and misuse traceable on a trusted LAN.
+
+**What's logged.** Every call to the §4.2 endpoints, including rejected ones (400/409), so failed attempts show too:
+
+```jsonc
+{ "at": "2026-10-15T04:12:09.311Z", "clock": "14:07",        // wall time + fast-clock time if known
+  "ip": "192.168.1.42", "device": "d-7f3a…", "ua": "Safari iOS 18",
+  "actor": "crew", "crew_id": "…", "crew_name": "Crew 2",
+  "action": "submit",                                          // submit|withdraw|acknowledge|release|decline|accept|clear
+  "outcome": "ok",                                             // ok | rejected (+ "error": "…")
+  "timetable_id": "…", "timetable_name": "…", "request_id": "…",
+  "detail": { … } }
+```
+
+`detail` by action:
+- `submit`: the request as filed (stops, loco, ready-at, notes).
+- `decline` / `withdraw` / `release`: the note, if any.
+- `accept`: the created train (name, crew, loco, stops with times), the assigned crew if it isn't the requester, the note, and each other train moved while plotting (name, old → new times).
+- `clear`: the ids of the requests removed.
+
+**Storage.** New `server/audit.js`:
+- Writes are an append-only JSON-lines file, `<data dir>/audit.jsonl`, appended per entry, so the DB is never rewritten for a log line.
+- It survives undo, timetable deletion and restore.
+- At 5 MB the file is rotated to `audit.1.jsonl`; one old file is kept.
+- Pure helpers (`entry()`, `shortUa()`, `summarise()`) are tested with `node:test`.
+
+**API.** `GET /api/audit?timetableId=&requestId=&crewId=&ip=&action=&before=&limit=` returns the newest entries first (default limit 200, max 1000), and `?format=csv` returns CSV. Read-only; nothing in the app edits or deletes entries.
+
+**UI (Control only).**
+- In the Requests drawer, each request row expands to show its history (time, action, crew/Control, IP, device).
+- An **Audit log** tab in the drawer lists all entries, filterable by crew, IP, device, action and request, with an **Export CSV** button.
+- Crews never see the log.
+
+**Scope.** Path-request actions only. Logging every planner mutation is possible later on the same module, but it's out of scope here.
+
 ## 5. Planner (Control)
 
 ### 5.1 Notification and queue
@@ -320,7 +366,8 @@ Per timetable (`TimetableSettings`, edited with the existing auto-assign setting
 - Any run-state control (start/complete) for train crews (P3a).
 - Other trains in Crew jobs (P20).
 - Sounds for requests (P14).
-- Auth/identity beyond picking a crew.
+- Auth/identity beyond picking a crew (the audit log records claimed identity, IP and device; it doesn't verify them).
+- Audit logging of non-request planner edits (§4.4 Scope).
 - Auto-accept or auto-plotting without Control.
 
 ## 9. Docs and release
@@ -329,16 +376,16 @@ Per timetable (`TimetableSettings`, edited with the existing auto-assign setting
   - new pages: "Crew jobs" (for train crews) and "Path requests" (crew + Control);
   - updated pages: planner, mode picker and the new mobile view picker, running a session, and the crew view page, renamed Running board;
   - new screenshots via `npm run docs:screenshots`. The demo data gets a couple of paths and requests, with anonymised crews.
-- `CLAUDE.md` key files and endpoints, `openapi.js`, `CHANGELOG.md`. Minor version (no breaking changes; new optional fields, and `/mobile` keeps its URL).
+- User guide: the audit log section on the Path requests page. `CLAUDE.md` key files and endpoints (incl. `server/audit.js`, `/api/audit`), `openapi.js`, `CHANGELOG.md`. Minor version (no breaking changes; new optional fields, and `/mobile` keeps its URL).
 
 ## 10. Phasing
 
 | Phase | Contents |
 |-------|----------|
 | 1 | Crew jobs app: mobile view picker at `/mobile` (ask, remember, Change view, `?view=` deep links), Running board label, crew pick, read-only My jobs with live updates and toasts (useful on its own, before requests exist) |
-| 2 | Types + `server/path-requests.js` (submit/withdraw/acknowledge/release/decline/clear, validation, tests) + `path-requests` sync message. Request form + My requests. Planner toast, badge and drawer with Decline |
+| 2 | Types + `server/path-requests.js` (submit/withdraw/acknowledge/release/decline/clear, validation, tests) + `path-requests` sync message + `server/audit.js` (log every request action from day one) and the device-id header. Request form + My requests. Planner toast, badge and drawer with Decline |
 | 3 | `pathPlan.ts` (path matching, inferred routes, fallbacks; tests) + `pendingTrain` in `TrainGraph` + edit-bar flow (crew, note, Edit stops) + `/accept` (with retime batch) + undo step |
-| 4 | Settings, warnings, Requested badges, user guide + screenshots, OpenAPI/CLAUDE.md |
+| 4 | Settings, warnings, Requested badges, audit log UI (per-request history, Audit log tab, CSV), user guide + screenshots, OpenAPI/CLAUDE.md |
 
 Phase gate as in the guard-panel spec §14.4: build + tests, Docker + Playwright smoke of touched screens (incl. `BASE_PATH`), Aaron approves before the next phase.
 
