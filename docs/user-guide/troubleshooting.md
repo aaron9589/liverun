@@ -44,7 +44,7 @@
 | Doors open but the loco does nothing | **not mapped in profile**, or the wrong F-number | Check the profile's decoder functions and **Test** them |
 | **Current stop unknown (no clock) — tap a stop in the list to set it** | No clock reading | Tap the stop you're at to pin it, then open the doors again |
 | The wrong stop is highlighted | Running early/late, or the clock is off | Tap the right stop to pin it (until Doors Close) |
-| A guard event fired at the last session but not this one | Events are rolled once per run and the tablet remembers them | **☰ → Reset events for this train** before running it again |
+| Running a train a second time in the same session, its guard events don't fire | Events are rolled once per run and the tablet remembers them for 12 hours | **☰ → Reset events for this train** before running it again |
 | New layout settings (profiles, events, sounds) aren't used | The open panel hasn't reloaded the settings | **☰ → Reload** |
 | A red banner says Control has removed or reassigned the train | Control changed the job | Close the doors if open, tap **ACK** |
 | Changes from Control stopped arriving | The **Live** dot isn't green | Wait for it to reconnect (it catches up by itself), or **☰ → Reload** |

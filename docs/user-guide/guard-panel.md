@@ -152,7 +152,7 @@ Control can hide scripted events in a train's stops: a late passenger, a door fa
 
 Station events fire a few seconds after a door moment at a stop. En-route events fire part-way between two stops, timed from when you actually left. An en-route event is dropped if you stop somewhere before it fires.
 
-Each event is decided once per run of a train: whether it happens, its wording and its timing. That decision is kept on the tablet, so reloading the page or Control re-saving the train doesn't roll it again, and an un-ACKed banner is still there after a reload. **☰ → Reset events for this train** throws the decision away and rolls again. Use it before running the same train again on the same tablet (for example at the next session), otherwise events that already fired won't fire again.
+Each event is decided once per run of a train: whether it happens, its wording and its timing. That decision is kept on the tablet, so reloading the page or Control re-saving the train doesn't roll it again, and an un-ACKed banner is still there after a reload. The tablet forgets it 12 hours after it last changed, so the next session rolls afresh. To run the same train again within a session, use **☰ → Reset events for this train**: it throws the decision away and rolls again.
 
 ---
 

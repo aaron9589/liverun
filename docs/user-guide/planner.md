@@ -16,7 +16,7 @@
 
 ![The planner: sidebar on the left, train graph on the right](images/planner-overview.png)
 
-The planner opens at the app's root URL on a desktop browser (add `?desktop` to force it on any device). The sidebar on the left lists **Timetables**, **Trains**, **Crew**, **Stations** and **Paths**. Click a section's heading to fold it away. The header across the top holds undo/redo, zoom, the crew filter, printing, the fast-clock indicator, ⚙ settings, **Guard panel** (opens the guard panel in this browser), **Layout** and **? Help** (this guide).
+The planner opens at the app's root URL on a desktop browser (add `?desktop` to force it on any device). The sidebar on the left lists **Timetables**, **Trains**, **Crew**, **Stations** and **Paths**. Click a section's heading to fold it away. Drag the sidebar's right edge to make it wider or narrower (double-click the edge to reset); the ‹ button (**Collapse sidebar**) folds it away entirely. The header across the top holds undo/redo, zoom, the crew filter, printing, the fast-clock indicator, ⚙ settings, **Guard panel** (opens the guard panel in this browser), **Layout** and **? Help** (this guide).
 
 ---
 

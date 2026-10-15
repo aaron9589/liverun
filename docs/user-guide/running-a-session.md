@@ -24,8 +24,7 @@
 1. Open LiveRun. Choose **Guard panel** or **Crew view** in the mode picker and tick **Remember this choice**.
 2. Guard panel: **Tap to start**, then pick the crew.
 3. Guard panel: open the **first train before Control sets up its authority** ([why](limit-of-authority.md#operating-rules)).
-4. If a tablet will run the same trains it ran at the last session, use **☰ → Reset events for this train** on each, so their [guard events](guard-panel.md#guard-events) are rolled again.
-5. Check the guard panel's **Live**, **JMRI** and **Clock** dots are green.
+4. Check the guard panel's **Live**, **JMRI** and **Clock** dots are green.
 
 ## During the session
 
@@ -60,7 +59,7 @@ Watch the guard panel's strip, or the dots in **Layout → Limit of authority**.
 
 1. **Reset run statuses**: **✓ Reset jobs** in the planner header (or **Reset all statuses** in the crew view).
 2. **Back up** again if you changed the timetable during the session.
-3. Leave the timetable active, or clear the flag. Tablets' LOA state expires by itself 12 hours after the session.
+3. Leave the timetable active, or clear the flag. Tablets forget their LOA state and rolled guard events by themselves 12 hours after the session.
 
 ## If something goes wrong
 
