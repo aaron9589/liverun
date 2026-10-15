@@ -172,7 +172,7 @@ The proxy passes the full path and the server's `BASE_PATH` middleware strips th
 - Trains without a `train_id` are listed; JMRI controls show "no roster ID" (§7.1).
 - The panel holds the **full timetable** via the shared `useLiveTimetable` hook (same as CrewMobile), so it has trains, stops, stations and crews without extra live-API endpoints.
 - Stops shown in **running order**. The planner stores stops in station order, so a train running the other way is stored backwards; the panel reverses it when its times run backwards (midnight-safe, `runningOrder()`). An aliased stop leads with the alias (e.g. *Sydney Terminal*) with the real location (*Staging (Up)*) underneath. **Hidden events are never rendered** in the list (§10).
-- "Forms next service" link on the last stop navigates; back stack as today.
+- Header **◀ previous job / next job ▶** buttons either side of the train selector step through the crew's jobs in run order. (No "forms" label: crews change trains between jobs, so the next job is not what the set forms.)
 - **Live refresh**: see §6.5.
 - All requests use an abort/sequence guard so a slow response for a previously-selected train can't overwrite the current one.
 
