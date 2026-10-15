@@ -1,4 +1,4 @@
-# Path Requests — Design Spec (draft 3)
+# Path Requests — Design Spec (draft 4)
 
 Status: **draft 2, decisions recorded**. Nothing implemented yet. Draft 1's open questions are answered and logged in §0 (P11–P20).
 
@@ -46,6 +46,7 @@ New job card ◀─ timetable- accepted + train created ◀── Accept (+ note
 | P19 (Q9) | `special_instructions` | **Shown** in the Crew jobs app. No migration or moves into `guard_events` |
 | P20 (Q10) | Other trains in Crew jobs | **No.** Crews see their own jobs only |
 | P21 | Audit log | Every path-request action, accepted or rejected, is logged with time, IP, device, acting crew or Control, and what changed (§4.4). Kept in an append-only file, not the timetable. Visible to Control only |
+| P22 | Crew cancelling | **Withdraw** while `pending` or `in_review`. After accept the crew can only **Ask to cancel**; Control approves (train removed) or rejects with a note (§1.1) |
 
 ## 1. Request lifecycle
 
@@ -55,18 +56,30 @@ New job card ◀─ timetable- accepted + train created ◀── Accept (+ note
 | `in_review` | Control **Acknowledge** | Control is plotting it on the graph | "Control is plotting your path" |
 | `accepted` | Control **Accept** | Train created; `train_id_created` set | Job appears (NEW) for the assigned crew; request shows "Accepted → PR3" (+ "assigned to Crew 3" if another crew got it) and Control's note |
 | `declined` | Control **Decline** (note required) | Closed | Toast + "Declined: *note*" |
-| `withdrawn` | Crew **Withdraw** (only while `pending`) | Closed | "Withdrawn" |
+| `withdrawn` | Crew **Withdraw** (while `pending` or `in_review`) | Closed | "Withdrawn" |
+| `cancelled` | Control **approves** a crew's ask to cancel | Train removed; closed | "Cancelled" + Control's note |
 
 - **Cancel while plotting** returns the request to `pending`. Nothing is saved, as with Cancel in graph edit mode today.
 - If the planner tab closes or reloads mid-plot, the request stays `in_review`. The Requests drawer offers **Resume plotting** (a fresh draft) or **Return to queue**.
 - **Undo after Accept** removes the train (normal undo), but the request stays `accepted`. The drawer shows it as "Accepted — train no longer exists" with **Reopen** (→ `pending`). Requests don't follow undo, so a crew's request never disappears because Control pressed Ctrl+Z.
-- Closed requests (`accepted`/`declined`/`withdrawn`) stay visible until Control clears them (**Clear closed** in the drawer). **Reset completions** doesn't touch them.
+- Closed requests (`accepted`/`declined`/`withdrawn`/`cancelled`) stay visible until Control clears them (**Clear closed** in the drawer). **Reset completions** doesn't touch them.
+
+### 1.1 Crew cancelling (P22)
+
+- **Before accept** (`pending`, `in_review`): the crew taps **Withdraw** and it closes straight away. If Control is plotting it, the `path-requests` sync message arrives and the edit bar shows "Crew 2 withdrew this request". Accept is disabled; Cancel discards the drafts. If Accept races the withdraw, the server returns 409 and nothing is saved.
+- **After accept**: the movement is a train in Control's timetable, so the crew can't delete it. They tap **Ask to cancel** (optional reason) on the request card. The request stays `accepted` with an open `cancel_ask`:
+  - Control gets a toast ("Crew 2 asks to cancel PR3") and the drawer flags the row, which counts in the Requests badge.
+  - **Approve**: the train is deleted in the same mutation and the request becomes `cancelled`, with an optional note. The crew's job disappears, using the existing removed-job toast.
+  - **Reject** (note required): the ask is closed, the train stays, and the crew sees "Cancel refused: *note*".
+  - Only one open ask at a time. The crew can ask again after a rejection.
+  - Control can still move, reassign or delete the train by any normal means. If the train is already gone when Control looks, the ask shows "train no longer exists" with **Close**.
+- An Approve isn't undone together with the train: as with accept, requests don't follow undo.
 
 ## 2. Data model
 
 ```ts
 // types.ts
-export type PathRequestStatus = 'pending' | 'in_review' | 'accepted' | 'declined' | 'withdrawn';
+export type PathRequestStatus = 'pending' | 'in_review' | 'accepted' | 'declined' | 'withdrawn' | 'cancelled';
 export type PathWorkKind = 'stop' | 'shunt' | 'work';
 
 export interface PathRequestStop {
@@ -91,6 +104,12 @@ export interface PathRequest {
   control_note?: string;            // ≤ 300 chars; Control → crew (P16). Required on decline
   train_id_created?: string;        // Train.id once accepted
   assigned_crew_id?: string;        // crew the train was given to (may differ from crew_id, P12)
+  cancel_ask?: {                    // crew's ask to cancel an accepted path (§1.1)
+    at: string;
+    reason?: string;                // ≤ 300 chars
+    status: 'open' | 'rejected' | 'approved';
+    control_note?: string;
+  };
 }
 
 // Timetable gains:
@@ -171,7 +190,7 @@ Opened by **Request a path**. Hidden when no active timetable is set or `request
 | Notes for Control | Textarea | |
 
 - **Submit** is disabled until From ≠ To and stations are unique. On success the form closes and the request appears under **My requests**.
-- A request card shows status, the route (`A → B (shunt 20) → C`), Control's note, the assigned crew if it isn't this one, and **Withdraw** while pending.
+- A request card shows status, the route (`A → B (shunt 20) → C`), Control's note, and the assigned crew if it isn't this one. Actions: **Withdraw** while pending or being plotted; **Ask to cancel** once accepted, then "Waiting for Control" until it's approved or refused (§1.1).
 - Status changes arrive via the `path-requests` sync message. On `declined`: toast with Control's note. On `accepted`: the assigned crew's new job appears in My jobs (NEW), and the request card links to it (if it's this crew's) and fades after a few minutes.
 
 ## 4. Server
@@ -185,11 +204,14 @@ New `server/path-requests.js` exporting `register(app, deps)` (pattern: `server/
 ```
 GET    /api/timetables/:id/path-requests                         — list (also in GET timetable)
 POST   /api/timetables/:id/path-requests                         — crew submits → pending
-POST   /api/timetables/:id/path-requests/:reqId/withdraw         — crew, pending only
+POST   /api/timetables/:id/path-requests/:reqId/withdraw         — crew, pending or in_review → withdrawn
 POST   /api/timetables/:id/path-requests/:reqId/acknowledge      — Control, pending → in_review
 POST   /api/timetables/:id/path-requests/:reqId/release          — Control, in_review → pending (Cancel / Return to queue / Reopen)
 POST   /api/timetables/:id/path-requests/:reqId/decline          — Control, { note } (required) → declined
 POST   /api/timetables/:id/path-requests/:reqId/accept           — Control, in_review → accepted (below)
+POST   /api/timetables/:id/path-requests/:reqId/cancel-ask       — crew, accepted, { reason? } → open cancel_ask
+POST   /api/timetables/:id/path-requests/:reqId/cancel-approve   — Control, { note? }: delete the train + → cancelled (one notifying mutation)
+POST   /api/timetables/:id/path-requests/:reqId/cancel-reject    — Control, { note } (required) → cancel_ask rejected
 DELETE /api/timetables/:id/path-requests?closed=true             — Control, clear closed
 ```
 
@@ -226,7 +248,7 @@ Validation on submit:
 ### 4.3 Sync
 
 - New message `{ type: 'path-requests', timetableId, rev, requests: PathRequest[] }`, sent on every request change (including accept) and once after `hello`.
-- Request-only mutations (`submit`, `withdraw`, `acknowledge`, `release`, `decline`, `clear`) use `{ notify: false }`, as `complete` does. Accept is a normal notifying mutation, because a train was created.
+- Request-only mutations (`submit`, `withdraw`, `acknowledge`, `release`, `decline`, `cancel-ask`, `cancel-reject`, `clear`) use `{ notify: false }`, as `complete` does. Accept and cancel-approve are normal notifying mutations, because a train is created or deleted.
 - `openapi.js`, `ws-inspector.html` and the `SyncMessage` type are updated.
 
 ### 4.4 Audit log (P21)
@@ -247,7 +269,7 @@ The crew is self-declared (whoever picked it on that phone). The log shows what 
 { "at": "2026-10-15T04:12:09.311Z", "clock": "14:07",        // wall time + fast-clock time if known
   "ip": "192.168.1.42", "device": "d-7f3a…", "ua": "Safari iOS 18",
   "actor": "crew", "crew_id": "…", "crew_name": "Crew 2",
-  "action": "submit",                                          // submit|withdraw|acknowledge|release|decline|accept|clear
+  "action": "submit",                                          // submit|withdraw|acknowledge|release|decline|accept|cancel-ask|cancel-approve|cancel-reject|clear
   "outcome": "ok",                                             // ok | rejected (+ "error": "…")
   "timetable_id": "…", "timetable_name": "…", "request_id": "…",
   "detail": { … } }
@@ -255,7 +277,8 @@ The crew is self-declared (whoever picked it on that phone). The log shows what 
 
 `detail` by action:
 - `submit`: the request as filed (stops, loco, ready-at, notes).
-- `decline` / `withdraw` / `release`: the note, if any.
+- `decline` / `withdraw` / `release` / `cancel-ask` / `cancel-reject`: the note or reason, if any. A `withdraw` notes whether Control was plotting it.
+- `cancel-approve`: the deleted train (name, crew, stops with times) and the note.
 - `accept`: the created train (name, crew, loco, stops with times), the assigned crew if it isn't the requester, the note, and each other train moved while plotting (name, old → new times).
 - `clear`: the ids of the requests removed.
 
@@ -287,6 +310,7 @@ The crew is self-declared (whoever picked it on that phone). The log shows what 
   - pending: **Acknowledge & plot**, **Decline** (asks for a note)
   - in_review: **Resume plotting**, **Return to queue**, **Decline**
   - accepted: link "→ PR3" (selects the train on the graph); "train no longer exists" + **Reopen** if it's gone
+  - accepted with an open ask to cancel: flagged, with the reason, **Approve cancel** and **Reject** (asks for a note)
 - Only one request is plotted at a time. Acknowledging a second one while plotting asks to finish or cancel the first.
 
 ### 5.2 Acknowledge → draft train (times from path templates)
