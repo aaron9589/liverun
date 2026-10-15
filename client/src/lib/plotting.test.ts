@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PathRequest, Train, TrainRequest } from '../types';
-import { draftFromRequest, plotRequestState, plotWarnings, retimeFromDrafts } from './plotting';
+import { draftFromRequest, hueOf, pickRequestColor, plotRequestState, plotWarnings, retimeFromDrafts } from './plotting';
 
 const prev: Train = { id: 'pending:r1', timetable_id: 't', name: 'PR1', color: '#fff', notes: '', request_id: 'r1', stops: [] };
 
@@ -75,5 +75,31 @@ describe('plotWarnings', () => {
   it('detects overlap across midnight', () => {
     const d = mk('d', 'c1', '23:50', '00:20');
     expect(plotWarnings(d, tt([mk('x', 'c1', '00:10', '00:40')]), null, [])).toHaveLength(1);
+  });
+});
+
+describe('pickRequestColor', () => {
+  const t = (color: string) => ({ color });
+  it('reads hues and ignores greys', () => {
+    expect(hueOf('#ff0000')).toBe(0);
+    expect(hueOf('#00ff00')).toBe(120);
+    expect(hueOf('#0000ff')).toBe(240);
+    expect(hueOf('#888888')).toBeNull();
+    expect(hueOf('nope')).toBeNull();
+  });
+  it('picks a hue far from every existing train colour', () => {
+    // Reds, greens and blues in use: the pick lands in the gaps (yellow-ish, cyan-ish or magenta-ish).
+    const trains = [t('#ff0000'), t('#00ff00'), t('#0000ff')];
+    for (const r of [0, 0.3, 0.6, 0.99]) {
+      const h = hueOf(pickRequestColor(trains, () => r))!;
+      const gap = Math.min(...[0, 120, 240].map((u) => Math.min(Math.abs(h - u), 360 - Math.abs(h - u))));
+      expect(gap).toBeGreaterThanOrEqual(50);
+    }
+  });
+  it('varies with the random source and returns a hex colour', () => {
+    const a = pickRequestColor([], () => 0);
+    const b = pickRequestColor([], () => 0.5);
+    expect(a).toMatch(/^#[0-9a-f]{6}$/);
+    expect(a).not.toBe(b);
   });
 });

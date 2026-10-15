@@ -883,9 +883,18 @@ export function TrainGraph({
                   {isRunning && <polyline points={ptStr} fill="none" stroke={train.color} strokeWidth="10" strokeOpacity={0.15} strokeLinejoin="round" strokeLinecap="round" />}
                   {isRunning && <polyline points={ptStr} fill="none" stroke={train.color} strokeWidth="5" strokeOpacity={0.35} strokeLinejoin="round" strokeLinecap="round" />}
                   {isHovered && <polyline points={ptStr} fill="none" stroke={lineColor} strokeWidth="6" strokeOpacity={0.25 * lineOpacity} />}
-                  <polyline points={ptStr} fill="none" stroke={lineColor} strokeOpacity={lineOpacity} strokeWidth={isHovered || isRunning ? 2.5 : 2} strokeLinejoin="round" strokeLinecap="round" strokeDasharray={pending ? '6 4' : undefined} />
+                  {/* The request being plotted: pulsing glow + marching dashes, so it stands out on a busy graph */}
                   {pending && (
-                    <text x={points[0].x + 6} y={points[0].y - 8} fill={lineColor} fontSize="11" fontWeight="600" fontFamily="system-ui, sans-serif" pointerEvents="none">{train.name} (request)</text>
+                    <polyline points={ptStr} fill="none" stroke={lineColor} strokeWidth="14" strokeLinejoin="round" strokeLinecap="round" pointerEvents="none">
+                      <animate attributeName="stroke-opacity" values="0.1;0.35;0.1" dur="1.6s" repeatCount="indefinite" />
+                    </polyline>
+                  )}
+                  {pending && <polyline points={ptStr} fill="none" stroke="#020617" strokeWidth="5" strokeOpacity={0.9} strokeLinejoin="round" strokeLinecap="round" pointerEvents="none" />}
+                  <polyline points={ptStr} fill="none" stroke={lineColor} strokeOpacity={lineOpacity} strokeWidth={pending ? 3 : isHovered || isRunning ? 2.5 : 2} strokeLinejoin="round" strokeLinecap="round" strokeDasharray={pending ? '9 5' : undefined}>
+                    {pending && <animate attributeName="stroke-dashoffset" from="0" to="-28" dur="1s" repeatCount="indefinite" />}
+                  </polyline>
+                  {pending && (
+                    <text x={points[0].x + 6} y={points[0].y - 8} fill={lineColor} stroke="#020617" strokeWidth="3" paintOrder="stroke" fontSize="12" fontWeight="700" fontFamily="system-ui, sans-serif" pointerEvents="none">{train.name} (request)</text>
                   )}
                   {points.map((p, i) => (
                     <circle key={i} cx={p.x} cy={p.y} r="2.5" fill={lineColor} opacity={lineOpacity} />

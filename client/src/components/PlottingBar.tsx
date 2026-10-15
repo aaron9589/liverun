@@ -24,7 +24,8 @@ export function PlottingBar({ plotting, crews, otherMoved, onChange, onEditStops
 
   function changeCrew(crewId: string) {
     const crew = crews.find((c) => c.id === crewId);
-    onChange({ ...train, crew_id: crew?.id, color: crew?.color ?? train.color });
+    // The draft keeps its own colour (picked to stand out), whoever drives it.
+    onChange({ ...train, crew_id: crew?.id });
   }
 
   return (

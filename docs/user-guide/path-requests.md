@@ -51,7 +51,7 @@ What you can do depends on the request's state:
 
 ## Plotting a request
 
-**Acknowledge & plot** moves the request to **Plotting** (the crew sees it straight away), closes the drawer, and draws a draft train on the graph as a dashed line labelled with its name and **(request)**. Nothing is saved yet: the draft is not in the timetable until you accept it. You can plot one request at a time.
+**Acknowledge & plot** moves the request to **Plotting** (the crew sees it straight away), closes the drawer, and draws a draft train on the graph: a thick dashed line with moving dashes and a pulsing glow, in a bright colour picked to differ from the trains already on the graph, labelled with its name and **(request)**. The accepted train keeps that colour. Nothing is saved yet: the draft is not in the timetable until you accept it. You can plot one request at a time.
 
 ![Plotting a request: the plotting bar above the graph and the dashed draft train](images/planner-plotting.png)
 
@@ -61,7 +61,7 @@ The graph switches to edit mode and the **plotting bar** appears above it:
 |---------|------|
 | **Plotting PR1 for Local Operator 2** | The draft train's name (from [Settings](#settings)) and the crew that asked |
 | **No other trains moved** / **n other trains moved** | Counts other trains you've dragged while plotting, for example to make room |
-| **Crew ▾** | Who the train goes to. It starts as the crew that asked; **Unassigned** is allowed. Changing it recolours the train |
+| **Crew ▾** | Who the train goes to. It starts as the crew that asked; **Unassigned** is allowed. The train keeps its colour |
 | **Edit stops** | Opens the train editor on the draft, to change stops, times, notes or the train's name |
 | **Note to crew (optional)** | A note the crew sees on their request card, up to 300 characters |
 | **Cancel** | Throws away the draft and every move, and returns the request to pending |

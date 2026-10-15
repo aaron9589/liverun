@@ -18,7 +18,7 @@ import { ChangeToasts, useToasts } from './components/ChangeToasts';
 import { RequestsDrawer } from './components/requests/RequestsDrawer';
 import { badgeCount, newRequestEvents, routeEnds } from './lib/requestQueue';
 import { planDraft } from './lib/pathPlan';
-import { draftFromRequest, plotRequestState, plotWarnings, retimeFromDrafts } from './lib/plotting';
+import { draftFromRequest, pickRequestColor, plotRequestState, plotWarnings, retimeFromDrafts } from './lib/plotting';
 import type { PlottingState } from './components/TrainGraph';
 
 // ─── Print helpers ────────────────────────────────────────────────────────────
@@ -624,7 +624,9 @@ export default function App() {
     const request = tt?.path_requests?.find((r) => r.id === requestId);
     if (!tt || !request) throw new Error('Request not found');
     const plan = planDraft(request, tt, clockTime);
-    setPlotting({ request, train: plan.train, withdrawn: false, busy: false, planWarnings: [...plan.warnings] });
+    // A random bright colour away from every other train's, so the draft is easy to find (kept on accept).
+    const train = { ...plan.train, color: pickRequestColor(tt.trains) };
+    setPlotting({ request, train, withdrawn: false, busy: false, planWarnings: [...plan.warnings] });
     setRequestsOpen(false);
   }
 

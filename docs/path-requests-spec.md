@@ -343,7 +343,7 @@ If inferred routes would put a station in the train twice, that leg falls back t
 **Train fields**
 - **Name**: `<prefix><n>`, where `request_train_prefix` defaults to `PR` and n is the next free number.
 - **Crew**: the requester.
-- **Colour**: the crew's colour.
+- **Colour**: a random bright colour, chosen among the hues furthest from every existing train's colour (`pickRequestColor`), so the draft is easy to find; the accepted train keeps it.
 - **Direction**: from the graph_pos trend.
 - `train_id`: the loco.
 - `notes`: the request notes.
@@ -352,12 +352,12 @@ If inferred routes would put a station in the train twice, that leg falls back t
 
 `TrainGraph` gets an optional **`plotting`** prop (`PlottingState`, `client/src/lib/plotting.ts`): the draft train, which isn't in `timetable.trains` (its id comes from `pendingTrainId()`). Its callbacks are `onPlotChange` (a moved draft), `onPlotEditStops`, `onPlotAccept(others, note)` and `onPlotCancel`.
 
-- Drawn on top, **dashed**, in the crew colour, labelled "PR3 (request)". The usual hover tooltip lists the work stops.
+- Drawn on top, **dashed with marching dashes, a dark casing and a pulsing glow**, in its picked colour, labelled "PR3 (request)". The usual hover tooltip lists the work stops.
 - Drag-to-shift and dwell handles work on it exactly as on a draft (`shiftStops`, `changeDwell`, midnight-safe). Running times stay as planned, matching today's rule that graph edits never change running times. To change a leg's running time, Control uses **Edit stops**.
 - Other trains can be moved in the same session as normal drafts, to clear the path.
 - While a pending train is shown, the edit bar becomes:
   `Plotting PR3 for Crew 2 · 1 other train moved` · Crew ▾ · **Edit stops** · Note to crew … · **Cancel** · **Accept**
-  - **Crew ▾**: assign to any crew (P12). Defaults to the requester; changing it recolours the draft.
+  - **Crew ▾**: assign to any crew (P12). Defaults to the requester; changing it keeps the draft's colour.
   - **Edit stops**: opens `TrainEditor` on the draft (name, crew, loco, stops, times, special instructions) without saving. On close, the edited train replaces the draft.
   - **Note to crew**: optional `control_note` (P16).
   - **Accept**: sends `/accept` with the draft, every other draft as `retime`, and the note. On 409 (request withdrawn, or another train's stops changed) nothing is saved, the drafts stay, and the error is shown, as Done does today.
