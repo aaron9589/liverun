@@ -1,6 +1,8 @@
-import type { Station, Train } from '../../types';
+import type { PathRequest, Station, Train } from '../../types';
 import { currentStop, type SeqStop } from '../../lib/stops';
 import { jobSummary } from '../../lib/crewJobs';
+import { cancelAskText } from '../../lib/pathRequests';
+import { RequestActions } from './RequestCard';
 
 interface Props {
   train: Train;
@@ -13,10 +15,16 @@ interface Props {
   isNew: boolean;
   /** Stop ids whose times just changed. */
   retimedStopIds: ReadonlySet<string>;
+  /** This crew's accepted request the train was made from, if any: offers Ask to cancel. */
+  request?: PathRequest;
+  trains?: Train[];
+  onWithdraw?: (requestId: string) => Promise<void>;
+  onAskCancel?: (requestId: string, reason: string) => Promise<void>;
 }
 
-/** One of the crew's jobs. Read-only: run status is shown, never changed here. */
-export function JobCard({ train, seq, stations, clock, expanded, onToggle, isNew, retimedStopIds }: Props) {
+/** One of the crew's jobs. Run status is shown, never changed here; a requested job can be asked to cancel. */
+export function JobCard({ train, seq, stations, clock, expanded, onToggle, isNew, retimedStopIds, request, trains, onWithdraw, onAskCancel }: Props) {
+  const askLine = request ? cancelAskText(request) : null;
   const stationName = new Map(stations.map((s) => [s.id, s.name]));
   const done = train.status === 'completed';
   const running = train.status === 'running';
@@ -81,6 +89,16 @@ export function JobCard({ train, seq, stations, clock, expanded, onToggle, isNew
             <div className="mt-3 flex items-start gap-3 text-sm">
               <p className="flex-1 whitespace-pre-wrap text-slate-300">{train.notes?.trim() ? `Notes: ${train.notes.trim()}` : ''}</p>
               {requested && <span className="shrink-0 text-xs font-semibold px-2 py-1 rounded-full bg-blue-900/60 text-blue-300">Requested</span>}
+            </div>
+          )}
+          {request && askLine && (
+            <p className={`mt-2 text-sm ${request.cancel_ask?.status === 'rejected' ? 'text-amber-300' : 'text-slate-400'}`}>
+              {request.cancel_ask?.status === 'open' ? `Cancel asked: ${askLine}` : askLine}
+            </p>
+          )}
+          {request && trains && onWithdraw && onAskCancel && (
+            <div className="mt-3 empty:hidden">
+              <RequestActions request={request} trains={trains} onWithdraw={onWithdraw} onAskCancel={onAskCancel} />
             </div>
           )}
         </div>

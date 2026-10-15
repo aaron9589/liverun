@@ -252,6 +252,10 @@ export function CrewJobs() {
             onToggle={() => setOpen((prev) => new Map(prev).set(t.id, !(prev.get(t.id) ?? t.id === autoId)))}
             isNew={newIds.has(t.id)}
             retimedStopIds={retimedIds}
+            request={timetable.path_requests?.find((r) => r.train_id_created === t.id && r.crew_id === crew!.id && r.status === 'accepted')}
+            trains={timetable.trains}
+            onWithdraw={withdraw}
+            onAskCancel={askCancel}
           />
         ))}
       </main>

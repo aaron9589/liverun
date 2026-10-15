@@ -99,12 +99,15 @@ export function cancelAskText(request: PathRequest): string | null {
 export const isOpen = (r: Pick<PathRequest, 'status'>): boolean => PATH_REQUEST_OPEN.includes(r.status);
 export const canWithdraw = isOpen;
 export const hasOpenAsk = (r: PathRequest): boolean => r.cancel_ask?.status === 'open';
-export const canAskCancel = (r: PathRequest): boolean => r.status === 'accepted' && !hasOpenAsk(r);
+/** Accepted, no open ask, and (when trains are given) its train still exists: there's something to cancel. */
+export const canAskCancel = (r: PathRequest, trains?: Pick<Train, 'id'>[]): boolean =>
+  r.status === 'accepted' && !hasOpenAsk(r)
+  && (!trains || (!!r.train_id_created && trains.some((t) => t.id === r.train_id_created)));
 
 /** How long an accepted card stays prominent before it fades. */
 export const ACCEPTED_FADE_MS = 5 * 60_000;
 
-/** True once an accepted request has been settled for a while (no open ask to deal with). */
+/** True once an accepted request has been settled for a while (no open ask to deal with). Only its looks fade: Ask to cancel stays. */
 export function isFaded(r: PathRequest, now: number): boolean {
   if (r.status !== 'accepted' || hasOpenAsk(r)) return false;
   const t = Date.parse(r.updated_at);

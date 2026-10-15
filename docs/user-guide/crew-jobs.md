@@ -98,9 +98,9 @@ Each card shows the route (for example *Kiama → Bombo (shunt 20) → Kembla He
 
 **Withdraw** asks you to confirm (**Yes, withdraw** or **Keep**). If Control picked the request up at the same moment, you may be told the request has moved on; the card then shows what happened.
 
-**Ask to cancel** is for an accepted request you no longer need. You can type a reason, then **Send request**. The train stays on the timetable until Control agrees: the card shows **Cancel asked: Waiting for Control**, and then either **Cancelled** or **Cancel refused** with Control's note. You can ask again after a refusal.
+**Ask to cancel** is for an accepted request you no longer need. It's on the request card and on the job itself in **My jobs** (open the job). You can type a reason, then **Send request**. The train stays on the timetable until Control agrees: the card shows **Cancel asked: Waiting for Control**, and then either **Cancelled** or **Cancel refused** with Control's note. You can ask again after a refusal.
 
-You also get a toast when something changes: **Control is plotting your path**, **Path accepted → PR1**, **Declined: …**, **Cancelled: …** or **Cancel refused: …**. An accepted card fades after five minutes; declined, withdrawn and cancelled ones stay dimmed until Control clears closed requests.
+You also get a toast when something changes: **Control is plotting your path**, **Path accepted → PR1**, **Declined: …**, **Cancelled: …** or **Cancel refused: …**. An accepted card shrinks to one line after five minutes but keeps **Ask to cancel** while its train exists; declined, withdrawn and cancelled ones stay dimmed until Control clears closed requests.
 
 For what Control does with your request, and what is recorded about it, see [Path requests](path-requests.md).
 

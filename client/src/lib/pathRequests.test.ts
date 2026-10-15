@@ -208,3 +208,23 @@ describe('controlNote', () => {
     expect(controlNote({ ...base, status: 'cancelled', cancel_ask: { at: '', status: 'approved' } } as PathRequest)).toBeUndefined();
   });
 });
+
+describe('canAskCancel', () => {
+  const base = { id: 'r', timetable_id: 't', crew_id: 'c', stops: [], created_at: '', updated_at: '', train_id_created: 'tr1' };
+  it('needs an accepted request with no open ask', () => {
+    expect(canAskCancel({ ...base, status: 'accepted' } as PathRequest)).toBe(true);
+    expect(canAskCancel({ ...base, status: 'pending' } as PathRequest)).toBe(false);
+    expect(canAskCancel({ ...base, status: 'accepted', cancel_ask: { at: '', status: 'open' } } as PathRequest)).toBe(false);
+    expect(canAskCancel({ ...base, status: 'accepted', cancel_ask: { at: '', status: 'rejected' } } as PathRequest)).toBe(true);
+  });
+  it('needs the train to still exist when trains are given', () => {
+    const r = { ...base, status: 'accepted' } as PathRequest;
+    expect(canAskCancel(r, [{ id: 'tr1' }])).toBe(true);
+    expect(canAskCancel(r, [{ id: 'other' }])).toBe(false);
+  });
+  it('is not affected by the card fading', () => {
+    const old = { ...base, status: 'accepted', updated_at: '2026-01-01T00:00:00Z' } as PathRequest;
+    expect(isFaded(old, Date.parse('2026-01-01T01:00:00Z'))).toBe(true);
+    expect(canAskCancel(old, [{ id: 'tr1' }])).toBe(true);
+  });
+});

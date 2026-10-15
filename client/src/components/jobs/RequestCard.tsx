@@ -36,20 +36,23 @@ type Pending = null | 'withdraw' | 'ask';
 
 const BTN = 'min-h-[48px] px-4 rounded-lg font-medium disabled:opacity-50';
 
-/** One of this crew's path requests. Shows status and route; Withdraw / Ask to cancel are the only actions. */
-export function RequestCard({ request, timetable, crewId, now, onWithdraw, onAskCancel }: Props) {
+/**
+ * Withdraw (open request) or Ask to cancel (accepted, train still there), each confirmed
+ * inline. Shared by the request card and the job card of a train made from the request.
+ * Renders nothing when neither applies.
+ */
+export function RequestActions({ request, trains, onWithdraw, onAskCancel }: {
+  request: PathRequest;
+  trains: Timetable['trains'];
+  onWithdraw: (requestId: string) => Promise<void>;
+  onAskCancel: (requestId: string, reason: string) => Promise<void>;
+}) {
   const [pending, setPending] = useState<Pending>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const open = isOpen(request);
-  const faded = isFaded(request, now);
-  const closed = !open && request.status !== 'accepted';
-  const askLine = cancelAskText(request);
-  const status = requestStatusText(request, timetable, crewId);
-  const control = controlNote(request);
-  const ready = request.ready_at ? `Ready at ${request.ready_at}` : 'Ready as soon as possible';
+  const withdrawable = canWithdraw(request);
+  if (!withdrawable && !canAskCancel(request, trains)) return null;
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -66,8 +69,61 @@ export function RequestCard({ request, timetable, crewId, now, onWithdraw, onAsk
   }
 
   return (
-    <div className={`rounded-xl border border-slate-800 bg-slate-900 ${closed || faded ? 'opacity-50' : ''}`}>
-      <div className="px-4 py-3 flex flex-col gap-1">
+    <div className="flex flex-col gap-2">
+      {pending === 'ask' && (
+        <input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={200}
+          placeholder="Reason (optional)"
+          aria-label="Reason for cancelling"
+          className="min-h-[48px] w-full rounded-lg bg-slate-800 border border-slate-600 px-3 text-base text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+        />
+      )}
+      {pending === null ? (
+        <button
+          className={`${BTN} bg-slate-800 hover:bg-slate-700 text-slate-100`}
+          onClick={() => setPending(withdrawable ? 'withdraw' : 'ask')}
+        >
+          {withdrawable ? 'Withdraw' : 'Ask to cancel'}
+        </button>
+      ) : (
+        <div className="flex gap-2">
+          <button
+            disabled={busy}
+            className={`${BTN} flex-1 bg-red-700 hover:bg-red-600 text-white`}
+            onClick={() => run(() => (pending === 'withdraw' ? onWithdraw(request.id) : onAskCancel(request.id, reason.trim())))}
+          >
+            {busy ? 'Sending…' : pending === 'withdraw' ? 'Yes, withdraw' : 'Send request'}
+          </button>
+          <button
+            disabled={busy}
+            className={`${BTN} bg-slate-800 hover:bg-slate-700 text-slate-100`}
+            onClick={() => { setPending(null); setError(null); }}
+          >
+            Keep
+          </button>
+        </div>
+      )}
+      {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+    </div>
+  );
+}
+
+/** One of this crew's path requests. Shows status and route; Withdraw / Ask to cancel are the only actions. */
+export function RequestCard({ request, timetable, crewId, now, onWithdraw, onAskCancel }: Props) {
+  const open = isOpen(request);
+  // A settled accepted card shrinks to its headline, but keeps Ask to cancel while its train exists.
+  const faded = isFaded(request, now);
+  const closed = !open && request.status !== 'accepted';
+  const askLine = cancelAskText(request);
+  const status = requestStatusText(request, timetable, crewId);
+  const control = controlNote(request);
+  const ready = request.ready_at ? `Ready at ${request.ready_at}` : 'Ready as soon as possible';
+
+  return (
+    <div className={`rounded-xl border border-slate-800 bg-slate-900 ${closed ? 'opacity-50' : ''}`}>
+      <div className={`px-4 py-3 flex flex-col gap-1 ${faded ? 'opacity-60' : ''}`}>
         <div className="flex items-start gap-2">
           <p className="flex-1 min-w-0 font-medium break-words">{status}</p>
           <span className={`shrink-0 text-xs font-semibold px-2 py-1 rounded-full ${CHIP[request.status]}`}>
@@ -91,47 +147,9 @@ export function RequestCard({ request, timetable, crewId, now, onWithdraw, onAsk
           </>
         )}
       </div>
-
-      {!faded && (canWithdraw(request) || canAskCancel(request)) && (
-        <div className="px-4 pb-3 flex flex-col gap-2">
-          {pending === 'ask' && (
-            <input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              maxLength={200}
-              placeholder="Reason (optional)"
-              aria-label="Reason for cancelling"
-              className="min-h-[48px] w-full rounded-lg bg-slate-800 border border-slate-600 px-3 text-base text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
-            />
-          )}
-          {pending === null ? (
-            <button
-              className={`${BTN} bg-slate-800 hover:bg-slate-700 text-slate-100`}
-              onClick={() => setPending(canWithdraw(request) ? 'withdraw' : 'ask')}
-            >
-              {canWithdraw(request) ? 'Withdraw' : 'Ask to cancel'}
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                disabled={busy}
-                className={`${BTN} flex-1 bg-red-700 hover:bg-red-600 text-white`}
-                onClick={() => run(() => (pending === 'withdraw' ? onWithdraw(request.id) : onAskCancel(request.id, reason.trim())))}
-              >
-                {busy ? 'Sending…' : pending === 'withdraw' ? 'Yes, withdraw' : 'Send request'}
-              </button>
-              <button
-                disabled={busy}
-                className={`${BTN} bg-slate-800 hover:bg-slate-700 text-slate-100`}
-                onClick={() => { setPending(null); setError(null); }}
-              >
-                Keep
-              </button>
-            </div>
-          )}
-          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-        </div>
-      )}
+      <div className="px-4 pb-3 empty:hidden">
+        <RequestActions request={request} trains={timetable.trains} onWithdraw={onWithdraw} onAskCancel={onAskCancel} />
+      </div>
     </div>
   );
 }
