@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TrainStop } from '../types';
-import { dragStopTime, shiftStops } from './trainDrag';
+import { changeDwell, dragStopTime, dwellOf, sameTimes, shiftStops } from './trainDrag';
 
 const st = (id: string, arrival: string | null, departure: string | null): TrainStop =>
   ({ id, train_id: 't', station_id: id, arrival, departure });
@@ -52,5 +52,40 @@ describe('dragStopTime', () => {
   it('works across midnight', () => {
     const late = [st('a', null, '23:50'), st('b', '23:58', '23:59'), st('c', '00:20', null)];
     expect(times(dragStopTime(late, 'b', 'dep', 5).stops)).toEqual(['a -/23:50', 'b 23:58/00:04', 'c 00:25/-']);
+  });
+});
+
+describe('changeDwell (running times never change)', () => {
+  it('stretches and shrinks a dwell; later stops follow', () => {
+    expect(times(changeDwell(kn6, 'bry', 5).stops)).toEqual(['kia 13:23/-', 'bry 12:32/12:55', 'now -/12:10']);
+    expect(times(changeDwell(kn6, 'bry', -8).stops)).toEqual(['kia 13:10/-', 'bry 12:32/12:42', 'now -/12:10']);
+  });
+  it('never below zero; a pass-through can only be pulled apart', () => {
+    expect(changeDwell(kn6, 'bry', -60).delta).toBe(-18);
+    const pass = [st('a', null, '10:00'), st('b', '10:10', '10:10'), st('c', '10:30', null)];
+    expect(changeDwell(pass, 'b', -5).delta).toBe(0);
+    expect(times(changeDwell(pass, 'b', 3).stops)).toEqual(['a -/10:00', 'b 10:10/10:13', 'c 10:33/-']);
+  });
+  it('first and last stops have no dwell', () => {
+    expect(changeDwell(kn6, 'now', 5)).toEqual({ stops: kn6, delta: 0 });
+    expect(changeDwell(kn6, 'kia', 5)).toEqual({ stops: kn6, delta: 0 });
+  });
+  it('running times are unchanged', () => {
+    // Running time = departure from one stop to arrival at the next (dwellOf does the midnight-safe maths)
+    const run = (s: TrainStop[]) => {
+      const by = Object.fromEntries(s.map((x) => [x.id, x]));
+      return [
+        dwellOf({ arrival: by.now.departure, departure: by.bry.arrival }),
+        dwellOf({ arrival: by.bry.departure, departure: by.kia.arrival }),
+      ];
+    };
+    expect(run(changeDwell(kn6, 'bry', 7).stops)).toEqual(run(kn6));
+    expect(run(shiftStops(kn6, 33))).toEqual(run(kn6));
+  });
+  it('dwellOf and sameTimes', () => {
+    expect(dwellOf({ arrival: '23:58', departure: '00:03' })).toBe(5);
+    expect(dwellOf({ arrival: null, departure: '10:00' })).toBeNull();
+    expect(sameTimes(kn6, shiftStops(kn6, 0))).toBe(true);
+    expect(sameTimes(kn6, shiftStops(kn6, 1))).toBe(false);
   });
 });

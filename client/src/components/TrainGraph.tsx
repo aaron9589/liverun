@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Timetable, Train, TrainStop } from '../types';
 import { timeToMinutes, minutesToTime, stationNameStyle } from '../utils';
-import { dragStopTime, shiftStops, type TimeKind } from '../lib/trainDrag';
+import { changeDwell, dwellOf, sameTimes, shiftStops, type TimeKind } from '../lib/trainDrag';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const PAD = { top: 24, right: 24, bottom: 48, left: 140 };
@@ -205,17 +205,23 @@ interface Props {
   onPan?: (newViewStart: number) => void;
   externalHoveredId?: string | null;
   onScaleChange?: (scale: number | null) => void;
-  /** Enables graph editing (Edit toggle): a train or one of its stop times was dragged to new times. */
-  onTrainTimesChange?: (train: Train, stops: TrainStop[]) => void;
+  /**
+   * Enables graph editing (✎ Edit). Moves are held on the graph until Done,
+   * then handed over together; resolves to the ids of trains that failed to
+   * save (they stay as drafts). Cancel discards everything.
+   */
+  onTrainTimesCommit?: (changes: { train: Train; stops: TrainStop[] }[]) => Promise<string[]>;
 }
 
-/** A drag in progress (edit mode): the whole train, or one stop time and everything after it. */
+/** A drag in progress (edit mode): the whole train, or one stop's dwell. */
 interface GraphDrag {
   trainId: string;
-  /** null = whole train; else the stop time being moved ('either' = a pass point, decided by direction). */
-  handle: { stopId: string; kind: TimeKind | 'either' } | null;
+  /** null = whole train; else the stop whose dwell is being changed. */
+  dwellStopId: string | null;
   startX: number;
-  /** Preview: the train's stops with the drag applied, and the minutes moved. */
+  /** The train's stops when the drag began (any earlier draft included). */
+  base: TrainStop[];
+  /** Preview: the stops with this drag applied, and the minutes moved. */
   stops: TrainStop[];
   delta: number;
   moved: boolean;
@@ -224,7 +230,7 @@ interface GraphDrag {
 export function TrainGraph({
   timetable, onTrainClick, labelMode = 'code', distanceUnit = 'km',
   viewStart: viewStartProp, viewEnd: viewEndProp,
-  clockTime, onPan, externalHoveredId, onScaleChange, onTrainTimesChange,
+  clockTime, onPan, externalHoveredId, onScaleChange, onTrainTimesCommit,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -235,12 +241,40 @@ export function TrainGraph({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [userScale, setUserScale] = useState<number | null>(timetable.settings.graph_scale ?? null);
   // Graph editing: off on every load, so a stray drag during a live session can't move a train.
+  // Moves are drafts (trainId → stops) until Done saves them all; Cancel throws them away.
   const [editMode, setEditMode] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, TrainStop[]>>({});
+  const [saving, setSaving] = useState(false);
   const [drag, setDrag] = useState<GraphDrag | null>(null);
   const dragState = useRef<GraphDrag | null>(null);
-  /** Swallows the click that ends a drag, so dropping a train doesn't open its editor. */
-  const suppressClick = useRef(false);
   const [dragAt, setDragAt] = useState<{ x: number; y: number } | null>(null);
+  const draftCount = Object.keys(drafts).length;
+
+  // Unsaved moves: warn before the page is closed or reloaded.
+  useEffect(() => {
+    if (draftCount === 0) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [draftCount]);
+
+  async function finishEditing(save: boolean) {
+    const list = save
+      ? timetable.trains.filter((t) => drafts[t.id]).map((t) => ({ train: t, stops: drafts[t.id] }))
+      : [];
+    if (list.length > 0 && onTrainTimesCommit) {
+      setSaving(true);
+      const failed = await onTrainTimesCommit(list).catch(() => list.map((c) => c.train.id));
+      setSaving(false);
+      if (failed.length > 0) {
+        // Keep what didn't save so nothing is lost; the rest are done.
+        setDrafts((d) => Object.fromEntries(Object.entries(d).filter(([id]) => failed.includes(id))));
+        return;
+      }
+    }
+    setDrafts({});
+    setEditMode(false);
+  }
   // Ref to stable layout values used in external-hover effect (avoids stale closures)
   const layoutRef = useRef({ stationMap: new Map<string, { graph_pos: number; name: string }>(), viewStart: 0, viewEnd: 0, posToY: (_: number) => PAD.top, gw: 0, timetable });
   const needsVScrollRef = useRef(false);
@@ -365,16 +399,17 @@ export function TrainGraph({
   const handleMouseLeave = () => { setTooltip(null); setHoveredId(null); };
 
   /**
-   * Edit mode: drags a whole train (handle null) or one stop time (and every
-   * later time on the run) left/right in whole minutes. The preview is drawn
-   * live; releasing saves once (one undo step). Escape cancels.
+   * Edit mode: drags a whole train (dwellStopId null) or one stop's dwell
+   * left/right in whole minutes. Running times never change, so a line's angle
+   * never does. The result becomes a draft (saved on Done); Escape cancels the drag.
    */
-  function startDrag(e: React.MouseEvent, train: Train, handle: GraphDrag['handle']) {
-    if (!editMode || !onTrainTimesChange || e.button !== 0) return;
+  function startDrag(e: React.MouseEvent, train: Train, dwellStopId: string | null) {
+    if (!editMode || saving || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     const pxPerMin = gw / viewWidth;
-    const begin: GraphDrag = { trainId: train.id, handle, startX: e.clientX, stops: train.stops, delta: 0, moved: false };
+    const base = drafts[train.id] ?? train.stops;
+    const begin: GraphDrag = { trainId: train.id, dwellStopId, startX: e.clientX, base, stops: base, delta: 0, moved: false };
     dragState.current = begin;
     setDrag(begin);
     setTooltip(null);
@@ -387,33 +422,28 @@ export function TrainGraph({
       const dx = ev.clientX - d.startX;
       const moved = d.moved || Math.abs(dx) > 3;
       const want = moved ? Math.round(dx / pxPerMin) : 0;
-      let stops = train.stops;
-      let delta = 0;
-      if (want !== 0 && !d.handle) {
-        stops = shiftStops(train.stops, want);
-        delta = want;
-      } else if (want !== 0 && d.handle) {
-        // A pass point: pulling right opens a dwell (departure), left moves the arrival earlier.
-        const kind = d.handle.kind === 'either' ? (want > 0 ? 'dep' : 'arr') : d.handle.kind;
-        ({ stops, delta } = dragStopTime(train.stops, d.handle.stopId, kind, want));
-      }
-      const next = { ...d, moved, stops, delta };
+      const r = want === 0 ? { stops: d.base, delta: 0 }
+        : d.dwellStopId ? changeDwell(d.base, d.dwellStopId, want)
+        : { stops: shiftStops(d.base, want), delta: want };
+      const next = { ...d, moved, stops: r.stops, delta: r.delta };
       dragState.current = next;
       setDrag(next);
     };
-    const finish = (save: boolean) => {
+    const finish = (keep: boolean) => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       window.removeEventListener('keydown', onKey);
       const d = dragState.current;
       dragState.current = null;
       setDrag(null);
-      if (d?.moved) {
-        // The click that follows this mouseup must not open the editor.
-        suppressClick.current = true;
-        setTimeout(() => { suppressClick.current = false; }, 0);
-      }
-      if (save && d && d.delta !== 0) onTrainTimesChange(train, d.stops);
+      if (!keep || !d || d.delta === 0) return;
+      setDrafts((all) => {
+        const next = { ...all };
+        // Dragged back to where it started: no longer a change.
+        if (sameTimes(d.stops, train.stops)) delete next[train.id];
+        else next[train.id] = d.stops;
+        return next;
+      });
     };
     const onUp = () => finish(true);
     const onKey = (ev: KeyboardEvent) => { if (ev.key === 'Escape') finish(false); };
@@ -543,13 +573,31 @@ export function TrainGraph({
     <div ref={containerRef} className="w-full h-full relative flex flex-col select-none overflow-hidden">
       {/* Vertical scale controls */}
       <div className="absolute z-10 flex items-center gap-0.5 bg-slate-900/80 backdrop-blur-sm rounded border border-slate-700/50 overflow-hidden" style={{ top: PAD.top + 4, right: PAD.right + 4 }}>
-        {onTrainTimesChange && (
+        {onTrainTimesCommit && !editMode && (
           <button
-            onClick={() => { setEditMode((v) => !v); setTooltip(null); }}
-            aria-pressed={editMode}
-            title={editMode ? 'Stop editing the graph' : 'Edit the graph: drag a train to move it, drag a stop handle to change that time (later stops follow)'}
-            className={`h-5 px-1.5 flex items-center gap-1 text-[11px] font-medium transition-colors border-r border-slate-700/50 ${editMode ? 'bg-amber-500/90 text-slate-950' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
-          >✎ {editMode ? 'Editing' : 'Edit'}</button>
+            onClick={() => { setEditMode(true); setTooltip(null); }}
+            title="Edit the graph: drag a train to move it, drag a stop's ◯ handle to change its dwell (later stops follow). Nothing is saved until Done."
+            className="h-5 px-1.5 flex items-center gap-1 text-[11px] font-medium transition-colors border-r border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+          >✎ Edit</button>
+        )}
+        {onTrainTimesCommit && editMode && (
+          <>
+            <span className="h-5 px-1.5 flex items-center text-[11px] text-amber-300 border-r border-slate-700/50 whitespace-nowrap">
+              {draftCount === 0 ? 'Drag a train or a ◯ dwell' : `${draftCount} train${draftCount === 1 ? '' : 's'} moved — not saved`}
+            </span>
+            <button
+              onClick={() => finishEditing(false)}
+              disabled={saving}
+              title="Discard every move and stop editing"
+              className="h-5 px-1.5 flex items-center text-[11px] font-medium text-slate-300 hover:text-white hover:bg-slate-700/50 border-r border-slate-700/50 disabled:opacity-40"
+            >Cancel</button>
+            <button
+              onClick={() => finishEditing(true)}
+              disabled={saving}
+              title={draftCount ? 'Save all moved trains (one undo step) and stop editing' : 'Stop editing'}
+              className="h-5 px-2 flex items-center text-[11px] font-semibold bg-emerald-500/90 text-slate-950 hover:bg-emerald-400 border-r border-slate-700/50 disabled:opacity-60"
+            >{saving ? 'Saving…' : 'Done'}</button>
+          </>
         )}
         <button
           onClick={handleVZoomOut}
@@ -698,8 +746,15 @@ export function TrainGraph({
               return (a.id === top ? 1 : 0) - (b.id === top ? 1 : 0);
             }).map((train) => {
               const dragging = drag?.trainId === train.id;
-              const shown = dragging ? { ...train, stops: drag!.stops } : train;
+              const draft = dragging ? drag!.stops : drafts[train.id];
+              const shown = draft ? { ...train, stops: draft } : train;
               const points = buildTrainPoints(shown, stationMap, viewStart, viewEnd, distToY, gw);
+              // A moved (unsaved) train keeps a faint dashed ghost of where it was.
+              const ghost = draft && !sameTimes(draft, train.stops)
+                ? buildTrainPoints(train, stationMap, viewStart, viewEnd, distToY, gw).map((p) => `${p.x},${p.y}`).join(' ')
+                : null;
+              // Dwell handles: intermediate stops only (they have both times; a pass is one point).
+              const dwellStops = new Set(shown.stops.filter((st) => st.arrival && st.departure).map((st) => st.id));
               if (points.length < 2) return null;
               const ptStr = points.map((p) => `${p.x},${p.y}`).join(' ');
               const isHovered = effectiveHoveredId === train.id;
@@ -716,8 +771,9 @@ export function TrainGraph({
                   onMouseMove={(e) => { if (!dragState.current) handleMouseMove(e); }}
                   onMouseLeave={() => { if (!dragState.current) { setHoveredId(null); setTooltip(null); } }}
                   onMouseDown={(e) => startDrag(e, train, null)}
-                  onClick={() => { if (!suppressClick.current) onTrainClick?.(train); }}
+                  onClick={() => { if (!editMode) onTrainClick?.(train); }}
                 >
+                  {ghost && <polyline points={ghost} fill="none" stroke={train.color} strokeWidth="1.5" strokeOpacity={0.4} strokeDasharray="4 3" pointerEvents="none" />}
                   <polyline points={ptStr} fill="none" stroke="transparent" strokeWidth="12" />
                   {/* Glow layers for running trains */}
                   {isRunning && <polyline points={ptStr} fill="none" stroke={train.color} strokeWidth="10" strokeOpacity={0.15} strokeLinejoin="round" strokeLinecap="round" />}
@@ -727,19 +783,21 @@ export function TrainGraph({
                   {points.map((p, i) => (
                     <circle key={i} cx={p.x} cy={p.y} r="2.5" fill={lineColor} opacity={lineOpacity} />
                   ))}
-                  {/* Edit mode: a handle per stop time; drag to change it (later stops follow) */}
-                  {editMode && (isHovered || dragging) && points.map((p, i) => (
-                    <circle
-                      key={`h${i}`}
-                      data-handle={`${p.stopId}:${p.pass ? 'either' : p.kind}`}
-                      cx={p.x} cy={p.y} r="5"
-                      fill="#0f172a" stroke={lineColor} strokeWidth="2"
-                      style={{ cursor: 'ew-resize' }}
-                      onMouseDown={(e) => startDrag(e, train, { stopId: p.stopId, kind: p.pass ? 'either' : p.kind })}
-                    >
-                      <title>{`${p.stationName} ${p.pass ? 'pass — drag right to add a dwell' : p.kind === 'arr' ? 'arrival' : 'departure'}`}</title>
-                    </circle>
-                  ))}
+                  {/* Edit mode: a dwell handle on each intermediate stop's departure (a pass is a single point) */}
+                  {editMode && (isHovered || dragging) && points
+                    .filter((p) => dwellStops.has(p.stopId) && (p.pass || p.kind === 'dep'))
+                    .map((p) => (
+                      <circle
+                        key={`h${p.stopId}`}
+                        data-dwell={p.stopId}
+                        cx={p.x} cy={p.y} r="5"
+                        fill="#0f172a" stroke={lineColor} strokeWidth="2"
+                        style={{ cursor: 'ew-resize' }}
+                        onMouseDown={(e) => startDrag(e, train, p.stopId)}
+                      >
+                        <title>{`${p.stationName}: drag to change the dwell${p.pass ? ' (passes now)' : ''}`}</title>
+                      </circle>
+                    ))}
                 </g>
               );
             })}
@@ -799,13 +857,13 @@ export function TrainGraph({
         if (!train) return null;
         const sign = drag.delta > 0 ? '+' : '';
         let text = `${train.name} ${sign}${drag.delta} min`;
-        if (drag.handle) {
-          const stop = drag.stops.find((st) => st.id === drag.handle!.stopId);
-          const name = stop ? (stop.location_alias || stationMap.get(stop.station_id)?.name || '') : '';
-          const time = stop ? (drag.handle.kind === 'arr' ? stop.arrival : stop.departure) ?? stop.departure ?? stop.arrival : null;
-          const what = stop && stop.arrival && stop.departure && stop.arrival !== stop.departure
-            ? `${stop.arrival}–${stop.departure}` : time;
-          text = `${name} ${what ?? ''}  (${sign}${drag.delta} min, later stops follow)`;
+        if (drag.dwellStopId) {
+          const before = drag.base.find((st) => st.id === drag.dwellStopId);
+          const after = drag.stops.find((st) => st.id === drag.dwellStopId);
+          const name = after ? (after.location_alias || stationMap.get(after.station_id)?.name || '') : '';
+          const was = before ? dwellOf(before) : null;
+          const now = after ? dwellOf(after) : null;
+          text = `${name} dwell ${was ?? '?'} → ${now ?? '?'} min${now === 0 ? ' (pass)' : ''} · later stops ${sign}${drag.delta}`;
         }
         return (
           <div

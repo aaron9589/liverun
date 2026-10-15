@@ -71,7 +71,7 @@ The heart of LiveRun — an interactive stringline graph with time on the X axis
 - **Location alias** — override the displayed station name for a specific stop (e.g. show a platform or siding rather than the parent station)
 - **Run tracking** — mark trains as Running (▶) or Completed (✓) during a live session; status is shown on the train list and graph, and synced in real-time across all connected browsers via WebSocket. Reset all statuses with one click.
 
-- **Edit on the graph** — turn on **✎ Edit** in the graph's top-right controls, then drag a train left/right to move it (its running times and dwells stay the same), or drag one of its stop handles: a departure stretches the dwell, an arrival changes the running time, and a pass-through can be pulled apart into a dwell. Later stops follow. Each drag is one undo step; Escape cancels mid-drag. Edit is off whenever the planner loads, so a stray drag in a live session can't move a train.
+- **Edit on the graph** — press **✎ Edit** in the graph's top-right controls, then drag a train left/right to move it, or drag the ◯ handle on an intermediate stop to lengthen or shorten its dwell (a pass-through can be pulled apart into a dwell); later stops follow. Running times are fixed by the path, so a line's angle never changes. Moves stay on the graph (with a faint ghost of the original) until **Done** saves them all as one undo step; **Cancel** discards them. Escape cancels a drag in progress. Edit is off whenever the planner loads, so a stray drag in a live session can't move a train.
 
 ![Train search and filter](docs/screenshots/03b-train-search-filter.png)
 

@@ -1,10 +1,13 @@
 /**
  * Pure helpers behind dragging trains on the train graph.
  *
- *   shiftStops(stops, delta)                  whole train left/right: every time moves
- *   dragStopTime(stops, stopId, kind, delta)  one handle: that time and every later
- *                                             time on the run move (the rest of the
- *                                             path keeps its running times and dwells)
+ *   shiftStops(stops, delta)              whole train left/right: every time moves
+ *   changeDwell(stops, stopId, delta)     one stop's dwell: its departure and every later
+ *                                         time move, so running times never change
+ *   dragStopTime(stops, stopId, kind, d)  the general form (any time + everything after)
+ *
+ * Running times between stations are fixed by the path, so the graph only ever
+ * moves whole trains or changes dwells; it never changes a line's angle.
  *
  * Works in running order (stops are stored in station order, see runningOrder)
  * with minutes unwrapped across midnight, and returns the stops in their stored
@@ -83,4 +86,28 @@ export function dragStopTime(
   const applied = i > 0 ? Math.max(delta, pts[i - 1].t - pts[i].t) : delta;
   if (applied === 0) return { stops, delta: 0 };
   return { stops: withTimes(stops, pts.map((p, j) => (j >= i ? { ...p, t: p.t + applied } : p))), delta: applied };
+}
+
+/**
+ * Lengthens or shortens one intermediate stop's dwell by `delta` minutes: its
+ * departure and every later time move, so no running time changes. A dwell
+ * never goes below zero (a pass-through can only be pulled apart). Unchanged
+ * for the first and last stops, which have no dwell.
+ */
+export function changeDwell(stops: TrainStop[], stopId: string, delta: number): { stops: TrainStop[]; delta: number } {
+  const stop = stops.find((s) => s.id === stopId);
+  if (!stop || !stop.arrival || !stop.departure) return { stops, delta: 0 };
+  return dragStopTime(stops, stopId, 'dep', delta);
+}
+
+/** Dwell in minutes at a stop with both times (midnight-safe), or null. */
+export function dwellOf(stop: Pick<TrainStop, 'arrival' | 'departure'>): number | null {
+  if (!stop.arrival || !stop.departure) return null;
+  return (((timeToMinutes(stop.departure) - timeToMinutes(stop.arrival)) % 1440) + 1440) % 1440;
+}
+
+/** Whether two versions of a train's stops have the same times. */
+export function sameTimes(a: TrainStop[], b: TrainStop[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((s, i) => s.id === b[i].id && s.arrival === b[i].arrival && s.departure === b[i].departure);
 }

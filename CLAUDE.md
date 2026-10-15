@@ -48,8 +48,8 @@ A web app for planning and running model railway operating sessions. Features: v
 | `client/src/utils.ts` | Time conversion, `exportCatsXml()`, `exportCrewsXml()`, `escapeXml()`, `useLocalStorage()`, `stationNameStyle()` |
 | `client/src/components/Sidebar.tsx` | Left panel: timetable list, station manager, train list/search, crew manager |
 | `client/src/components/TrainEditor.tsx` | Train form modal — stops, path template, color picker |
-| `client/src/components/TrainGraph.tsx` | SVG stringline — pan/zoom (8x max), hover tooltips, branch grouping; ✎ Edit toggle (off on load): drag a train or a stop-time handle, saved via `onTrainTimesChange` |
-| `client/src/lib/trainDrag.ts` | Pure graph-edit maths: `shiftStops()` (whole train), `dragStopTime()` (one time + everything after, clamped, midnight-safe, running order) |
+| `client/src/components/TrainGraph.tsx` | SVG stringline — pan/zoom (8x max), hover tooltips, branch grouping; ✎ Edit (off on load): drag a train or a stop's dwell handle; moves are drafts until Done → `onTrainTimesCommit` (one undo step), Cancel discards. Never changes running times |
+| `client/src/lib/trainDrag.ts` | Pure graph-edit maths: `shiftStops()` (whole train), `changeDwell()` (one dwell, later stops follow, ≥ 0), midnight-safe, running order |
 | `client/src/components/StationReport.tsx` | A5 printable arrival/departure register |
 | `client/src/components/CrewMobile.tsx` | Mobile-optimised crew/train view |
 | `client/src/hooks/useFastClock.ts` | Browser MQTT subscriber for live clock |
