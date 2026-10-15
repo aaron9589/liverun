@@ -103,7 +103,7 @@ export function GuardEventsEditor({ value, library, onChange }: Props) {
                 )}
                 {kind === 'enroute' && (
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                    Between this stop and the next, at
+                    On the way from this stop to the next stop the train runs to, at
                     <input aria-label="Position min percent" type="number" min={0} max={100} value={f.atMinPct}
                       onChange={(e) => patch(i, { atMinPct: e.target.value })} className={`${INPUT} w-16`} />
                     to

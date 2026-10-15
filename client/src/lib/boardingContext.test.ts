@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildBoardingContext, stopPosition } from './boardingContext';
+import { buildBoardingContext, previewStops, stopPosition } from './boardingContext';
 import { sequenceStops } from './stops';
 import type { Station, Train } from '../types';
 
@@ -33,5 +33,13 @@ describe('boardingContext', () => {
   });
   it('null when no stop is known', () => {
     expect(buildBoardingContext({ train, seq, stations, clockMinutes: null, pinnedStopId: null })).toBeNull();
+  });
+  it('previewStops: running order and positions for a train stored backwards', () => {
+    // Stored in station order (as the planner does for an Up train): c is where it starts.
+    const up = { stops: [stop('a', '07:20', null), stop('b', '07:10', '07:12'), stop('c', null, '07:00')] } as unknown as Train;
+    expect(previewStops(up).map((p) => [p.stop.station_id, p.position])).toEqual([
+      ['c', 'origin'], ['b', 'intermediate'], ['a', 'terminus'],
+    ]);
+    expect(previewStops(train).map((p) => p.position)).toEqual(['origin', 'intermediate', 'terminus']);
   });
 });

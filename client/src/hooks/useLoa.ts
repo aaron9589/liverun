@@ -4,27 +4,20 @@ import {
   initialLoaState, parseLoaState, sectionsForTrain, stepLoa,
   type LoaTrainState, type SectionMatch, type SectionView,
 } from '../lib/loa';
+import { readSessionState, stampSessionState } from '../lib/sessionState';
 
 const storeKey = (ttId: string, trainId: string) => `guard:loa:${ttId}:${trainId}`;
 
-/**
- * A tablet's grants and completions belong to one session. With no manual reset
- * (LOA is Control's), stored state expires this long after it last changed, so
- * running the same timetable next week starts clean instead of "all complete".
- */
-const STATE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
-
+// Stored state expires 12 h after it last changed (lib/sessionState): with no
+// manual reset (LOA is Control's), next week's session starts clean instead of "all complete".
 function load(ttId: string, trainId: string): LoaTrainState | null {
   try {
-    const raw = localStorage.getItem(storeKey(ttId, trainId));
-    if (!raw) return null;
-    const obj = JSON.parse(raw) as { saved_at?: unknown };
-    if (typeof obj.saved_at !== 'number' || Date.now() - obj.saved_at > STATE_MAX_AGE_MS) return null;
-    return parseLoaState(obj, trainId);
+    const obj = readSessionState(localStorage.getItem(storeKey(ttId, trainId)));
+    return obj ? parseLoaState(obj, trainId) : null;
   } catch { return null; }
 }
 function save(ttId: string, s: LoaTrainState): void {
-  try { localStorage.setItem(storeKey(ttId, s.trainId), JSON.stringify({ ...s, saved_at: Date.now() })); } catch { /* storage unavailable */ }
+  try { localStorage.setItem(storeKey(ttId, s.trainId), stampSessionState(s)); } catch { /* storage unavailable */ }
 }
 
 interface Args {

@@ -3,6 +3,13 @@ import type { Path, Timetable, TimetableSummary, Train } from '../types';
 import { StationPanel } from './StationPanel';
 import { crewInitials, useLocalStorage } from '../utils';
 
+/** Sidebar width in px: default, and the range the drag handle allows. */
+export const SIDEBAR_DEFAULT_W = 320;
+const SIDEBAR_MIN_W = 256;
+const SIDEBAR_MAX_W = 560;
+const clampSidebarWidth = (w: unknown): number =>
+  typeof w === 'number' && Number.isFinite(w) ? Math.round(Math.min(SIDEBAR_MAX_W, Math.max(SIDEBAR_MIN_W, w))) : SIDEBAR_DEFAULT_W;
+
 interface Props {
   timetables: TimetableSummary[];
   selectedId: string | null;
@@ -94,6 +101,29 @@ export function Sidebar({
   const dragCrewId = useRef<string | null>(null);
   const dragOverCrewId = useRef<string | null>(null);
 
+  // Width: drag the right edge (double-click resets); remembered per browser.
+  const [storedWidth, setWidth] = useLocalStorage('tg:sidebarWidth', SIDEBAR_DEFAULT_W);
+  const width = clampSidebarWidth(storedWidth);
+  const [resizing, setResizing] = useState(false);
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const startW = width;
+    setResizing(true);
+    const move = (ev: PointerEvent) => setWidth(clampSidebarWidth(startW + ev.clientX - startX));
+    const end = () => {
+      setResizing(false);
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  };
+
   function toggleSection(s: 'trains' | 'stations' | 'paths' | 'crews') {
     setOpenSections((prev) => ({ ...prev, [s]: !prev[s] }));
   }
@@ -114,7 +144,17 @@ export function Sidebar({
   }
 
   return (
-    <aside className="w-72 shrink-0 flex flex-col bg-slate-900 border-r border-slate-800 overflow-y-auto">
+    <aside style={{ width }} className="relative shrink-0 flex flex-col bg-slate-900 border-r border-slate-800 overflow-y-auto">
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        title="Drag to resize; double-click to reset"
+        onPointerDown={startResize}
+        onDoubleClick={() => setWidth(SIDEBAR_DEFAULT_W)}
+        className={`fixed top-0 bottom-0 z-30 w-1.5 -ml-1 cursor-col-resize transition-colors hover:bg-blue-500/40 ${resizing ? 'bg-blue-500/60' : ''}`}
+        style={{ left: width }}
+      />
       {/* Header */}
       <div className="px-4 pt-5 pb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
@@ -616,7 +656,8 @@ export function Sidebar({
                               ⚠ overlap
                             </span>
                           )}
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Take no room until hovered, so the name and Guard fit a narrow sidebar. */}
+                          <div className="hidden group-hover:flex group-focus-within:flex gap-1 shrink-0">
                             <button
                               onClick={() => { setEditingCrew({ id: crew!.id, name: crew!.name, color: crew!.color }); setNewCrew(null); }}
                               className="p-1 text-slate-400 hover:text-slate-200 rounded"

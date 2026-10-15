@@ -2,7 +2,7 @@
 
 import type { Station, Train } from '../types';
 import type { CountContext, StopPosition } from './boarding';
-import { currentStop, type SeqStop } from './stops';
+import { currentStop, sequenceStops, type SeqStop } from './stops';
 
 export interface BoardingContext {
   stopId: string;
@@ -21,6 +21,16 @@ export interface BoardingContext {
 export function stopPosition(index: number, length: number): StopPosition {
   if (index <= 0) return 'origin';
   return index >= length - 1 ? 'terminus' : 'intermediate';
+}
+
+/**
+ * A train's timed stops in running order with their position, as the guard
+ * panel sees them (Layout settings → Boarding preview). Stored stops are in
+ * station order, so an Up train's first stored stop is its terminus.
+ */
+export function previewStops(train: Pick<Train, 'stops'>): { stop: Train['stops'][number]; position: StopPosition }[] {
+  const seq = sequenceStops(train);
+  return seq.map(({ stop }, i) => ({ stop, position: stopPosition(i, seq.length) }));
 }
 
 const wrap = (m: number) => ((Math.round(m) % 1440) + 1440) % 1440;

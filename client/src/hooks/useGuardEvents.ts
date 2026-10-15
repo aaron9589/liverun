@@ -4,18 +4,22 @@ import {
   onDoor, reconcileRolled, rollEvents, tick,
   type DoorType, type RolledEvent, type RolledState, type StepResult,
 } from '../lib/guardEvents';
+import { readSessionState, stampSessionState } from '../lib/sessionState';
 
 const storeKey = (ttId: string, trainId: string) => `guard:events:${ttId}:${trainId}`;
 
+// Rolled state and un-ACKed banners expire 12 h after they last changed
+// (lib/sessionState), so the next session on this tablet rolls afresh.
 function load(ttId: string, trainId: string): RolledState | null {
   try {
-    const raw = localStorage.getItem(storeKey(ttId, trainId));
-    const s = raw ? (JSON.parse(raw) as RolledState) : null;
-    return s && s.v === 1 && s.trainId === trainId && Array.isArray(s.events) ? s : null;
+    const obj = readSessionState(localStorage.getItem(storeKey(ttId, trainId)));
+    if (!obj) return null;
+    const { saved_at: _savedAt, ...s } = obj as unknown as RolledState & { saved_at: number };
+    return s.v === 1 && s.trainId === trainId && Array.isArray(s.events) ? s : null;
   } catch { return null; }
 }
 function save(ttId: string, s: RolledState): void {
-  try { localStorage.setItem(storeKey(ttId, s.trainId), JSON.stringify(s)); } catch { /* storage unavailable */ }
+  try { localStorage.setItem(storeKey(ttId, s.trainId), stampSessionState(s)); } catch { /* storage unavailable */ }
 }
 
 export interface FiredEvent { key: string; ev: RolledEvent; train: Train }
@@ -26,13 +30,13 @@ export interface FiredEvent { key: string; ev: RolledEvent; train: Train }
 const queueKey = (ttId: string) => `guard:eventQueue:${ttId}`;
 function loadQueue(ttId: string): FiredEvent[] {
   try {
-    const q = JSON.parse(localStorage.getItem(queueKey(ttId)) ?? '[]') as FiredEvent[];
-    return Array.isArray(q) ? q.filter((f) => f && f.key && f.ev && f.train) : [];
+    const q = readSessionState(localStorage.getItem(queueKey(ttId)))?.queue;
+    return Array.isArray(q) ? (q as FiredEvent[]).filter((f) => f && f.key && f.ev && f.train) : [];
   } catch { return []; }
 }
 function saveQueue(ttId: string, q: FiredEvent[]): void {
   try {
-    if (q.length) localStorage.setItem(queueKey(ttId), JSON.stringify(q));
+    if (q.length) localStorage.setItem(queueKey(ttId), stampSessionState({ queue: q }));
     else localStorage.removeItem(queueKey(ttId));
   } catch { /* storage unavailable */ }
 }
