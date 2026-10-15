@@ -3,7 +3,7 @@ import { modeUrl, saveMode, type SavedMode } from '../lib/mode';
 
 const CARDS: { mode: SavedMode; title: string; blurb: string }[] = [
   { mode: 'guard', title: 'Guard panel', blurb: 'Your train, stops and clock at a glance while you work the service.' },
-  { mode: 'crew', title: 'Crew view', blurb: 'Browse crews and trains, see timetables and mark runs complete.' },
+  { mode: 'crew', title: 'Mobile', blurb: 'Crew jobs or the running board' },
   { mode: 'planner', title: 'Planner', blurb: 'Build timetables, stations and the stringline graph.' },
 ];
 

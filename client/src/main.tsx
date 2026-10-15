@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { CrewMobile } from './components/CrewMobile';
+import { MobileRoot } from './components/MobileRoot';
 import { GuardPanel } from './components/guard/GuardPanel';
 import { ModePicker } from './components/ModePicker';
 import { loadSavedMode, resolveMode } from './lib/mode';
@@ -18,7 +18,7 @@ if (replacePath) window.history.replaceState(null, '', replacePath);
 
 const root =
   view === 'guard' ? <GuardPanel /> :
-  view === 'crew' ? <CrewMobile /> :
+  view === 'crew' ? <MobileRoot /> :
   view === 'choose' ? <ModePicker /> :
   <App />;
 

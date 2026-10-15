@@ -4,7 +4,7 @@ import { api } from '../api';
 import { useFastClock } from '../hooks/useFastClock';
 import { useLiveTimetable } from '../hooks/useLiveTimetable';
 import { describeJobChange, diffJobs } from '../lib/jobDiff';
-import { switchMode } from '../lib/mode';
+import { changeMobileView, switchMode } from '../lib/mode';
 import { helpUrl } from '../lib/help';
 import { timeToMinutes, useLocalStorage } from '../utils';
 import { ChangeToasts, useToasts } from './ChangeToasts';
@@ -601,7 +601,7 @@ export function CrewMobile() {
               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="#6366f1" viewBox="0 0 16 16" className="shrink-0">
                 <path d="M10.621.515C8.647.02 7.353.02 5.38.515c-.924.23-1.982.766-2.78 1.22C1.566 2.322 1 3.432 1 4.582V13.5A2.5 2.5 0 0 0 3.5 16h9a2.5 2.5 0 0 0 2.5-2.5V4.583c0-1.15-.565-2.26-1.6-2.849-.797-.453-1.855-.988-2.779-1.22ZM6.5 2h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1 0-1m-2 2h7A1.5 1.5 0 0 1 13 5.5v2A1.5 1.5 0 0 1 11.5 9h-7A1.5 1.5 0 0 1 3 7.5v-2A1.5 1.5 0 0 1 4.5 4m.5 9a1 1 0 1 1-2 0 1 1 0 0 1 2 0m0 0a1 1 0 1 1 2 0 1 1 0 0 1-2 0m8 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0m-3-1a1 1 0 1 1 0 2 1 1 0 0 1 0-2M4 5.5a.5.5 0 0 1 .5-.5h3v3h-3a.5.5 0 0 1-.5-.5zM8.5 8V5h3a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.5.5z"/>
               </svg>
-              <span className="text-base font-semibold text-white group-hover:text-slate-300 transition-colors">LiveRun Mobile</span>
+              <span className="text-base font-semibold text-white group-hover:text-slate-300 transition-colors">Running board</span>
             </a>
             <span
               className="text-xl font-mono font-bold tabular-nums shrink-0"
@@ -610,9 +610,14 @@ export function CrewMobile() {
             >{displayClock}</span>
             <button
               onClick={switchMode}
-              title="Switch mode (guard panel, crew view, planner)"
+              title="Switch mode (guard panel, mobile, planner)"
               className="text-xs text-slate-400 hover:text-slate-200 border border-slate-700 rounded-md px-2 py-1 shrink-0"
             >Switch</button>
+            <button
+              onClick={changeMobileView}
+              title="Change view (Crew jobs or Running board)"
+              className="text-xs text-slate-400 hover:text-slate-200 border border-slate-700 rounded-md px-2 py-1 shrink-0"
+            >View</button>
             <a
               href={helpUrl('crew-view.md')}
               target="_blank"
