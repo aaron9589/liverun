@@ -407,12 +407,66 @@ Per timetable (`TimetableSettings`, edited with the existing auto-assign setting
 | Phase | Contents |
 |-------|----------|
 | 1 | Crew jobs app: mobile view picker at `/mobile` (ask, remember, Change view, `?view=` deep links), Running board label, crew pick, read-only My jobs with live updates and toasts (useful on its own, before requests exist) |
-| 2 | Types + `server/path-requests.js` (submit/withdraw/acknowledge/release/decline/clear, validation, tests) + `path-requests` sync message + `server/audit.js` (log every request action from day one) and the device-id header. Request form + My requests. Planner toast, badge and drawer with Decline |
-| 3 | `pathPlan.ts` (path matching, inferred routes, fallbacks; tests) + `pendingTrain` in `TrainGraph` + edit-bar flow (crew, note, Edit stops) + `/accept` (with retime batch) + undo step |
+| 2 | Types + `server/path-requests.js` (submit/withdraw/acknowledge/release/decline/cancel-ask/cancel-reject/clear, validation, tests) + `path-requests` sync message + `server/audit.js` (log every request action from day one) and the device-id header. Request form + My requests (Withdraw, Ask to cancel). Planner toast, badge and drawer with Decline / Reject cancel |
+| 3 | `pathPlan.ts` (path matching, inferred routes, fallbacks; tests) + `pendingTrain` in `TrainGraph` + edit-bar flow (crew, note, Edit stops) + `/accept` (with retime batch) + `/cancel-approve` + undo step |
 | 4 | Settings, warnings, Requested badges, audit log UI (per-request history, Audit log tab, CSV), user guide + screenshots, OpenAPI/CLAUDE.md |
 
-Phase gate as in the guard-panel spec §14.4: build + tests, Docker + Playwright smoke of touched screens (incl. `BASE_PATH`), Aaron approves before the next phase.
+Who builds what, in which order, is in §12. Phase gate: §12.4.
 
 ## 11. Open questions
 
 None. Draft 1's questions are answered in §0 (P11–P20).
+
+## 12. Delivery plan
+
+Same model as the guard-panel spec §14.
+
+### 12.1 Roles and models
+
+| Role | Model | Responsibilities |
+|------|-------|------------------|
+| **Supervisor** | Opus 5.5 (main session) | Write each phase's contracts (types, API shapes, sync message, hook and pure-function signatures) before dispatching; brief agents; merge worktrees; own `App.tsx` integration where waves would collide; run build, Docker and Playwright checks; review; commit; report at each phase gate |
+| **Implementer: logic** | Opus 5.5 subagent | Code where subtle bugs are expensive: the request state machine and its races (withdraw vs accept), atomic accept/cancel-approve mutations, path-template routing (`pathPlan.ts`) |
+| **Implementer: standard** | Sonnet 5.5 subagent | UI components (Crew jobs, picker, request form, drawer, graph pending train, audit UI), the audit module, settings, docs and screenshots |
+| **Sweeper** | Haiku 5.5 subagent | Read-only leftover checks, and syncing `CLAUDE.md`, README, OpenAPI and CHANGELOG with what was built |
+
+### 12.2 Working rules
+
+- **Contracts first.** Before agents start, the supervisor commits the shared types (`types.ts`: `PathRequest`, `SyncMessage` additions, `Train.request_id`), endpoint request/response shapes, the audit entry shape and the `X-LiveRun-Device` header, and the signatures of `resolveMobileView()` and `planDraft()`. Parallel agents build against these.
+- **Parallel agents get separate files** and run in **isolated git worktrees**. Two agents never edit the same file in the same wave. `App.tsx` and `TrainGraph.tsx` are hotspots: at most one agent touches each per wave, otherwise the supervisor wires them.
+- **New server code goes in new modules** (`server/path-requests.js`, `server/audit.js`), each exporting `register(app, deps)` and called from `index.js` in one line. Train creation shared with `POST /trains` is extracted into a helper rather than copied.
+- **Pure logic is a separate module with unit tests**: mobile view resolution, request validation and transitions, audit helpers, `pathPlan.ts`. Client tests use Vitest; server tests use `node:test`.
+- **Two-device testing**: Playwright runs a phone context (Crew jobs) and a desktop context (planner) against the same server, so the request → toast → plot → accept → job flow is checked end to end. Demo data gains path templates covering a single-path case, an inferred (chained) case and a no-data leg.
+- Branch `feat/path-requests`, **one commit per phase**, no push or PR without asking.
+
+### 12.3 Phases
+
+| Phase | Wave | Agent (model) | Work |
+|-------|------|---------------|------|
+| **1** Crew jobs | 0 | Supervisor | Contracts: `MobileView` type, `resolveMobileView()` / `loadMobileView()` / `saveMobileView()` signatures, Crew jobs props |
+| | 1 ∥ | 1A (Sonnet) | `lib/mode.ts` mobile view functions + tests; `MobilePicker`; `/mobile` entry switch (`?view=` deep links); main picker card → **Mobile**; Running board label and ☰ **Change view** in `CrewMobile` |
+| | 1 ∥ | 1B (Sonnet) | `CrewJobs` view: crew pick (all crews), My jobs (running order, special instructions, aliases, loco, notes, current stop, read-only status), live updates and `diffJobs` toasts via `useLiveTimetable`; never renders `guard_events` |
+| **2** Requests + audit | 0 | Supervisor | Contracts: `PathRequest` types, endpoint shapes, `path-requests` sync message, audit entry shape, device-id header, `api.ts` signatures |
+| | 1 ∥ | 2A (Opus) | `server/path-requests.js`: submit, withdraw (pending/in_review), acknowledge, release, decline, cancel-ask, cancel-reject, clear; validation, 409 state rules, active-timetable check, open-request cap; `{ notify: false }` mutations; `path-requests` message in `sync.js` (on change + after `hello`); tests |
+| | 1 ∥ | 2B (Sonnet) | `server/audit.js`: append-only JSONL, 5 MB rotation, `shortUa()`, query + CSV, `GET /api/audit`; tests. Client device id + header in `api.ts` |
+| | 1 ∥ | 2C (Sonnet) | Crew jobs: request form (stations, sidings, work stops, ready-at, notes, roster combobox), My requests cards (status, Control's note, Withdraw, Ask to cancel) |
+| | 2 | 2D (Sonnet) | Planner: new-request and ask-to-cancel toasts, **Requests** badge, drawer (list, "times from" placeholder, Decline, Return to queue, Reject cancel); sync handling in `App.tsx`. Hooks 2A's handlers into `audit.js` |
+| **3** Plot + accept | 0 | Supervisor | Contracts: `planDraft(request, timetable, clock) → { train, source, warnings }`, `pendingTrain` prop and edit-bar callbacks, accept / cancel-approve bodies |
+| | 1 ∥ | 3A (Opus) | `lib/pathPlan.ts`: single-path match (forward/reversed, most direct), leg graph + Dijkstra on median leg times, no-data fallback, duplicate-station fallback, passing points, start time, terminal-stop rule, station-order storage; Vitest |
+| | 1 ∥ | 3B (Opus) | Server `/accept` (one mutation: state check, `validateRetime`, shared train creation, retime, request update) and `/cancel-approve` (delete train + `cancelled`); audit details for both; tests incl. withdraw-vs-accept race |
+| | 1 ∥ | 3C (Sonnet) | `TrainGraph`: dashed `pendingTrain`, drag/dwell on it, plotting edit bar (crew ▾, note, Edit stops, Accept, Cancel), "crew withdrew" state, warnings |
+| | 2 | 3D (Sonnet) | `App.tsx` wiring: Acknowledge → `planDraft` → graph; Accept with undo step; Cancel → release; Edit stops via `TrainEditor` in draft mode; drawer: Resume plotting, Approve cancel, "times from" line, accepted/cancelled links |
+| **4** Polish + docs | 1 ∥ | 4A (Sonnet) | Per-timetable settings (keys + UI), **Requested** badges in Crew jobs and Running board, crew-overlap and before-clock warnings |
+| | 1 ∥ | 4B (Sonnet) | Audit log UI: per-request history in the drawer, **Audit log** tab with filters, Export CSV |
+| | 2 | 4C (Sonnet) | User guide: Crew jobs and Path requests pages, mobile view picker, Running board rename; demo data (paths, requests); `npm run docs:screenshots` |
+| | 3 | Sweeper (Haiku) | `CLAUDE.md` (key files, endpoints, architecture notes), OpenAPI, README, CHANGELOG; checks: no run-state controls in Crew jobs, no `guard_events` in Crew jobs, guard panel still hides `special_instructions` |
+| **Release** | — | Supervisor + Haiku | Minor version bump, `/code-review` and `/security-review` on the branch (new unauthenticated write endpoints, request text shown to Control, IP/device logging) |
+
+∥ = runs in parallel in separate worktrees.
+
+### 12.4 Phase gate (every phase)
+
+1. `npm run build` (tsc + Vite) and unit tests pass.
+2. `docker compose up -d --build`, then a Playwright smoke test of the screens touched, including under `BASE_PATH=/traingraph`.
+3. From phase 2 on: the two-device flow (phone + planner). Phase 2: submit → toast → decline/withdraw. Phase 3: submit → acknowledge → plot → accept → job on the phone; withdraw while plotting; ask to cancel → approve. Audit entries checked for each step.
+4. Supervisor reviews the diff, commits, and reports to Aaron with a summary and screenshots. **The next phase starts only after Aaron approves.**
