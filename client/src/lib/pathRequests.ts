@@ -62,6 +62,12 @@ export function routeLabel(request: Pick<PathRequest, 'stops'>, stations: Pick<S
 const crewName = (tt: Pick<Timetable, 'crews'>, id: string | undefined): string | null =>
   (id ? tt.crews.find((c) => c.id === id)?.name : null) ?? null;
 
+/** Control's latest note to the crew: on a cancelled request it's the note given when approving the cancel. */
+export function controlNote(r: PathRequest): string | undefined {
+  const note = r.status === 'cancelled' ? r.cancel_ask?.control_note : r.control_note;
+  return note?.trim() || undefined;
+}
+
 /** Headline status for a request card (Control's note on non-declined requests is shown separately). */
 export function requestStatusText(request: PathRequest, timetable: Timetable, myCrewId: string): string {
   switch (request.status) {
@@ -207,11 +213,13 @@ export function requestToasts(
       } else if (r.status === 'accepted') {
         const train = timetable.trains.find((t) => t.id === r.train_id_created);
         const other = r.assigned_crew_id && r.assigned_crew_id !== crewId ? crewName(timetable, r.assigned_crew_id) : null;
-        out.push({ message: `Path accepted → ${train?.name ?? 'new train'}${other ? ` (${other})` : ''}`, tone: 'success' });
+        // The status can arrive just before the re-fetch that brings the train; its "New job" toast names it then.
+        out.push({ message: `Path accepted${train ? ` → ${train.name}` : ''}${other ? ` (${other})` : ''}`, tone: 'success' });
       } else if (r.status === 'in_review') {
         out.push({ message: 'Control is plotting your path', tone: 'info' });
       } else if (r.status === 'cancelled') {
-        out.push({ message: r.control_note?.trim() ? `Cancelled: ${r.control_note.trim()}` : 'Cancelled', tone: 'info' });
+        const note = controlNote(r);
+        out.push({ message: note ? `Cancelled: ${note}` : 'Cancelled', tone: 'info' });
       }
     } else if (r.cancel_ask?.status === 'rejected' && (old.cancel_ask?.status !== 'rejected' || old.cancel_ask.at !== r.cancel_ask.at)) {
       const note = r.cancel_ask.control_note?.trim();

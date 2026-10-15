@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { PathRequest, Timetable } from '../../types';
 import {
-  apiErrorText, cancelAskText, canAskCancel, canWithdraw, isFaded, isOpen, requestStatusText, routeLabel,
+  apiErrorText, cancelAskText, controlNote, canAskCancel, canWithdraw, isFaded, isOpen, requestStatusText, routeLabel,
 } from '../../lib/pathRequests';
 
 interface Props {
@@ -48,7 +48,7 @@ export function RequestCard({ request, timetable, crewId, now, onWithdraw, onAsk
   const closed = !open && request.status !== 'accepted';
   const askLine = cancelAskText(request);
   const status = requestStatusText(request, timetable, crewId);
-  const control = request.control_note?.trim();
+  const control = controlNote(request);
   const ready = request.ready_at ? `Ready at ${request.ready_at}` : 'Ready as soon as possible';
 
   async function run(fn: () => Promise<void>) {

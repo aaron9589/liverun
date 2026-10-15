@@ -1,6 +1,5 @@
 /**
- * Path requests (docs/path-requests-spec.md §1, §4). Phase 2: submit and the
- * request-only transitions; accept / cancel-approve come in phase 3.
+ * Path requests (docs/path-requests-spec.md §1, §4).
  *
  * Stored on the timetable: tt.path_requests[] (PathRequest in client/src/types.ts).
  * Only the ACTIVE timetable takes new submits (400 otherwise).
@@ -15,7 +14,10 @@
  *   POST   /api/timetables/:id/path-requests/:reqId/release     control           in_review → pending;
  *                                                                                 accepted whose train no longer exists → pending (Reopen)
  *   POST   /api/timetables/:id/path-requests/:reqId/decline     control { note }  pending|in_review → declined (note required)
+ *   POST   /api/timetables/:id/path-requests/:reqId/accept      control PathAcceptBody { train, retime?, note? }
+ *                                                                                 in_review → accepted, train created (below)
  *   POST   /api/timetables/:id/path-requests/:reqId/cancel-ask  crew   { crewId, reason? }  accepted, no open ask → cancel_ask open
+ *   POST   /api/timetables/:id/path-requests/:reqId/cancel-approve control { note? } open ask → cancelled, train deleted
  *   POST   /api/timetables/:id/path-requests/:reqId/cancel-reject control { note } open ask → rejected (note required)
  *   DELETE /api/timetables/:id/path-requests?closed=true        control           remove accepted/declined/withdrawn/cancelled
  *                                                                                 (an accepted one with an OPEN cancel ask is kept)
@@ -25,25 +27,56 @@
  * "too many open requests" (50 open per timetable). A missing timetable or
  * request is checked first, then a malformed body, the crew, the state.
  *
- * Every mutation here is request-only: mutateTimetable(..., { notify: false }),
+ * Accept (spec §4.2), all inside ONE notifying mutateTimetable:
+ *   1. the train body: name required (trimmed, ≤ 60), color #hex (3–8) or the
+ *      default, stations exist and are unique, times HH:MM or null, at least 2
+ *      timed stops, guard events valid (events.validateStopsEvents), crewId an
+ *      existing crew or ''/null (unassigned); a malformed retime; note ≤ 300 → 400;
+ *   2. the request is still in_review (else 409 with its status, e.g. withdrawn);
+ *   3. retime (optional, may be empty) via retime.validateRetime: a moved train
+ *      changed meanwhile → 409 { error, status, conflicts };
+ *   4. tt.trains.push(trains.newTrain(ttId, train, { request_id })) — the same
+ *      normalisation and terminal-stop rules as POST /trains;
+ *   5. retime.applyRetime; 6. the request: accepted, train_id_created,
+ *      assigned_crew_id (train crewId || null), control_note (if given).
+ * Cancel-approve (accepted with an OPEN cancel_ask): request cancelled,
+ * cancel_ask approved with control_note = note (if given), and the train
+ * train_id_created deleted if it still exists, in one notifying mutation.
+ *
+ * Every other mutation here is request-only: mutateTimetable(..., { notify: false }),
  * then sync.broadcastPathRequests(id, tt, { requestsOnly: true }) (sends
- * { type: 'path-requests', timetableId, requests, rev }). The sync module also
- * sends the list (without rev) right after 'hello'. The state is checked again
- * inside the mutation; a refusal there throws, so nothing is written and rev
- * doesn't move.
+ * { type: 'path-requests', timetableId, requests, rev }). Accept and
+ * cancel-approve create or delete a train, so they notify ({ notify: true }) and
+ * broadcast WITHOUT rev: the timetable-updated notice makes clients re-fetch.
+ * The sync module also sends the list (without rev) right after 'hello'. The
+ * state is checked again inside the mutation; a refusal there throws, so nothing
+ * is written and rev doesn't move.
  *
  * Every call (ok AND rejected, incl. 400/403/404/409; not GET) is logged with
  * audit.record(req, { actor, crew_id, crew_name, action, outcome, error?,
  * timetable_id, timetable_name, request_id, detail }). Crew actions: the acting
- * crew is body.crewId (self-declared). detail per spec §4.4.
+ * crew is body.crewId (self-declared). detail per spec §4.4; a rejection of a
+ * known request has detail { status }. accept: { train: summariseTrain(new),
+ * assigned_crew (name, or null for unassigned; only when it isn't the requester),
+ * note, moved: [{ name, from: summariseTrain(old).stops, to: …new }] };
+ * cancel-approve: { train: summariseTrain(deleted) | null, note }.
  *
  * Pure, exported for node:test: validateSubmit(tt, body, { id?, now? }) →
  * { request } | { error }, transition(request, action, ctx) → { ok: patch } |
- * { status: <HTTP code>, error }, applyPatch(), clearClosed(), isOpen().
+ * { status: <HTTP code>, error }, validateAcceptTrain(tt, train) → { train } |
+ * { error }, planAccept(tt, reqId, body, { trainId?, now? }) → { plan } |
+ * { status, error, requestStatus?, conflicts? }, applyAccept(tt, plan) → audit
+ * detail, applyPatch(), clearClosed(), isOpen().
  */
 
 const { randomUUID } = require('crypto');
+const { newTrain } = require('./trains');
+const { validateRetime, applyRetime } = require('./retime');
+const { validateStopsEvents } = require('./events');
+const { summariseTrain } = require('./audit');
 
+const COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
+const MAX_TRAIN_NAME = 60;
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const KINDS = new Set(['stop', 'shunt', 'work']);
 const OPEN = new Set(['pending', 'in_review']);
@@ -164,12 +197,15 @@ function validateSubmit(tt, body, { id = randomUUID(), now = new Date().toISOStr
 }
 
 /**
- * The state machine for the phase-2 actions. ctx: { crewId (acting crew, crew
- * actions), note, reason, trainExists (release: the accepted train is still in
- * the timetable), now }. Returns { ok: patch } (keys set to undefined are
- * removed by applyPatch) or { status: 400|403|409, error }.
+ * The request state machine. ctx: { crewId (acting crew, crew actions), note,
+ * reason, trainExists (release: the accepted train is still in the timetable),
+ * trainCreated + assignedCrewId (accept: the new train's id and crew), now }.
+ * Returns { ok: patch } (keys set to undefined are removed by applyPatch) or
+ * { status: 400|403|409, error }.
  */
-function transition(request, action, { crewId, note, reason, trainExists = true, now = new Date().toISOString() } = {}) {
+function transition(request, action, {
+  crewId, note, reason, trainExists = true, trainCreated, assignedCrewId = null, now = new Date().toISOString(),
+} = {}) {
   const status = request.status;
   const wrongState = (what) => ({ status: 409, error: `Can't ${what}: the request is ${STATE_LABEL[status] || status}` });
   const notRequester = (what) => (crewId !== request.crew_id
@@ -222,6 +258,25 @@ function transition(request, action, { crewId, note, reason, trainExists = true,
       if (!request.cancel_ask || request.cancel_ask.status !== 'open') return { status: 409, error: 'There is no open ask to cancel' };
       return { ok: { cancel_ask: { ...request.cancel_ask, status: 'rejected', control_note: n.value }, updated_at: now } };
     }
+    case 'accept': {
+      const n = text(note, MAX_LEN.controlNote, 'Note');
+      if (n.error) return { status: 400, error: n.error };
+      if (status !== 'in_review') return wrongState('accept it');
+      return { ok: {
+        status: 'accepted', train_id_created: trainCreated, assigned_crew_id: assignedCrewId || null,
+        control_note: n.value || undefined, updated_at: now,
+      } };
+    }
+    case 'cancel-approve': {
+      const n = text(note, MAX_LEN.controlNote, 'Note');
+      if (n.error) return { status: 400, error: n.error };
+      if (status !== 'accepted') return wrongState('approve the cancel');
+      if (!request.cancel_ask || request.cancel_ask.status !== 'open') return { status: 409, error: 'There is no open ask to cancel' };
+      const { control_note: _old, ...ask } = request.cancel_ask;
+      return { ok: {
+        status: 'cancelled', cancel_ask: { ...ask, status: 'approved', ...(n.value ? { control_note: n.value } : {}) }, updated_at: now,
+      } };
+    }
     default:
       return { status: 400, error: `Unknown action: ${action}` };
   }
@@ -242,6 +297,124 @@ function clearClosed(requests) {
   return { kept: requests.filter((r) => !closed(r)), removed: requests.filter(closed) };
 }
 
+/** An optional string field: absent/null is fine, anything but a string is an error. */
+function optionalString(v, what) {
+  return v === undefined || v === null || typeof v === 'string' ? null : `${what} must be text`;
+}
+
+/**
+ * Checks the train of an accept body (camelCase TrainRequest) against the
+ * timetable. Stricter than POST /trains: stations must exist and be unique,
+ * times must be HH:MM or null ('' counts as null), at least 2 stops must have a
+ * time, and the crew must exist (''/null = unassigned). → { train } (a clean
+ * body for trains.newTrain) | { error }.
+ */
+function validateAcceptTrain(tt, train) {
+  if (!isPlainObject(train)) return { error: 'train must be an object' };
+  if (typeof train.name !== 'string' || !train.name.trim()) return { error: 'Train name is required' };
+  const name = train.name.trim();
+  if (name.length > MAX_TRAIN_NAME) return { error: `Train name is longer than ${MAX_TRAIN_NAME} characters` };
+  if (train.color !== undefined && train.color !== null && train.color !== ''
+    && !(typeof train.color === 'string' && COLOR_RE.test(train.color))) {
+    return { error: 'Train colour must be a #hex colour' };
+  }
+  for (const [key, what] of [['notes', 'Train notes'], ['trainId', 'Train ID'], ['direction', 'Direction']]) {
+    const e = optionalString(train[key], what);
+    if (e) return { error: e };
+  }
+  let crewId = null;
+  if (train.crewId !== undefined && train.crewId !== null && train.crewId !== '') {
+    const crew = typeof train.crewId === 'string' ? (tt.crews || []).find((c) => c.id === train.crewId) : null;
+    if (!crew) return { error: 'Unknown crew' };
+    crewId = crew.id;
+  }
+
+  if (!Array.isArray(train.stops)) return { error: 'train.stops must be an array' };
+  const stations = new Map((tt.stations || []).map((s) => [s.id, s]));
+  const seen = new Set();
+  const stops = [];
+  let timed = 0;
+  for (let i = 0; i < train.stops.length; i++) {
+    const s = train.stops[i];
+    const at = `train.stops[${i}]`;
+    if (!isPlainObject(s)) return { error: `${at} must be an object` };
+    const station = typeof s.stationId === 'string' ? stations.get(s.stationId) : undefined;
+    if (!station) return { error: `${at}: unknown station` };
+    if (seen.has(station.id)) return { error: `${station.name} appears twice: each station can be visited once` };
+    seen.add(station.id);
+    const times = {};
+    for (const key of ['arrival', 'departure']) {
+      const v = s[key];
+      if (v === undefined || v === null || v === '') times[key] = null;
+      else if (typeof v === 'string' && HHMM_RE.test(v)) times[key] = v;
+      else return { error: `${at}: ${key} must be HH:MM or null` };
+    }
+    if (times.arrival || times.departure) timed++;
+    for (const [key, what] of [['specialInstructions', 'special instructions'], ['locationAlias', 'siding']]) {
+      const e = optionalString(s[key], `${at} ${what}`);
+      if (e) return { error: e };
+    }
+    stops.push({
+      stationId: station.id, ...times,
+      specialInstructions: s.specialInstructions, locationAlias: s.locationAlias, guardEvents: s.guardEvents,
+    });
+  }
+  if (timed < 2) return { error: 'The train needs at least 2 stops with a time' };
+  const ev = validateStopsEvents(train.stops);
+  if (ev.error) return { error: ev.error };
+
+  return { train: {
+    name, color: train.color || undefined, notes: train.notes || '', trainId: train.trainId || '',
+    direction: train.direction || '', crewId, stops,
+  } };
+}
+
+/**
+ * Everything accept checks, against one timetable, in the 404 → 400 → 409
+ * order. → { plan: { request, train (stored), changes, patch } } |
+ * { status, error, requestStatus?, conflicts? }. Pure; nothing is changed.
+ */
+function planAccept(tt, reqId, body, { trainId = randomUUID(), now = new Date().toISOString() } = {}) {
+  const request = (tt.path_requests || []).find((r) => r.id === reqId);
+  if (!request) return { status: 404, error: 'Request not found' };
+  const requestStatus = request.status;
+  const bad = (error) => ({ status: 400, error, requestStatus });
+  if (!isPlainObject(body)) return bad('Request body must be an object');
+  const t = validateAcceptTrain(tt, body.train);
+  if (t.error) return bad(t.error);
+  if (body.retime !== undefined && body.retime !== null && !Array.isArray(body.retime)) return bad('retime must be an array');
+  const changes = body.retime || [];
+  const check = changes.length ? validateRetime(tt, changes) : {};
+  if (check.error) return bad(`retime: ${check.error}`);
+  const r = transition(request, 'accept', { note: body.note, trainCreated: trainId, assignedCrewId: t.train.crewId, now });
+  if (!r.ok) return { ...r, requestStatus };
+  if (check.conflicts) {
+    return { status: 409, error: `Not saved: ${check.conflicts.join('; ')}`, requestStatus, conflicts: check.conflicts };
+  }
+  const train = newTrain(tt.id, t.train, { request_id: request.id }, trainId);
+  return { plan: { request, train, changes, patch: r.ok } };
+}
+
+/** Applies a plan from planAccept to the same timetable. → the audit detail. */
+function applyAccept(tt, { request, train, changes, patch }) {
+  const summary = (tr) => summariseTrain(tr, tt.stations, tt.crews);
+  const before = changes.map((c) => summary(tt.trains.find((x) => x.id === c.trainId)));
+  tt.trains.push(train);
+  applyRetime(tt, changes);
+  applyPatch(request, patch);
+  const moved = changes.map((c, i) => ({
+    name: before[i].name, from: before[i].stops, to: summary(tt.trains.find((x) => x.id === c.trainId)).stops,
+  }));
+  const detail = { train: summary(train) };
+  if (request.assigned_crew_id !== request.crew_id) {
+    const crew = (tt.crews || []).find((c) => c.id === request.assigned_crew_id);
+    detail.assigned_crew = crew ? crew.name : null;
+  }
+  detail.note = request.control_note ?? null;
+  detail.moved = moved;
+  return detail;
+}
+
 /** What the audit entry records for a successful transition (spec §4.4). */
 function detailFor(action, before, patch) {
   switch (action) {
@@ -256,10 +429,11 @@ function detailFor(action, before, patch) {
 
 /** Thrown inside a mutateTimetable callback to abort it, so nothing is written. */
 class Refusal extends Error {
-  constructor(status, error, requestStatus) {
+  constructor(status, error, requestStatus, extra = {}) {
     super(error);
     this.status = status;
     this.requestStatus = requestStatus;
+    this.extra = extra;
   }
 }
 
@@ -291,23 +465,27 @@ function register(app, { readDB, getTimetable, mutateTimetable, normalise, sync,
     });
   }
 
-  function refuse(res, log, status, error, requestStatus) {
+  function refuse(res, log, status, error, requestStatus, extra = {}) {
     log('rejected', { error, ...(requestStatus ? { detail: { status: requestStatus } } : {}) });
-    return res.status(status).json(status === 409 && requestStatus ? { error, status: requestStatus } : { error });
+    return res.status(status).json(status === 409 && requestStatus ? { error, status: requestStatus, ...extra } : { error });
   }
 
-  /** Request-only mutation; a Refusal thrown by fn aborts it. → { tt } | { refusal } */
-  function mutateRequests(id, fn) {
+  /**
+   * Request-only mutation (or, with notify, one that changes trains too); a
+   * Refusal thrown by fn aborts it. → { tt } | { refusal }
+   */
+  function mutateRequests(id, fn, { notify = false } = {}) {
     try {
-      return { tt: mutateTimetable(id, fn, { notify: false }) };
+      return { tt: mutateTimetable(id, fn, { notify }) };
     } catch (err) {
       if (err instanceof Refusal) return { refusal: err };
       throw err;
     }
   }
 
-  function done(res, id, updated, code = 200) {
-    sync.broadcastPathRequests(id, updated, { requestsOnly: true });
+  /** Success: broadcast the requests (with rev only for request-only changes) and reply. */
+  function done(res, id, updated, code = 200, { requestsOnly = true } = {}) {
+    sync.broadcastPathRequests(id, updated, requestsOnly ? { requestsOnly: true } : undefined);
     return res.status(code).json(normalise(updated));
   }
 
@@ -377,6 +555,62 @@ function register(app, { readDB, getTimetable, mutateTimetable, normalise, sync,
     });
   }
 
+  // Accept: create the train, apply the retime, request → accepted. One notifying mutation.
+  app.post(`${base}/:reqId/accept`, (req, res) => {
+    const { id, reqId } = req.params;
+    const tt = getTimetable(id);
+    const log = logger(req, { actor: 'control', action: 'accept', tt });
+    if (!tt) return refuse(res, log, 404, 'Timetable not found');
+    const refuseCheck = (c) => refuse(res, log, c.status, c.error, c.requestStatus, c.conflicts ? { conflicts: c.conflicts } : {});
+    const first = planAccept(tt, reqId, req.body);
+    if (!first.plan) return refuseCheck(first);
+
+    let detail;
+    const result = mutateRequests(id, (t) => {
+      const check = planAccept(t, reqId, req.body);
+      if (!check.plan) throw new Refusal(check.status, check.error, check.requestStatus, check.conflicts ? { conflicts: check.conflicts } : {});
+      detail = applyAccept(t, check.plan);
+    }, { notify: true });
+    if (result.refusal) {
+      const { status, message, requestStatus, extra } = result.refusal;
+      return refuse(res, log, status, message, requestStatus, extra);
+    }
+    if (!result.tt) return refuse(res, log, 404, 'Timetable not found');
+    log('ok', { detail });
+    return done(res, id, result.tt, 200, { requestsOnly: false });
+  });
+
+  // Approve a crew's ask to cancel: delete the train (if still there), request → cancelled.
+  app.post(`${base}/:reqId/cancel-approve`, (req, res) => {
+    const { id, reqId } = req.params;
+    const body = isPlainObject(req.body) ? req.body : {};
+    const tt = getTimetable(id);
+    const log = logger(req, { actor: 'control', action: 'cancel-approve', tt });
+    if (!tt) return refuse(res, log, 404, 'Timetable not found');
+
+    const attempt = (t) => {
+      const request = (t.path_requests || []).find((r) => r.id === reqId);
+      if (!request) return { request: null, result: { status: 404, error: 'Request not found' } };
+      return { request, result: transition(request, 'cancel-approve', { note: body.note }) };
+    };
+    const first = attempt(tt);
+    if (!first.result.ok) return refuse(res, log, first.result.status, first.result.error, first.request && first.request.status);
+
+    let detail;
+    const result = mutateRequests(id, (t) => {
+      const { request, result: r } = attempt(t);
+      if (!r.ok) throw new Refusal(r.status, r.error, request && request.status);
+      const train = request.train_id_created ? (t.trains || []).find((tr) => tr.id === request.train_id_created) : null;
+      detail = { train: train ? summariseTrain(train, t.stations, t.crews) : null, note: r.ok.cancel_ask.control_note ?? null };
+      if (train) t.trains = t.trains.filter((tr) => tr.id !== train.id);
+      applyPatch(request, r.ok);
+    }, { notify: true });
+    if (result.refusal) return refuse(res, log, result.refusal.status, result.refusal.message, result.refusal.requestStatus);
+    if (!result.tt) return refuse(res, log, 404, 'Timetable not found');
+    log('ok', { detail });
+    return done(res, id, result.tt, 200, { requestsOnly: false });
+  });
+
   app.delete(base, (req, res) => {
     const { id } = req.params;
     const tt = getTimetable(id);
@@ -400,4 +634,6 @@ function register(app, { readDB, getTimetable, mutateTimetable, normalise, sync,
   });
 }
 
-module.exports = { register, validateSubmit, transition, applyPatch, clearClosed, isOpen, MAX_OPEN };
+module.exports = {
+  register, validateSubmit, transition, validateAcceptTrain, planAccept, applyAccept, applyPatch, clearClosed, isOpen, MAX_OPEN,
+};

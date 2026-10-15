@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PathRequest, Timetable, Train } from '../types';
 import {
   apiErrorText, buildSubmit, canSubmit, defaultFrom, myRequests, requestStatusText, requestToasts, routeLabel,
-  cancelAskText, canAskCancel, isFaded, type RequestDraft,
+  cancelAskText, canAskCancel, controlNote, isFaded, type RequestDraft,
 } from './pathRequests';
 
 const stations = [
@@ -197,5 +197,14 @@ describe('requestToasts', () => {
     expect(requestToasts([req({ crew_id: 'c3' })], [req({ crew_id: 'c3', status: 'declined' })], 'c1', t)).toEqual([]);
     expect(requestToasts([req()], [req()], 'c1', t)).toEqual([]);
     expect(after({ status: 'withdrawn' })).toEqual([]);
+  });
+});
+
+describe('controlNote', () => {
+  it('uses the cancel-approval note on a cancelled request', () => {
+    const base = { id: 'r', timetable_id: 't', crew_id: 'c', stops: [], created_at: '', updated_at: '', control_note: 'Via the loop' };
+    expect(controlNote({ ...base, status: 'accepted' } as PathRequest)).toBe('Via the loop');
+    expect(controlNote({ ...base, status: 'cancelled', cancel_ask: { at: '', status: 'approved', control_note: ' Loco swapped ' } } as PathRequest)).toBe('Loco swapped');
+    expect(controlNote({ ...base, status: 'cancelled', cancel_ask: { at: '', status: 'approved' } } as PathRequest)).toBeUndefined();
   });
 });

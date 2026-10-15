@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PathRequest, Timetable } from '../../types';
 import { api } from '../../api';
+import { describeSource, planRoute } from '../../lib/pathPlan';
 import { ageLabel, hasOpenAsk, isOpenRequest, routeSummary, sortRequests } from '../../lib/requestQueue';
 
 // Right-hand drawer for Control's path-request queue (docs/path-requests-spec.md §5.1).
@@ -11,6 +12,8 @@ interface Props {
   /** Request to scroll to and highlight (from a toast's Review button). */
   focusId?: string | null;
   onTimetable: (tt: Timetable) => void;
+  /** Acknowledge (pending) or resume (in_review) and open the request on the graph. Throws on failure. */
+  onStartPlot: (requestId: string, acknowledge: boolean) => Promise<void>;
   /** Highlights a train on the graph while the pointer is over its link; null clears. */
   onHighlightTrain?: (trainId: string | null) => void;
   onClose: () => void;
@@ -31,7 +34,7 @@ const STATUS_LABEL: Record<PathRequest['status'], string> = {
   cancelled: 'Cancelled',
 };
 
-export function RequestsDrawer({ timetable, focusId, onTimetable, onHighlightTrain, onClose }: Props) {
+export function RequestsDrawer({ timetable, focusId, onTimetable, onStartPlot, onHighlightTrain, onClose }: Props) {
   const requests = useMemo(() => sortRequests(timetable.path_requests ?? []), [timetable.path_requests]);
   const [now, setNow] = useState(() => Date.now());
   const [clearError, setClearError] = useState<string | null>(null);
@@ -73,6 +76,7 @@ export function RequestsDrawer({ timetable, focusId, onTimetable, onHighlightTra
             now={now}
             focused={r.id === focusId}
             onTimetable={onTimetable}
+            onStartPlot={onStartPlot}
             onHighlightTrain={onHighlightTrain}
           />
         ))}
@@ -92,19 +96,30 @@ export function RequestsDrawer({ timetable, focusId, onTimetable, onHighlightTra
   );
 }
 
-type NoteMode = null | 'decline' | 'reject';
+type NoteMode = null | 'decline' | 'reject' | 'approve';
 
-function RequestRow({ request: r, timetable, now, focused, onTimetable, onHighlightTrain }: {
+/** "Path Kiama–Bombo" etc. The planner may not be able to work a request out; never break the row. */
+function timesFrom(r: PathRequest, timetable: Timetable): string {
+  try {
+    const { source, legs } = planRoute(r, timetable);
+    const name = (id: string) => timetable.stations.find((s) => s.id === id)?.name ?? '?';
+    return describeSource(source, legs, name);
+  } catch {
+    return 'Times: worked out when plotted';
+  }
+}
+
+function RequestRow({ request: r, timetable, now, focused, onTimetable, onStartPlot, onHighlightTrain }: {
   request: PathRequest;
   timetable: Timetable;
   now: number;
   focused: boolean;
   onTimetable: (tt: Timetable) => void;
+  onStartPlot: (requestId: string, acknowledge: boolean) => Promise<void>;
   onHighlightTrain?: (trainId: string | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [acked, setAcked] = useState(false);
   const [noteMode, setNoteMode] = useState<NoteMode>(null);
   const [note, setNote] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -115,14 +130,17 @@ function RequestRow({ request: r, timetable, now, focused, onTimetable, onHighli
   const open = isOpenRequest(r);
   const ask = hasOpenAsk(r) ? r.cancel_ask : undefined;
 
-  async function run(call: () => Promise<Timetable>, after?: () => void) {
+  // Only worked out while the request is open: closed rows don't need the route.
+  const timesLine = useMemo(() => (open && r.status !== 'accepted' ? timesFrom(r, timetable) : null), [open, r, timetable]);
+
+  async function run(call: () => Promise<Timetable | void>) {
     setBusy(true);
     setError(null);
     try {
-      onTimetable(await call());
+      const result = await call();
+      if (result) onTimetable(result);
       setNoteMode(null);
       setNote('');
-      after?.();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -153,7 +171,7 @@ function RequestRow({ request: r, timetable, now, focused, onTimetable, onHighli
       <div className="mt-1 text-xs text-slate-400">
         Ready: {r.ready_at ? r.ready_at : 'ASAP'}
         <span className="mx-1.5 text-slate-600">·</span>
-        <span className="text-slate-500">Times: worked out when plotted</span>
+        {timesLine && <span className="text-slate-500">{timesLine}</span>}
       </div>
       {r.notes && <div className="mt-1 text-xs text-slate-300 whitespace-pre-wrap">{r.notes}</div>}
 
@@ -166,7 +184,7 @@ function RequestRow({ request: r, timetable, now, focused, onTimetable, onHighli
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {r.status === 'pending' && (
           <>
-            <button className={primary} disabled={busy} onClick={() => run(() => api.acknowledgePathRequest(timetable.id, r.id), () => setAcked(true))}>
+            <button className={primary} disabled={busy} onClick={() => run(() => onStartPlot(r.id, true))}>
               Acknowledge &amp; plot
             </button>
             <button className={danger} disabled={busy} onClick={() => setNoteMode(noteMode === 'decline' ? null : 'decline')}>Decline</button>
@@ -174,7 +192,10 @@ function RequestRow({ request: r, timetable, now, focused, onTimetable, onHighli
         )}
         {r.status === 'in_review' && (
           <>
-            <button className={secondary} disabled={busy} onClick={() => run(() => api.releasePathRequest(timetable.id, r.id), () => setAcked(false))}>
+            <button className={primary} disabled={busy} onClick={() => run(() => onStartPlot(r.id, false))}>
+              Resume plotting
+            </button>
+            <button className={secondary} disabled={busy} onClick={() => run(() => api.releasePathRequest(timetable.id, r.id))}>
               Return to queue
             </button>
             <button className={danger} disabled={busy} onClick={() => setNoteMode(noteMode === 'decline' ? null : 'decline')}>Decline</button>
@@ -198,7 +219,7 @@ function RequestRow({ request: r, timetable, now, focused, onTimetable, onHighli
             )}
             {ask && (
               <>
-                <button className={`${btn} border-slate-700 text-slate-500`} disabled title="Coming in the next update">Approve cancel</button>
+                <button className={primary} disabled={busy} onClick={() => setNoteMode(noteMode === 'approve' ? null : 'approve')}>Approve cancel</button>
                 <button className={danger} disabled={busy} onClick={() => setNoteMode(noteMode === 'reject' ? null : 'reject')}>Reject</button>
               </>
             )}
@@ -209,10 +230,6 @@ function RequestRow({ request: r, timetable, now, focused, onTimetable, onHighli
         )}
       </div>
 
-      {acked && r.status === 'in_review' && (
-        <div className="mt-2 text-xs text-slate-400">Acknowledged — plotting arrives in the next update.</div>
-      )}
-
       {noteMode && (
         <div className="mt-2 space-y-1.5">
           <textarea
@@ -220,18 +237,21 @@ function RequestRow({ request: r, timetable, now, focused, onTimetable, onHighli
             maxLength={300}
             rows={2}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={noteMode === 'decline' ? 'Reason for the crew (required)' : 'Why the train stays (required)'}
+            placeholder={noteMode === 'decline' ? 'Reason for the crew (required)' : noteMode === 'reject' ? 'Why the train stays (required)' : 'Note for the crew (optional)'}
             className="w-full rounded bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500"
           />
           <div className="flex gap-1.5">
             <button
               className={danger}
-              disabled={busy || !note.trim()}
+              disabled={busy || (noteMode !== 'approve' && !note.trim())}
               onClick={() => run(() => noteMode === 'decline'
                 ? api.declinePathRequest(timetable.id, r.id, note.trim())
-                : api.rejectCancelPathRequest(timetable.id, r.id, note.trim()))}
+                : noteMode === 'reject'
+                  ? api.rejectCancelPathRequest(timetable.id, r.id, note.trim())
+                  // Deletes the train but is deliberately not an undo step: requests don't follow undo.
+                  : api.approveCancelPathRequest(timetable.id, r.id, note.trim() || undefined))}
             >
-              {noteMode === 'decline' ? 'Decline request' : 'Reject cancel'}
+              {noteMode === 'decline' ? 'Decline request' : noteMode === 'reject' ? 'Reject cancel' : 'Approve and delete train'}
             </button>
             <button className={secondary} onClick={() => { setNoteMode(null); setNote(''); }}>Cancel</button>
           </div>

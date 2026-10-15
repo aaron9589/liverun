@@ -10,6 +10,7 @@ const events = require('./events');
 const { readDB, writeDB, getTimetable, mutateTimetable, onTimetableChange, uuidv4, getLayout, setLayout } = require('./db');
 const openApiSpec = require('./openapi');
 const { stripTrainType } = require('./migrations');
+const { newTrain, buildStops, stripTerminalTimes, withGuardEvents, normTime } = require('./trains');
 const layoutRoutes = require('./layout');
 const { WS_SYNC_PATH, createSync } = require('./sync');
 const loaCacheRoutes = require('./loa-cache');
@@ -545,19 +546,12 @@ app.delete('/api/timetables/:id/paths/:pathId', (req, res) => {
 });
 
 app.post('/api/timetables/:id/trains', (req, res) => {
-  const { name, color, notes, trainId: trainIdField, direction, crewId, stops } = req.body;
+  const { name, stops } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const evCheck = events.validateStopsEvents(stops);
   if (evCheck.error) return res.status(400).json({ error: evCheck.error });
-  const trainId = uuidv4();
   const updated = mutateTimetable(req.params.id, (tt) => {
-    tt.trains.push({
-      id: trainId, timetable_id: req.params.id, name: name.trim(),
-      color: color || '#3b82f6', notes: notes || '',
-      train_id: trainIdField || '', direction: direction || '',
-      crew_id: crewId || null,
-      stops: buildStops(trainId, stops || []),
-    });
+    tt.trains.push(newTrain(req.params.id, req.body));
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.status(201).json(normalise(updated));
@@ -693,66 +687,6 @@ function buildPathStops(pathId, stops) {
  * Also removes any stops that ended up with both times null (e.g. from a
  * previous buggy migration run).
  */
-function stripTerminalTimes(stops) {
-  if (!stops || stops.length === 0) return stops;
-  function stopMins(s) {
-    const t = s.departure || s.arrival;
-    if (!t) return Infinity;
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
-  }
-  // Only consider stops that actually have a time when finding first/last
-  const timedStops = stops.filter((s) => s.arrival || s.departure);
-  if (timedStops.length === 0) return stops;
-  const sorted = [...timedStops].sort((a, b) => stopMins(a) - stopMins(b));
-  const firstId = sorted[0]?.id ?? sorted[0]?.station_id;
-  const lastId  = sorted[sorted.length - 1]?.id ?? sorted[sorted.length - 1]?.station_id;
-  if (firstId === lastId) return stops; // single-stop train — nothing to strip
-  return stops
-    .map((s) => {
-      const key = s.id ?? s.station_id;
-      if (key === firstId) {
-        // Origin: departure only — unless the stop has a meaningful dwell (arrival ≠ departure).
-        if (s.arrival && s.departure && s.arrival !== s.departure) return s;
-        const dep = s.departure || s.arrival;
-        return { ...s, arrival: null, departure: dep };
-      }
-      if (key === lastId) {
-        // Destination: arrival only — unless the stop has a meaningful dwell (arrival ≠ departure).
-        if (s.arrival && s.departure && s.arrival !== s.departure) return s;
-        const arr = s.arrival || s.departure;
-        return { ...s, arrival: arr, departure: null };
-      }
-      return s;
-    })
-    .filter((s) => s.arrival || s.departure); // drop any null-null stops
-}
-
-function withGuardEvents(list) {
-  const g = events.sanitizePlacements(list);
-  return g ? { guard_events: g } : {};
-}
-
-function buildStops(trainId, stops) {
-  const built = stops
-    .filter((s) => s.arrival || s.departure)
-    .map((s) => ({
-      id: uuidv4(), train_id: trainId, station_id: s.stationId,
-      arrival: s.arrival || null, departure: s.departure || null,
-      special_instructions: s.specialInstructions || null,
-      location_alias: s.locationAlias || null,
-      ...withGuardEvents(s.guardEvents),
-    }));
-  return stripTerminalTimes(built);
-}
-
-function normTime(t) {
-  if (!t || typeof t !== 'string') return t;
-  const parts = t.split(':');
-  if (parts.length < 2) return t;
-  return parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0');
-}
-
 function normalise(tt) {
   return {
     ...tt,

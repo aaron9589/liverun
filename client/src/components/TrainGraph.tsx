@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Timetable, Train, TrainStop } from '../types';
 import { timeToMinutes, minutesToTime, stationNameStyle } from '../utils';
+import { PlottingBar } from './PlottingBar';
 import { changeDwell, dwellOf, sameTimes, shiftStops, type TimeKind } from '../lib/trainDrag';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
@@ -94,6 +95,8 @@ interface TooltipData {
   trainId?: string;
   direction?: string;
   nextService?: { name: string; time: string };
+  /** Pending request train: its work stops / special instructions, one line each. */
+  stopNotes?: string[];
 }
 
 function findNextService(train: Train, allTrains: Train[]): { name: string; time: string } | undefined {
@@ -170,6 +173,16 @@ function GraphTooltip({ data }: { data: TooltipData }) {
           <span className="text-slate-400 text-xs">{data.train.notes}</span>
         </div>
       )}
+      {data.stopNotes && data.stopNotes.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-slate-700 space-y-0.5">
+          {data.stopNotes.map((n, i) => (
+            <div key={i} className="flex items-start gap-1.5">
+              <span className="w-1.5 h-1.5 mt-1 rounded-full bg-amber-400 shrink-0" />
+              <span className="text-slate-400 text-xs">{n}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {data.hasSpecialInstructions && (
         <div className="mt-2 pt-2 border-t border-slate-700 flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
@@ -211,6 +224,38 @@ interface Props {
    * nothing was saved, and the drafts stay. Cancel discards everything.
    */
   onTrainTimesCommit?: (changes: { trainId: string; stops: TrainStop[] }[]) => Promise<boolean>;
+  /**
+   * Plotting a path request (docs/path-requests-spec.md §5.3). While set, the graph is
+   * in edit mode with the plotting edit bar instead of Done. The App owns the pending
+   * train; moves of other trains stay drafts inside the graph as usual.
+   */
+  plotting?: PlottingState | null;
+  /** The pending train was dragged / its dwell changed / its crew changed. */
+  onPlotChange?: (train: Train) => void;
+  /** Edit stops: open TrainEditor on the pending train (App replaces it on close). */
+  onPlotEditStops?: () => void;
+  /**
+   * Accept: `others` = every other train moved while plotting (same shape as
+   * onTrainTimesCommit). Resolve true on success (graph clears drafts and leaves
+   * edit mode); false keeps everything as it is.
+   */
+  onPlotAccept?: (others: { trainId: string; stops: TrainStop[] }[], note: string) => Promise<boolean>;
+  /** Cancel: the graph has already discarded all drafts and left edit mode. */
+  onPlotCancel?: () => void;
+}
+
+export interface PlottingState {
+  requestId: string;
+  /** Not in timetable.trains; id from pendingTrainId(). Drawn dashed, labelled "<name> (request)". */
+  train: Train;
+  /** The requesting crew's name, for "Plotting PR3 for Crew 2". */
+  requesterName: string;
+  /** Crew withdrew while plotting: "Crew 2 withdrew this request", Accept disabled. */
+  withdrawn: boolean;
+  /** Non-blocking warnings for the edit bar (path data, clock, crew overlap). */
+  warnings: string[];
+  /** Accept in flight. */
+  busy: boolean;
 }
 
 /** A drag in progress (edit mode): the whole train, or one stop's dwell. */
@@ -231,6 +276,7 @@ export function TrainGraph({
   timetable, onTrainClick, labelMode = 'code', distanceUnit = 'km',
   viewStart: viewStartProp, viewEnd: viewEndProp,
   clockTime, onPan, externalHoveredId, onScaleChange, onTrainTimesCommit,
+  plotting, onPlotChange, onPlotEditStops, onPlotAccept, onPlotCancel,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -252,11 +298,11 @@ export function TrainGraph({
 
   // Unsaved moves: warn before the page is closed or reloaded.
   useEffect(() => {
-    if (draftCount === 0) return;
+    if (draftCount === 0 && !plotting) return;
     const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [draftCount]);
+  }, [draftCount, !!plotting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function finishEditing(save: boolean) {
     // Every draft, including trains hidden or filtered out since they were moved.
@@ -270,6 +316,27 @@ export function TrainGraph({
     setDrafts({});
     setEditMode(false);
   }
+  // Plotting a request: the pending train is dragged like any other, but its moves go to the App.
+  const plottingRef = useRef(plotting);
+  plottingRef.current = plotting;
+  const onPlotChangeRef = useRef(onPlotChange);
+  onPlotChangeRef.current = onPlotChange;
+  const plotId = plotting?.requestId ?? null;
+  const pendingId = plotting?.train.id ?? null;
+
+  async function acceptPlot(note: string) {
+    const list = Object.entries(drafts).map(([trainId, stops]) => ({ trainId, stops }));
+    const ok = await onPlotAccept?.(list, note).catch(() => false);
+    if (!ok) return; // keep the pending train and every draft
+    setDrafts({});
+    setEditMode(false);
+  }
+  function cancelPlot() {
+    setDrafts({});
+    setEditMode(false);
+    onPlotCancel?.();
+  }
+
   // Ref to stable layout values used in external-hover effect (avoids stale closures)
   const layoutRef = useRef({ stationMap: new Map<string, { graph_pos: number; name: string }>(), viewStart: 0, viewEnd: 0, posToY: (_: number) => PAD.top, gw: 0, timetable });
   const needsVScrollRef = useRef(false);
@@ -303,6 +370,20 @@ export function TrainGraph({
   const viewWidth = viewEnd - viewStart;
   const ttRange = ttEnd - ttStart;
   const isZoomed = viewWidth < ttRange;
+
+  // New request to plot: edit mode on (existing drafts stay), then bring its first departure into view.
+  useEffect(() => {
+    const p = plottingRef.current;
+    if (!p) return;
+    setEditMode(true);
+    setTooltip(null);
+    setHoveredId(null);
+    const times = p.train.stops.flatMap((s) => [s.departure, s.arrival]).filter((t): t is string => !!t).map(timeToMinutes);
+    if (times.length === 0 || !onPan) return;
+    const first = Math.min(...times);
+    if (first >= viewStart && first <= viewEnd) return;
+    onPan(Math.max(ttStart, Math.min(ttEnd - viewWidth, first - viewWidth * 0.1)));
+  }, [plotId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Non-passive wheel for pan + Ctrl+scroll vertical scale
   useEffect(() => {
@@ -399,11 +480,12 @@ export function TrainGraph({
    * never does. The result becomes a draft (saved on Done); Escape cancels the drag.
    */
   function startDrag(e: React.MouseEvent, train: Train, dwellStopId: string | null) {
-    if (!editMode || saving || e.button !== 0) return;
+    if (!editMode || saving || plottingRef.current?.busy || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     const pxPerMin = gw / viewWidth;
-    const base = drafts[train.id] ?? train.stops;
+    const pending = train.id === pendingId;
+    const base = pending ? train.stops : (drafts[train.id] ?? train.stops);
     const begin: GraphDrag = { trainId: train.id, dwellStopId, startX: e.clientX, base, stops: base, delta: 0, moved: false };
     dragState.current = begin;
     setDrag(begin);
@@ -432,6 +514,11 @@ export function TrainGraph({
       dragState.current = null;
       setDrag(null);
       if (!keep || !d || d.delta === 0) return;
+      if (pending) {
+        const p = plottingRef.current;
+        if (p) onPlotChangeRef.current?.({ ...p.train, stops: d.stops });
+        return;
+      }
       setDrafts((all) => {
         const next = { ...all };
         // Dragged back to where it started: no longer a change.
@@ -497,6 +584,14 @@ export function TrainGraph({
 
   const effectiveHoveredId = hoveredId ?? externalHoveredId ?? null;
 
+  /** Tooltip extras for the pending train: "(request)" name, work stops and instructions listed. */
+  function pendingTooltip(train: Train): Partial<TooltipData> {
+    const notes = train.stops
+      .filter((s) => s.special_instructions)
+      .map((s) => `${s.location_alias || stationMap.get(s.station_id)?.name || ''}: ${s.special_instructions}`);
+    return { train: { ...train, name: `${train.name} (request)` }, stopNotes: notes, hasSpecialInstructions: false };
+  }
+
   const handleTrainHover = useCallback(
     (train: Train, points: PlotPoint[], e: React.MouseEvent) => {
       const inView = points.filter((p) => p.minutes >= viewStart && p.minutes <= viewEnd);
@@ -517,9 +612,10 @@ export function TrainGraph({
         trainId: train.train_id || undefined,
         direction: train.direction || undefined,
         nextService: findNextService(train, timetable.trains),
+        ...(train.id === pendingId ? pendingTooltip(train) : {}),
       });
     },
-    [viewStart, viewEnd, timetable]
+    [viewStart, viewEnd, timetable, pendingId]
   );
 
   const handleMouseMove = useCallback(
@@ -566,16 +662,28 @@ export function TrainGraph({
 
   return (
     <div ref={containerRef} className="w-full h-full relative flex flex-col select-none overflow-hidden">
+      {plotting && (
+        <PlottingBar
+          key={plotting.requestId}
+          plotting={plotting}
+          crews={timetable.crews}
+          otherMoved={draftCount}
+          onChange={(t) => onPlotChange?.(t)}
+          onEditStops={onPlotEditStops}
+          onCancel={cancelPlot}
+          onAccept={acceptPlot}
+        />
+      )}
       {/* Vertical scale controls */}
       <div className="absolute z-10 flex items-center gap-0.5 bg-slate-900/80 backdrop-blur-sm rounded border border-slate-700/50 overflow-hidden" style={{ top: PAD.top + 4, right: PAD.right + 4 }}>
-        {onTrainTimesCommit && !editMode && (
+        {onTrainTimesCommit && !editMode && !plotting && (
           <button
             onClick={() => { setEditMode(true); setTooltip(null); }}
             title="Edit the graph: drag a train to move it, drag a stop's ◯ handle to change its dwell (later stops follow). Nothing is saved until Done."
             className="h-5 px-1.5 flex items-center gap-1 text-[11px] font-medium transition-colors border-r border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
           >✎ Edit</button>
         )}
-        {onTrainTimesCommit && editMode && (
+        {onTrainTimesCommit && editMode && !plotting && (
           <>
             <span className="h-5 px-1.5 flex items-center text-[11px] text-amber-300 border-r border-slate-700/50 whitespace-nowrap">
               {draftCount === 0 ? 'Drag a train or a ◯ dwell' : `${draftCount} train${draftCount === 1 ? '' : 's'} moved — not saved`}
@@ -736,12 +844,13 @@ export function TrainGraph({
           {/* Train paths — clipped */}
           <g clipPath="url(#graphClip)">
             {/* The hovered / dragged train is drawn last, on top, so its line and handles get the mouse first. */}
-            {[...timetable.trains].sort((a, b) => {
+            {[...[...timetable.trains].sort((a, b) => {
               const top = drag?.trainId ?? effectiveHoveredId;
               return (a.id === top ? 1 : 0) - (b.id === top ? 1 : 0);
-            }).map((train) => {
+            }), ...(plotting ? [plotting.train] : [])].map((train) => {
+              const pending = train.id === pendingId;
               const dragging = drag?.trainId === train.id;
-              const draft = dragging ? drag!.stops : drafts[train.id];
+              const draft = dragging ? drag!.stops : (pending ? undefined : drafts[train.id]);
               const shown = draft ? { ...train, stops: draft } : train;
               const points = buildTrainPoints(shown, stationMap, viewStart, viewEnd, distToY, gw);
               // A moved (unsaved) train keeps a faint dashed ghost of where it was.
@@ -774,7 +883,10 @@ export function TrainGraph({
                   {isRunning && <polyline points={ptStr} fill="none" stroke={train.color} strokeWidth="10" strokeOpacity={0.15} strokeLinejoin="round" strokeLinecap="round" />}
                   {isRunning && <polyline points={ptStr} fill="none" stroke={train.color} strokeWidth="5" strokeOpacity={0.35} strokeLinejoin="round" strokeLinecap="round" />}
                   {isHovered && <polyline points={ptStr} fill="none" stroke={lineColor} strokeWidth="6" strokeOpacity={0.25 * lineOpacity} />}
-                  <polyline points={ptStr} fill="none" stroke={lineColor} strokeOpacity={lineOpacity} strokeWidth={isHovered || isRunning ? 2.5 : 2} strokeLinejoin="round" strokeLinecap="round" strokeDasharray={undefined} />
+                  <polyline points={ptStr} fill="none" stroke={lineColor} strokeOpacity={lineOpacity} strokeWidth={isHovered || isRunning ? 2.5 : 2} strokeLinejoin="round" strokeLinecap="round" strokeDasharray={pending ? '6 4' : undefined} />
+                  {pending && (
+                    <text x={points[0].x + 6} y={points[0].y - 8} fill={lineColor} fontSize="11" fontWeight="600" fontFamily="system-ui, sans-serif" pointerEvents="none">{train.name} (request)</text>
+                  )}
                   {points.map((p, i) => (
                     <circle key={i} cx={p.x} cy={p.y} r="2.5" fill={lineColor} opacity={lineOpacity} />
                   ))}
@@ -848,7 +960,7 @@ export function TrainGraph({
 
       {tooltip && <GraphTooltip data={tooltip} />}
       {drag?.moved && dragAt && (() => {
-        const train = timetable.trains.find((t) => t.id === drag.trainId);
+        const train = timetable.trains.find((t) => t.id === drag.trainId) ?? (drag.trainId === pendingId ? plotting!.train : undefined);
         if (!train) return null;
         const sign = drag.delta > 0 ? '+' : '';
         let text = `${train.name} ${sign}${drag.delta} min`;

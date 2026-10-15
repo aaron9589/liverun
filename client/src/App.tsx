@@ -17,6 +17,9 @@ import { StationReport } from './components/StationReport';
 import { ChangeToasts, useToasts } from './components/ChangeToasts';
 import { RequestsDrawer } from './components/requests/RequestsDrawer';
 import { badgeCount, newRequestEvents, routeEnds } from './lib/requestQueue';
+import { planDraft } from './lib/pathPlan';
+import { draftFromRequest, plotRequestState, retimeFromDrafts } from './lib/plotting';
+import type { PlottingState } from './components/TrainGraph';
 
 // ─── Print helpers ────────────────────────────────────────────────────────────
 
@@ -251,6 +254,21 @@ export default function App() {
   useEffect(() => { setRequestsOpen(false); setFocusRequestId(null); }, [selectedId]);
   const requestToasts = useToasts({ ttlMs: 15_000 });
   const pushRequestToast = requestToasts.push;
+
+  // Plotting a request (docs/path-requests-spec.md §1): the draft train lives here only —
+  // never in timetable.trains or the history stacks — until Accept saves it with the request.
+  type Plotting = { request: PathRequest; train: Train; withdrawn: boolean; busy: boolean; warnings: string[] };
+  const [plotting, setPlotting] = useState<Plotting | null>(null);
+  const [editingPending, setEditingPending] = useState(false);
+  useEffect(() => { setPlotting(null); setEditingPending(false); }, [selectedId]);
+  // The request left review (withdrawn by the crew, declined or returned from the drawer, …).
+  const plottedId = plotting?.request.id;
+  useEffect(() => {
+    if (!plottedId) return;
+    const state = plotRequestState(timetable?.path_requests, plottedId);
+    if (state === 'gone') { setPlotting(null); setEditingPending(false); }
+    else if (state === 'withdrawn') setPlotting((p) => (p && !p.withdrawn ? { ...p, withdrawn: true } : p));
+  }, [timetable?.path_requests, plottedId]);
 
   // ── Sync WebSocket — keep completion state in sync across all clients ────────
   useEffect(() => {
@@ -574,6 +592,73 @@ export default function App() {
       window.alert(`${msg}\n\nYour moves are still on the graph: Done to try again, or Cancel to discard them.`);
       return false;
     }
+  }
+
+  // ── Plotting a path request (docs/path-requests-spec.md §1, §5.3) ──
+
+  /** Server errors arrive as Error(body) with body JSON `{ error }`. */
+  function serverMessage(e: unknown, fallback: string): string {
+    let msg = e instanceof Error ? e.message : fallback;
+    try { msg = (JSON.parse(msg) as { error?: string }).error ?? msg; } catch { /* plain text */ }
+    return msg;
+  }
+
+  /** Drawer: Acknowledge & plot (pending) or Resume plotting (in_review, e.g. after a reload). Throws on failure so the row can show it. */
+  async function handleStartPlot(requestId: string, acknowledge: boolean) {
+    if (!selectedId) return;
+    if (plotting && plotting.request.id !== requestId) {
+      const other = timetable?.crews.find((c) => c.id === plotting.request.crew_id)?.name ?? 'another request';
+      window.alert(`Finish or cancel plotting ${other} first.`);
+      return;
+    }
+    let tt = timetable;
+    if (acknowledge) {
+      tt = await api.acknowledgePathRequest(selectedId, requestId);
+      setTimetable(tt); // request status only: no undo step
+    }
+    const request = tt?.path_requests?.find((r) => r.id === requestId);
+    if (!tt || !request) throw new Error('Request not found');
+    const plan = planDraft(request, tt, clockTime);
+    // Phase 4 adds crew-overlap / clock warnings to this list.
+    setPlotting({ request, train: plan.train, withdrawn: false, busy: false, warnings: [...plan.warnings] });
+    setRequestsOpen(false);
+  }
+
+  function handlePlotEditSave(data: TrainRequest) {
+    setPlotting((p) => (p ? { ...p, train: draftFromRequest(data, p.train) } : p));
+    setEditingPending(false);
+  }
+
+  // One undo step, committed only once the server accepted: a failed Accept leaves history alone.
+  async function handlePlotAccept(others: { trainId: string; stops: TrainStop[] }[], note: string): Promise<boolean> {
+    if (!selectedId || !plotting || !timetableRef.current) return false;
+    const before = stripStatus(timetableRef.current);
+    const { request, train } = plotting;
+    setPlotting((p) => (p ? { ...p, busy: true } : p));
+    try {
+      const { id: _id, ...body } = trainRequest(train);
+      const updated = await api.acceptPathRequest(selectedId, request.id, { train: body, retime: retimeFromDrafts(others), note: note.trim() || undefined });
+      setHistoryPast((prev) => [...prev.slice(-19), before]);
+      setHistoryFuture([]);
+      setTimetable(updated);
+      setPlotting(null);
+      return true;
+    } catch (e) {
+      setPlotting((p) => (p ? { ...p, busy: false } : p));
+      window.alert(`${serverMessage(e, 'Accept failed')}\n\nYour drafts are kept: Accept to try again, or Cancel to discard them.`);
+      return false;
+    }
+  }
+
+  async function handlePlotCancel() {
+    const p = plotting;
+    setPlotting(null);
+    setEditingPending(false);
+    // Withdrawn while plotting: nothing to release (and no rejected call in the audit log).
+    if (!p || !selectedId || p.withdrawn) return;
+    try {
+      setTimetable(await api.releasePathRequest(selectedId, p.request.id));
+    } catch { /* 409: no longer in review (withdrawn / declined elsewhere) — nothing to release */ }
   }
 
   async function handleToggleTrainComplete(trainId: string) {
@@ -1066,6 +1151,18 @@ export default function App() {
               externalHoveredId={hoveredCrewTrainId}
               onScaleChange={(scale) => handleSettingsSave({ ...displayTimetable.settings, graph_scale: scale })}
               onTrainTimesCommit={handleTrainTimesCommit}
+              plotting={plotting ? {
+                requestId: plotting.request.id,
+                train: plotting.train,
+                requesterName: displayTimetable.crews.find((c) => c.id === plotting.request.crew_id)?.name ?? 'a crew',
+                withdrawn: plotting.withdrawn,
+                warnings: plotting.warnings,
+                busy: plotting.busy,
+              } satisfies PlottingState : null}
+              onPlotChange={(train) => setPlotting((p) => (p ? { ...p, train } : p))}
+              onPlotEditStops={() => setEditingPending(true)}
+              onPlotAccept={handlePlotAccept}
+              onPlotCancel={handlePlotCancel}
             />
           )}
         </div>
@@ -1101,6 +1198,23 @@ export default function App() {
         />
       )}
 
+      {editingPending && plotting && timetable && (
+        <TrainEditor
+          train={plotting.train}
+          stations={timetable.stations}
+          paths={timetable.paths}
+          crews={timetable.crews}
+          existingColors={timetable.trains.map((t) => t.color)}
+          distanceUnit={distanceUnit}
+          jmriUrl={layout?.jmri.url}
+          profiles={layout?.train_profiles ?? []}
+          eventLibrary={layout?.events?.library}
+          onDraftChange={() => {}}
+          onSave={handlePlotEditSave}
+          onClose={() => setEditingPending(false)}
+        />
+      )}
+
       {(modal.type === 'newPath' || modal.type === 'editPath') && timetable && (
         <PathEditor
           path={modal.type === 'editPath' ? modal.path : undefined}
@@ -1127,6 +1241,7 @@ export default function App() {
           timetable={timetable}
           focusId={focusRequestId}
           onTimetable={setTimetable}
+          onStartPlot={handleStartPlot}
           onHighlightTrain={setHoveredCrewTrainId}
           onClose={() => setRequestsOpen(false)}
         />

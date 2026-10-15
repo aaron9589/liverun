@@ -200,6 +200,17 @@ export interface PathRequestSubmit {
   notes?: string;
 }
 
+/**
+ * POST /api/timetables/:id/path-requests/:reqId/accept body (spec §4.2). `train` is the
+ * draft as a normal train body (same rules as POST /trains; the server adds request_id).
+ * `retime`: other trains moved while plotting, same shape as /trains/retime changes.
+ */
+export interface PathAcceptBody {
+  train: Omit<TrainRequest, 'id'>;
+  retime?: { trainId: string; times: { stationId: string; arrival: string | null; departure: string | null }[] }[];
+  note?: string;
+}
+
 // ─── Audit log (docs/path-requests-spec.md §4.4) ──────────────────────────────
 
 export type AuditAction =

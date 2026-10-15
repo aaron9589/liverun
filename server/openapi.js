@@ -401,6 +401,107 @@ const spec = {
         },
       },
     },
+    '/api/timetables/{id}/path-requests/{reqId}/accept': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+        { name: 'reqId', in: 'path', required: true, schema: { type: 'string' }, description: 'Path request ID' },
+      ],
+      post: {
+        tags: ['Path requests'],
+        summary: 'Accept a request (Control)',
+        description:
+          'in_review → accepted, in one mutation: creates the train (same normalisation and terminal-stop rules as `POST /trains`, plus `request_id`), ' +
+          'applies `retime` (other trains moved while plotting; same shape and all-or-nothing rules as `POST /trains/retime`), and sets ' +
+          '`train_id_created`, `assigned_crew_id` (the train\'s crew, or null) and `control_note`. ' +
+          'The train needs a name (≤ 60), existing and unique stations, HH:MM or null times with at least 2 timed stops, and an existing crew or none. ' +
+          'Notifying change: the live sync socket sends `timetable-updated` and `path-requests` (without `rev`). ' +
+          'The audit entry records the train, the assigned crew if it isn\'t the requester, the note and each moved train (old → new times).',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['train'],
+                properties: {
+                  train: {
+                    type: 'object',
+                    required: ['name', 'stops'],
+                    properties: {
+                      name: { type: 'string', maxLength: 60, example: 'PR3' },
+                      color: { type: 'string', example: '#3b82f6', description: '#hex; default #3b82f6' },
+                      notes: { type: 'string' },
+                      trainId: { type: 'string', example: '3001', description: 'JMRI roster name' },
+                      direction: { type: 'string', example: 'Up' },
+                      crewId: { type: 'string', nullable: true, description: 'Empty or null = unassigned' },
+                      stops: {
+                        type: 'array',
+                        description: 'Station order; stops without a time are dropped',
+                        items: {
+                          type: 'object',
+                          required: ['stationId'],
+                          properties: {
+                            stationId: { type: 'string' },
+                            arrival: { type: 'string', nullable: true, example: '14:20' },
+                            departure: { type: 'string', nullable: true, example: '14:30' },
+                            specialInstructions: { type: 'string' },
+                            locationAlias: { type: 'string', nullable: true },
+                            guardEvents: { type: 'array', items: { type: 'object' } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  retime: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['trainId', 'times'],
+                      properties: {
+                        trainId: { type: 'string' },
+                        times: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            required: ['stationId'],
+                            properties: {
+                              stationId: { type: 'string' },
+                              arrival: { type: 'string', nullable: true },
+                              departure: { type: 'string', nullable: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  note: { type: 'string', maxLength: 300, description: 'Optional note to the crew (`control_note`)' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Full updated timetable' },
+          400: { description: 'Malformed train, retime or note' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: {
+            description: 'Not in review any more (e.g. withdrawn meanwhile), or a moved train changed after it was moved (`conflicts`). Nothing is saved.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error: { type: 'string' },
+                    status: { type: 'string', example: 'withdrawn' },
+                    conflicts: { type: 'array', items: { type: 'string' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     '/api/timetables/{id}/path-requests/{reqId}/cancel-ask': {
       parameters: [
         { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
@@ -415,6 +516,27 @@ const spec = {
           200: { description: 'Full updated timetable' },
           400: { description: 'Reason longer than 300 characters' },
           403: { description: 'Not the requesting crew' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { $ref: '#/components/responses/WrongState' },
+        },
+      },
+    },
+    '/api/timetables/{id}/path-requests/{reqId}/cancel-approve': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+        { name: 'reqId', in: 'path', required: true, schema: { type: 'string' }, description: 'Path request ID' },
+      ],
+      post: {
+        tags: ['Path requests'],
+        summary: 'Approve a crew\'s ask to cancel (Control)',
+        description:
+          'Open cancel ask → approved (optional note as `cancel_ask.control_note`), request → cancelled, and the train it created is deleted ' +
+          '(if it still exists) in the same mutation. Notifying change: the live sync socket sends `timetable-updated` and `path-requests` (without `rev`). ' +
+          'The audit entry records the deleted train (or null) and the note.',
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { note: { type: 'string', maxLength: 300 } } } } } },
+        responses: {
+          200: { description: 'Full updated timetable' },
+          400: { description: 'Note longer than 300 characters' },
           404: { $ref: '#/components/responses/NotFound' },
           409: { $ref: '#/components/responses/WrongState' },
         },

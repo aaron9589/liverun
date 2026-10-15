@@ -1,6 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { validateSubmit, transition, applyPatch, clearClosed, register, MAX_OPEN } = require('../path-requests');
+const {
+  validateSubmit, transition, applyPatch, clearClosed, register, MAX_OPEN, validateAcceptTrain, planAccept,
+} = require('../path-requests');
 
 const NOW = '2026-10-15T04:00:00.000Z';
 
@@ -164,7 +166,7 @@ test('transition: cancel-ask and cancel-reject, and asking again after a rejecti
 });
 
 test('transition: unknown action → 400', () => {
-  assert.strictEqual(transition(request(), 'accept').status, 400);
+  assert.strictEqual(transition(request(), 'nope').status, 400);
 });
 
 test('clearClosed keeps open requests and accepted ones with an open cancel ask', () => {
@@ -421,4 +423,314 @@ test('GET list: the requests, not audited; 404 for a missing timetable', () => {
   assert.deepStrictEqual(harness({ tt: { ...timetable(), path_requests: undefined } }).call('GET /api/timetables/:id/path-requests').body, []);
   assert.strictEqual(h.call('GET /api/timetables/:id/path-requests', { params: { id: 'gone' } }).code, 404);
   assert.strictEqual(h.audits.length, 0);
+});
+
+// ── Accept and cancel-approve (phase 3) ──────────────────────────────────────
+
+/** A timetable with a request being plotted (r1, by c1) and another train (X1) that can be moved. */
+const plotting = (over = {}) => timetable({
+  trains: [{
+    id: 't2', name: 'X1', crew_id: 'c2', train_id: '4001', stops: [
+      { id: 's1', train_id: 't2', station_id: 'kia', arrival: null, departure: '14:00', special_instructions: 'keep' },
+      { id: 's2', train_id: 't2', station_id: 'bom', arrival: '14:10', departure: null },
+    ],
+  }],
+  path_requests: [request({ status: 'in_review' })],
+  ...over,
+});
+
+const acceptBody = (over = {}, trainOver = {}) => ({
+  train: {
+    name: ' PR3 ', color: '#abc', notes: 'after 23L', trainId: '3001', direction: 'Down', crewId: 'c2',
+    stops: [
+      { stationId: 'kia', arrival: '14:20', departure: '14:20', locationAlias: 'Rd 2' },
+      { stationId: 'bom', arrival: '14:30', departure: '14:50', specialInstructions: 'Shunt 20 min' },
+      { stationId: 'mtk', arrival: null, departure: null },
+      { stationId: 'dun', arrival: '15:00', departure: '15:00' },
+    ],
+    ...trainOver,
+  },
+  retime: [{ trainId: 't2', times: [{ stationId: 'kia', arrival: null, departure: '14:05' }, { stationId: 'bom', arrival: '14:15', departure: null }] }],
+  note: ' Held at Bombo for 23L ',
+  ...over,
+});
+
+const ACCEPT_ROUTE = 'POST /api/timetables/:id/path-requests/:reqId/accept';
+
+test('transition: accept in_review only; optional note ≤ 300', () => {
+  const r = request({ status: 'in_review' });
+  assert.deepStrictEqual(transition(r, 'accept', { trainCreated: 'tn', assignedCrewId: 'c2', note: ' ok ', now: NOW }).ok, {
+    status: 'accepted', train_id_created: 'tn', assigned_crew_id: 'c2', control_note: 'ok', updated_at: NOW,
+  });
+  const plain = applyPatch({ ...r, control_note: 'old' }, transition(r, 'accept', { trainCreated: 'tn', now: NOW }).ok);
+  assert.strictEqual(plain.assigned_crew_id, null, 'unassigned');
+  assert.ok(!('control_note' in plain), 'no note → none kept');
+  assert.strictEqual(transition(r, 'accept', { note: 'x'.repeat(301) }).status, 400);
+  assert.strictEqual(transition(r, 'accept', { note: 5 }).status, 400);
+  for (const status of ['pending', 'accepted', 'declined', 'withdrawn', 'cancelled']) {
+    assert.strictEqual(transition(request({ status }), 'accept', { trainCreated: 'tn' }).status, 409, status);
+  }
+});
+
+test('transition: cancel-approve needs an accepted request with an open ask', () => {
+  const asked = request({ status: 'accepted', train_id_created: 't2', cancel_ask: { at: NOW, reason: 'loco failed', status: 'open' } });
+  assert.deepStrictEqual(transition(asked, 'cancel-approve', { note: ' Done ', now: NOW }).ok, {
+    status: 'cancelled', cancel_ask: { at: NOW, reason: 'loco failed', status: 'approved', control_note: 'Done' }, updated_at: NOW,
+  });
+  assert.deepStrictEqual(transition(asked, 'cancel-approve', { now: NOW }).ok.cancel_ask, { at: NOW, reason: 'loco failed', status: 'approved' });
+  assert.strictEqual(transition(asked, 'cancel-approve', { note: 'x'.repeat(301) }).status, 400);
+  assert.strictEqual(transition(request({ status: 'accepted' }), 'cancel-approve').status, 409, 'no ask');
+  assert.strictEqual(transition(request({ status: 'accepted', cancel_ask: { at: NOW, status: 'rejected' } }), 'cancel-approve').status, 409);
+  assert.strictEqual(transition(request({ status: 'pending' }), 'cancel-approve').status, 409);
+});
+
+test('validateAcceptTrain: a clean body for newTrain; bad trains rejected', () => {
+  const tt = plotting();
+  const { train } = validateAcceptTrain(tt, acceptBody().train);
+  assert.deepStrictEqual({ ...train, stops: train.stops.length }, {
+    name: 'PR3', color: '#abc', notes: 'after 23L', trainId: '3001', direction: 'Down', crewId: 'c2', stops: 4,
+  });
+  assert.strictEqual(validateAcceptTrain(tt, acceptBody({}, { crewId: '' }).train).train.crewId, null);
+  assert.strictEqual(validateAcceptTrain(tt, acceptBody({}, { crewId: null, color: '' }).train).train.color, undefined);
+  assert.strictEqual(validateAcceptTrain(tt, acceptBody({}, { name: 'n'.repeat(60) }).train).train.name.length, 60);
+  const stops = acceptBody().train.stops;
+  const bad = (trainOver, why) => assert.ok(validateAcceptTrain(tt, acceptBody({}, trainOver).train).error, why || JSON.stringify(trainOver));
+  assert.ok(validateAcceptTrain(tt, undefined).error);
+  assert.ok(validateAcceptTrain(tt, 'PR3').error);
+  bad({ name: '' }); bad({ name: '   ' }); bad({ name: undefined }); bad({ name: 7 }); bad({ name: 'n'.repeat(61) });
+  bad({ color: 'red' }); bad({ color: '#12' }); bad({ color: '#123456789' }); bad({ color: 5 });
+  bad({ notes: 5 }); bad({ trainId: {} }); bad({ direction: [] });
+  bad({ crewId: 'nobody' }); bad({ crewId: 5 });
+  bad({ stops: 'x' }); bad({ stops: undefined });
+  bad({ stops: [stops[0]] }, 'one stop');
+  bad({ stops: [stops[0], stops[2]] }, 'only one timed stop');
+  bad({ stops: [stops[0], null] });
+  bad({ stops: [stops[0], { ...stops[1], stationId: 'gone' }] }, 'unknown station');
+  bad({ stops: [stops[0], stops[1], { ...stops[3], stationId: 'kia' }] }, 'duplicate station');
+  bad({ stops: [stops[0], { ...stops[1], arrival: '9:05' }] }); bad({ stops: [stops[0], { ...stops[1], departure: '24:00' }] });
+  bad({ stops: [stops[0], { ...stops[1], departure: 1450 }] });
+  bad({ stops: [stops[0], { ...stops[1], specialInstructions: 5 }] }); bad({ stops: [stops[0], { ...stops[1], locationAlias: {} }] });
+  bad({ stops: [stops[0], { ...stops[1], guardEvents: 'x' }] }); bad({ stops: [stops[0], { ...stops[1], guardEvents: [{ id: '' }] }] });
+});
+
+test('planAccept: 404 → 400 → 409 order, nothing changed', () => {
+  const tt = plotting();
+  const before = structuredClone(tt);
+  assert.strictEqual(planAccept(tt, 'nope', acceptBody()).status, 404);
+  const withdrawn = plotting({ path_requests: [request({ status: 'withdrawn' })] });
+  assert.deepStrictEqual(
+    [planAccept(withdrawn, 'r1', acceptBody({}, { name: '' })).status, planAccept(withdrawn, 'r1', acceptBody()).status],
+    [400, 409], 'a bad body is 400 even on a withdrawn request',
+  );
+  const p = planAccept(tt, 'r1', acceptBody(), { trainId: 'tn', now: NOW });
+  assert.strictEqual(p.plan.train.id, 'tn');
+  assert.strictEqual(p.plan.train.request_id, 'r1');
+  assert.deepStrictEqual(tt, before);
+});
+
+test('accept: train created via newTrain, retime applied, request accepted, notifying, audited', () => {
+  const h = harness({ tt: plotting() });
+  const res = h.call(ACCEPT_ROUTE, { params: { reqId: 'r1' }, body: acceptBody() });
+  assert.strictEqual(res.code, 200);
+  assert.strictEqual(res.body.trains.length, 2);
+  const train = h.store.trains[1];
+  assert.deepStrictEqual({ ...train, stops: undefined }, {
+    id: train.id, timetable_id: 'tt', name: 'PR3', color: '#abc', notes: 'after 23L', train_id: '3001', direction: 'Down',
+    crew_id: 'c2', request_id: 'r1', stops: undefined,
+  });
+  // Passing stop without a time dropped; terminal rule: origin departs only, destination arrives only.
+  assert.deepStrictEqual(train.stops.map((s) => [s.station_id, s.arrival, s.departure, s.location_alias, s.special_instructions, s.train_id]), [
+    ['kia', null, '14:20', 'Rd 2', null, train.id],
+    ['bom', '14:30', '14:50', null, 'Shunt 20 min', train.id],
+    ['dun', '15:00', null, null, null, train.id],
+  ]);
+  assert.ok(train.stops.every((s) => typeof s.id === 'string' && s.id));
+  // The other train: times only.
+  assert.deepStrictEqual(h.store.trains[0].stops.map((s) => [s.id, s.arrival, s.departure, s.special_instructions]), [
+    ['s1', null, '14:05', 'keep'], ['s2', '14:15', null, undefined],
+  ]);
+  const r = h.find('r1');
+  assert.deepStrictEqual([r.status, r.train_id_created, r.assigned_crew_id, r.control_note], ['accepted', train.id, 'c2', 'Held at Bombo for 23L']);
+  assert.notStrictEqual(r.updated_at, NOW);
+  assert.deepStrictEqual(h.mutations, [{ notify: true }]);
+  assert.strictEqual(h.store.rev, 2);
+  assert.deepStrictEqual(h.broadcasts, [{ id: 'tt', rev: 2, opts: undefined, requests: h.store.path_requests }], 'broadcast without requestsOnly (no rev)');
+  const a = h.lastAudit();
+  assert.deepStrictEqual([a.actor, a.crew_id, a.action, a.outcome, a.request_id, a.timetable_name], ['control', null, 'accept', 'ok', 'r1', 'Session 1']);
+  assert.deepStrictEqual(a.detail, {
+    train: {
+      name: 'PR3', crew: 'Crew 2', loco: '3001',
+      stops: [{ station: 'Kiama', arr: null, dep: '14:20' }, { station: 'Bombo', arr: '14:30', dep: '14:50' }, { station: 'Dunmore', arr: '15:00', dep: null }],
+    },
+    assigned_crew: 'Crew 2',
+    note: 'Held at Bombo for 23L',
+    moved: [{
+      name: 'X1',
+      from: [{ station: 'Kiama', arr: null, dep: '14:00' }, { station: 'Bombo', arr: '14:10', dep: null }],
+      to: [{ station: 'Kiama', arr: null, dep: '14:05' }, { station: 'Bombo', arr: '14:15', dep: null }],
+    }],
+  });
+  // Accepting again: it isn't in review any more.
+  const again = h.call(ACCEPT_ROUTE, { params: { reqId: 'r1' }, body: acceptBody() });
+  assert.deepStrictEqual([again.code, again.body.status], [409, 'accepted']);
+  assert.strictEqual(h.store.trains.length, 2);
+});
+
+test('accept: assigned to the requester or unassigned; no retime, no note', () => {
+  const h = harness({ tt: plotting() });
+  let res = h.call(ACCEPT_ROUTE, { params: { reqId: 'r1' }, body: acceptBody({ retime: [], note: undefined }, { crewId: 'c1' }) });
+  assert.strictEqual(res.code, 200);
+  assert.deepStrictEqual([h.find('r1').assigned_crew_id, 'control_note' in h.find('r1')], ['c1', false]);
+  assert.ok(!('assigned_crew' in h.lastAudit().detail), 'same crew as the requester: not noted');
+  assert.deepStrictEqual([h.lastAudit().detail.note, h.lastAudit().detail.moved], [null, []]);
+  assert.deepStrictEqual(h.store.trains[0].stops.map((s) => s.departure), ['14:00', null], 'X1 untouched');
+
+  const u = harness({ tt: plotting() });
+  res = u.call(ACCEPT_ROUTE, { params: { reqId: 'r1' }, body: acceptBody({ retime: undefined }, { crewId: '', color: undefined }) });
+  assert.strictEqual(res.code, 200);
+  assert.deepStrictEqual([u.store.trains[1].crew_id, u.store.trains[1].color, u.find('r1').assigned_crew_id], [null, '#3b82f6', null]);
+  assert.strictEqual(u.lastAudit().detail.assigned_crew, null, 'unassigned differs from the requester');
+});
+
+test('accept after a withdraw → 409 withdrawn, no train', () => {
+  const h = harness({ tt: plotting() });
+  assert.strictEqual(h.act('withdraw', 'r1', { crewId: 'c1' }).code, 200);
+  const res = h.call(ACCEPT_ROUTE, { params: { reqId: 'r1' }, body: acceptBody() });
+  assert.strictEqual(res.code, 409);
+  assert.deepStrictEqual(res.body, { error: res.body.error, status: 'withdrawn' });
+  assert.match(res.body.error, /withdrawn/);
+  assert.strictEqual(h.store.trains.length, 1);
+  assert.strictEqual(h.mutations.length, 1, 'only the withdraw wrote');
+  assert.deepStrictEqual([h.lastAudit().action, h.lastAudit().outcome, h.lastAudit().detail], ['accept', 'rejected', { status: 'withdrawn' }]);
+});
+
+test('accept races a withdraw: read in_review, withdrawn before the mutation → 409, nothing written', () => {
+  const h = harness({ tt: plotting({ path_requests: [request({ status: 'withdrawn' })] }) });
+  h.staleRead = plotting(); // the handler's first read still saw it in_review
+  const res = h.call(ACCEPT_ROUTE, { params: { reqId: 'r1' }, body: acceptBody() });
+  assert.deepStrictEqual([res.code, res.body.status], [409, 'withdrawn']);
+  assert.deepStrictEqual(h.mutations, [{ notify: true }], 'the mutation ran');
+  assert.strictEqual(h.store.rev, 1, 'but aborted: no write, no rev bump');
+  assert.strictEqual(h.store.trains.length, 1);
+  assert.deepStrictEqual(h.store.trains[0].stops.map((s) => s.departure), ['14:00', null], 'retime not applied');
+  assert.strictEqual(h.find('r1').status, 'withdrawn');
+  assert.strictEqual(h.broadcasts.length, 0);
+  assert.deepStrictEqual([h.lastAudit().outcome, h.lastAudit().detail], ['rejected', { status: 'withdrawn' }]);
+});
+
+test('accept with a retime conflict → 409, request stays in_review, no train', () => {
+  const h = harness({ tt: plotting() });
+  const conflicting = acceptBody({ retime: [{ trainId: 't2', times: [{ stationId: 'kia', arrival: null, departure: '14:05' }] }] });
+  let res = h.call(ACCEPT_ROUTE, { params: { reqId: 'r1' }, body: conflicting });
+  assert.strictEqual(res.code, 409);
+  assert.deepStrictEqual([res.body.status, res.body.conflicts], ['in_review', ["X1's stops were changed after it was moved"]]);
+  assert.match(res.body.error, /^Not saved: /);
+  res = h.call(ACCEPT_ROUTE, { params: { reqId: 'r1' }, body: acceptBody({ retime: [{ trainId: 'gone', times: [] }] }) });
+  assert.deepStrictEqual([res.code, res.body.conflicts], [409, ['train gone no longer exists']]);
+  assert.strictEqual(h.mutations.length, 0);
+  assert.deepStrictEqual([h.find('r1').status, h.store.trains.length], ['in_review', 1]);
+  assert.deepStrictEqual([h.lastAudit().outcome, h.lastAudit().detail], ['rejected', { status: 'in_review' }]);
+
+  // The moved train changed between the handler's read and the mutation.
+  const changed = plotting();
+  changed.trains[0].stops.pop();
+  h.store = changed;
+  h.staleRead = plotting();
+  res = h.call(ACCEPT_ROUTE, { params: { reqId: 'r1' }, body: acceptBody() });
+  assert.deepStrictEqual([res.code, res.body.status, res.body.conflicts.length], [409, 'in_review', 1]);
+  assert.deepStrictEqual([h.store.rev, h.store.trains.length, h.find('r1').status], [1, 1, 'in_review']);
+});
+
+test('accept: malformed bodies → 400, nothing written, audited with the status', () => {
+  const h = harness({ tt: plotting() });
+  const stops = acceptBody().train.stops;
+  const bodies = [
+    undefined, null, 'x', {}, { train: null },
+    acceptBody({}, { name: '' }),
+    acceptBody({}, { name: 'x'.repeat(61) }),
+    acceptBody({}, { stops: [stops[0], { ...stops[1], stationId: 'gone' }] }),
+    acceptBody({}, { stops: [stops[0], stops[1], { ...stops[3], stationId: 'bom' }] }),
+    acceptBody({}, { crewId: 'nobody' }),
+    acceptBody({ note: 'x'.repeat(301) }),
+    acceptBody({ retime: 'x' }),
+    acceptBody({ retime: [{ trainId: 't2' }] }),
+    acceptBody({ retime: [{ trainId: 't2', times: [{ stationId: 'kia', departure: '25:00' }] }] }),
+  ];
+  for (const body of bodies) {
+    const res = h.call(ACCEPT_ROUTE, { params: { reqId: 'r1' }, body });
+    assert.strictEqual(res.code, 400, JSON.stringify(body));
+    assert.deepStrictEqual(Object.keys(res.body), ['error']);
+    assert.deepStrictEqual([h.lastAudit().outcome, h.lastAudit().error, h.lastAudit().detail], ['rejected', res.body.error, { status: 'in_review' }]);
+  }
+  assert.match(h.audits[7].error, /unknown station/);
+  assert.match(h.audits[8].error, /Bombo appears twice/);
+  assert.match(h.audits[9].error, /Unknown crew/);
+  assert.match(h.audits[10].error, /Note/);
+  assert.strictEqual(h.mutations.length, 0);
+  assert.strictEqual(h.broadcasts.length, 0);
+  assert.strictEqual(h.audits.length, bodies.length);
+  assert.strictEqual(h.call(ACCEPT_ROUTE, { params: { reqId: 'nope' }, body: acceptBody() }).code, 404);
+  assert.strictEqual(h.call(ACCEPT_ROUTE, { params: { id: 'gone', reqId: 'r1' }, body: acceptBody() }).code, 404);
+});
+
+const CANCEL_APPROVE_ROUTE = 'POST /api/timetables/:id/path-requests/:reqId/cancel-approve';
+const askedRequest = (over = {}) => request({
+  status: 'accepted', train_id_created: 't2', assigned_crew_id: 'c2', cancel_ask: { at: NOW, reason: 'Loco failed', status: 'open' }, ...over,
+});
+
+test('cancel-approve: deletes the train, request cancelled, notifying, audited', () => {
+  const h = harness({ tt: plotting({ trains: [plotting().trains[0], { id: 'keep', name: 'K', stops: [] }], path_requests: [askedRequest()] }) });
+  const res = h.call(CANCEL_APPROVE_ROUTE, { params: { reqId: 'r1' }, body: { note: ' Train cancelled ' } });
+  assert.strictEqual(res.code, 200);
+  assert.deepStrictEqual(h.store.trains.map((t) => t.id), ['keep']);
+  const r = h.find('r1');
+  assert.strictEqual(r.status, 'cancelled');
+  assert.deepStrictEqual(r.cancel_ask, { at: NOW, reason: 'Loco failed', status: 'approved', control_note: 'Train cancelled' });
+  assert.deepStrictEqual(h.mutations, [{ notify: true }]);
+  assert.deepStrictEqual(h.broadcasts.map((b) => b.opts), [undefined]);
+  const a = h.lastAudit();
+  assert.deepStrictEqual([a.actor, a.action, a.outcome, a.request_id], ['control', 'cancel-approve', 'ok', 'r1']);
+  assert.deepStrictEqual(a.detail, {
+    train: { name: 'X1', crew: 'Crew 2', loco: '4001', stops: [{ station: 'Kiama', arr: null, dep: '14:00' }, { station: 'Bombo', arr: '14:10', dep: null }] },
+    note: 'Train cancelled',
+  });
+  const again = h.call(CANCEL_APPROVE_ROUTE, { params: { reqId: 'r1' }, body: {} });
+  assert.deepStrictEqual([again.code, again.body.status], [409, 'cancelled']);
+  assert.deepStrictEqual([h.lastAudit().outcome, h.lastAudit().detail], ['rejected', { status: 'cancelled' }]);
+});
+
+test('cancel-approve when the train is already gone: train null, no note', () => {
+  const h = harness({ tt: plotting({ path_requests: [askedRequest({ train_id_created: 'undone' })] }) });
+  const res = h.call(CANCEL_APPROVE_ROUTE, { params: { reqId: 'r1' } });
+  assert.strictEqual(res.code, 200);
+  assert.deepStrictEqual(h.store.trains.map((t) => t.id), ['t2']);
+  assert.deepStrictEqual([h.find('r1').status, h.find('r1').cancel_ask.status, 'control_note' in h.find('r1').cancel_ask], ['cancelled', 'approved', false]);
+  assert.deepStrictEqual(h.lastAudit().detail, { train: null, note: null });
+});
+
+test('cancel-approve: 409 without an open ask, 400 for a long note, nothing written', () => {
+  const h = harness({ tt: plotting({ path_requests: [
+    askedRequest({ cancel_ask: undefined }),
+    askedRequest({ id: 'r2', cancel_ask: { at: NOW, status: 'rejected', control_note: 'no' } }),
+    request({ id: 'r3', status: 'pending' }),
+    askedRequest({ id: 'r4' }),
+  ] }) });
+  for (const reqId of ['r1', 'r2', 'r3']) {
+    const res = h.call(CANCEL_APPROVE_ROUTE, { params: { reqId }, body: {} });
+    assert.strictEqual(res.code, 409, reqId);
+    assert.ok(res.body.status);
+    assert.strictEqual(h.lastAudit().outcome, 'rejected');
+  }
+  assert.strictEqual(h.call(CANCEL_APPROVE_ROUTE, { params: { reqId: 'r4' }, body: { note: 'x'.repeat(301) } }).code, 400);
+  assert.deepStrictEqual(h.lastAudit().detail, { status: 'accepted' });
+  assert.strictEqual(h.call(CANCEL_APPROVE_ROUTE, { params: { reqId: 'nope' }, body: {} }).code, 404);
+  assert.strictEqual(h.mutations.length, 0);
+  assert.deepStrictEqual(h.store.trains.map((t) => t.id), ['t2']);
+
+  // Stale read: the ask was rejected between the handler's read and the mutation.
+  h.staleRead = structuredClone(h.store);
+  h.find('r4').cancel_ask = { at: NOW, status: 'rejected', control_note: 'no' };
+  const res = h.call(CANCEL_APPROVE_ROUTE, { params: { reqId: 'r4' }, body: {} });
+  assert.strictEqual(res.code, 409);
+  assert.deepStrictEqual([h.store.rev, h.store.trains.length], [1, 1]);
 });

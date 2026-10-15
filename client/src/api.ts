@@ -8,6 +8,7 @@ import type {
   PathSaveRequest,
   PathRequest,
   PathRequestSubmit,
+  PathAcceptBody,
   AuditEntry,
   AuditQuery,
 } from './types';
@@ -88,6 +89,14 @@ export const api = {
 
   rejectCancelPathRequest: (timetableId: string, requestId: string, note: string) =>
     prPost(timetableId, `/${requestId}/cancel-reject`, { note }),
+
+  /** One mutation: creates the train, applies `retime`, request → accepted. 409 if withdrawn meanwhile or a moved train changed. */
+  acceptPathRequest: (timetableId: string, requestId: string, body: PathAcceptBody) =>
+    prPost(timetableId, `/${requestId}/accept`, body),
+
+  /** Deletes the request's train and marks it cancelled (one mutation). */
+  approveCancelPathRequest: (timetableId: string, requestId: string, note?: string) =>
+    prPost(timetableId, `/${requestId}/cancel-approve`, { note }),
 
   clearClosedPathRequests: (timetableId: string) =>
     req<Timetable>(`/timetables/${timetableId}/path-requests?closed=true`, { method: 'DELETE', headers: auditHeaders() }),
