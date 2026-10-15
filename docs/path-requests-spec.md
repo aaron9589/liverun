@@ -47,6 +47,8 @@ New job card ◀─ timetable- accepted + train created ◀── Accept (+ note
 | P20 (Q10) | Other trains in Crew jobs | **No.** Crews see their own jobs only |
 | P21 | Audit log | Every path-request action, accepted or rejected, is logged with time, IP, device, acting crew or Control, and what changed (§4.4). Kept in an append-only file, not the timetable. Visible to Control only |
 | P22 | Crew cancelling | **Withdraw** while `pending` or `in_review`. After accept the crew can only **Ask to cancel**; Control approves (train removed) or rejects with a note (§1.1) |
+| P23 | Settled requests (revised after testing) | The drawer lists only what needs Control: `pending`, `in_review`, and `accepted` with an open cancel ask whose train exists (`queueRequests`). Accepted, declined, withdrawn, cancelled, and accepted-whose-train-was-deleted requests drop out of the drawer and the crew's list; the audit log keeps them. No **Clear closed** or **Reopen** in the UI (the endpoints remain) |
+| P24 | One list in Crew jobs (revised after testing) | **My requests** and **My jobs** merge into one collapsible **My jobs** list: requests not yet a job (waiting, plotting, declined in the last 10 min) first, collapsed by default, then jobs. Accepted requests are their job, badged **Accepted** (+ **Cancel asked** / **Cancel refused**); one badge set (`requestBadge`/`jobBadges`) for both. Ask to cancel lives on the job |
 
 ## 1. Request lifecycle
 
@@ -61,8 +63,8 @@ New job card ◀─ timetable- accepted + train created ◀── Accept (+ note
 
 - **Cancel while plotting** returns the request to `pending`. Nothing is saved, as with Cancel in graph edit mode today.
 - If the planner tab closes or reloads mid-plot, the request stays `in_review`. The Requests drawer offers **Resume plotting** (a fresh draft) or **Return to queue**.
-- **Undo after Accept** removes the train (normal undo), but the request stays `accepted`. The drawer shows it as "Accepted — train no longer exists" with **Reopen** (→ `pending`). Requests don't follow undo, so a crew's request never disappears because Control pressed Ctrl+Z.
-- Closed requests (`accepted`/`declined`/`withdrawn`/`cancelled`) stay visible until Control clears them (**Clear closed** in the drawer). **Reset completions** doesn't touch them.
+- **Undo after Accept** removes the train (normal undo), but the request stays `accepted`; with no train it drops out of the drawer and the crew's list (P23), and redo brings it back. Requests don't follow undo.
+- Settled requests leave the drawer and the crew's list at once (declined ones stay on the crew's list for 10 minutes); see P23/P24. **Reset completions** doesn't touch them.
 
 ### 1.1 Crew cancelling (P22)
 

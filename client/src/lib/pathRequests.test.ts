@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PathRequest, Timetable, Train } from '../types';
 import {
   apiErrorText, buildSubmit, canSubmit, defaultFrom, myRequests, requestStatusText, requestToasts, routeLabel,
-  cancelAskText, canAskCancel, controlNote, isFaded, type RequestDraft,
+  cancelAskText, canAskCancel, controlNote, jobBadges, requestBadge, requestForTrain, requestItems, type RequestDraft,
 } from './pathRequests';
 
 const stations = [
@@ -78,13 +78,6 @@ describe('cancel asks', () => {
     expect(cancelAskText(r)).toBe('Cancel refused: Needed');
     expect(canAskCancel(r)).toBe(true);
     expect(canAskCancel(req())).toBe(false);
-  });
-  it('fades accepted cards after five minutes', () => {
-    const r = req({ status: 'accepted', updated_at: '2026-01-01T00:00:00Z' });
-    const t0 = Date.parse('2026-01-01T00:00:00Z');
-    expect(isFaded(r, t0 + 4 * 60_000)).toBe(false);
-    expect(isFaded(r, t0 + 6 * 60_000)).toBe(true);
-    expect(isFaded({ ...r, cancel_ask: { at: 'x', status: 'open' } }, t0 + 6 * 60_000)).toBe(false);
   });
 });
 
@@ -222,9 +215,32 @@ describe('canAskCancel', () => {
     expect(canAskCancel(r, [{ id: 'tr1' }])).toBe(true);
     expect(canAskCancel(r, [{ id: 'other' }])).toBe(false);
   });
-  it('is not affected by the card fading', () => {
-    const old = { ...base, status: 'accepted', updated_at: '2026-01-01T00:00:00Z' } as PathRequest;
-    expect(isFaded(old, Date.parse('2026-01-01T01:00:00Z'))).toBe(true);
-    expect(canAskCancel(old, [{ id: 'tr1' }])).toBe(true);
+});
+
+describe('requestItems / requestForTrain / badges', () => {
+  const at = '2026-01-01T10:00:00Z';
+  const now = Date.parse('2026-01-01T10:05:00Z');
+  const r = (id: string, status: PathRequest['status'], over: Partial<PathRequest> = {}) =>
+    ({ id, timetable_id: 't', crew_id: 'me', stops: [], created_at: at, updated_at: at, status, ...over }) as PathRequest;
+
+  it('lists waiting, plotting and recently declined requests of this crew only', () => {
+    const list = [
+      r('p', 'pending'), r('i', 'in_review'), r('d', 'declined'), r('old', 'declined', { updated_at: '2026-01-01T09:00:00Z' }),
+      r('a', 'accepted', { train_id_created: 't1' }), r('w', 'withdrawn'), r('c', 'cancelled'), r('x', 'pending', { crew_id: 'other' }),
+    ];
+    expect(requestItems(list, 'me', now).map((q) => q.id).sort()).toEqual(['d', 'i', 'p']);
+  });
+  it('finds the accepted request behind a train', () => {
+    const list = [r('a', 'accepted', { train_id_created: 't1' }), r('c', 'cancelled', { train_id_created: 't2' })];
+    expect(requestForTrain(list, 't1')?.id).toBe('a');
+    expect(requestForTrain(list, 't2')).toBeUndefined();
+  });
+  it('uses one badge set for requests and jobs', () => {
+    expect(requestBadge(r('p', 'pending'))).toEqual({ label: 'Waiting', tone: 'amber' });
+    expect(requestBadge(r('i', 'in_review'))).toEqual({ label: 'Plotting', tone: 'blue' });
+    expect(jobBadges({ status: 'running' }, r('a', 'accepted', { cancel_ask: { at, status: 'open' } })).map((b) => b.label))
+      .toEqual(['Accepted', 'Cancel asked', 'Running']);
+    expect(jobBadges({ status: 'completed' }).map((b) => b.label)).toEqual(['Done']);
+    expect(jobBadges({})).toEqual([]);
   });
 });

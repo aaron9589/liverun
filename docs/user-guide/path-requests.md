@@ -22,10 +22,12 @@ Requests go to the **active timetable** only, and only while **Crews can request
 |--------|-----------|--------------|---------------|
 | **Pending** | **Waiting** | In the drawer, counted in the **Requests** badge | Control picks **Acknowledge & plot** or **Decline**; the crew can **Withdraw** |
 | **Plotting** (in review) | **Plotting** | **Plotting**, with **Resume plotting** and **Return to queue** | Control accepts or declines, or returns it to pending; the crew can **Withdraw** |
-| **Accepted** | **Accepted → PR1** | A link to the new train | The crew asks to cancel, or Control clears closed requests |
-| **Declined** | **Declined** and Control's reason | **Declined** | Cleared by Control |
-| **Withdrawn** | **Withdrawn** | **Withdrawn by crew** | Cleared by Control |
-| **Cancelled** | **Cancelled** | **Cancelled** | Cleared by Control |
+| **Accepted** | The job, badged **Accepted** | Nothing: it leaves the drawer and is now a train | The crew asks to cancel (it comes back to the drawer until you decide) |
+| **Declined** | **Declined** and Control's reason, for 10 minutes | Nothing: it leaves the drawer | — |
+| **Withdrawn** | Nothing: it disappears | Nothing: it leaves the drawer (with a toast) | — |
+| **Cancelled** | Nothing: the job disappears | Nothing | — |
+
+Every request, settled or not, stays in the [audit log](#audit-log). If an accepted request's train is deleted (or the accept undone), the request drops out of the drawer and the crew's list too.
 
 ## Handling requests in the planner
 
@@ -33,7 +35,7 @@ Requests go to the **active timetable** only, and only while **Crews can request
 
 When a crew sends a request, a toast appears: **Local Operator 2 requests a path: Kiama → Kembla Heights**, with a **Review** button that opens the drawer at that request. Crews withdrawing a request, or asking to cancel a train, get a toast too.
 
-The **Requests** button in the planner header opens the drawer. A number badge counts the requests waiting for you: pending ones plus accepted ones with an open ask to cancel. The button shows while the timetable is active, or while it still has requests.
+The **Requests** button in the planner header opens the drawer. It lists only what still needs you: pending requests, ones being plotted, and accepted ones the crew has asked to cancel. A number badge counts the pending ones plus the asks to cancel. The button shows while the timetable is active, or while it still has requests.
 
 Each row shows the crew, the loco, how long ago it was sent, the route (with shunt and work stops and their notes), **Ready** (a time or **ASAP**), the crew's notes, and a **times from** line saying where plotting will get its running times (see [Where the times come from](#where-the-times-come-from)). Rows with a cancel ask are outlined in amber.
 
@@ -43,11 +45,9 @@ What you can do depends on the request's state:
 |-------|---------|
 | Pending | **Acknowledge & plot**, **Decline** |
 | Plotting | **Resume plotting**, **Return to queue**, **Decline** |
-| Accepted | A link to the train (hover it to highlight the train on the graph). With an ask to cancel: **Approve cancel**, **Reject** |
-| Accepted, but the train has since been deleted | **Reopen**, which puts the request back to pending |
-| Declined, Withdrawn, Cancelled | None |
+| Accepted, with an ask to cancel | A link to the train (hover it to highlight the train on the graph), **Approve cancel**, **Reject** |
 
-**Decline** needs a reason; the crew sees it on their card. At the bottom of the drawer, **Clear closed** removes every accepted, declined, withdrawn and cancelled request (an accepted one with an open ask to cancel stays). Each row's **History** shows what has been done to that request; see [Audit log](#audit-log).
+**Decline** needs a reason; the crew sees it on their card. Each row's **History** shows what has been done to that request; see [Audit log](#audit-log).
 
 ## Plotting a request
 
@@ -97,9 +97,9 @@ Stations the train passes between the requested stops are included as timing poi
 
 ## Undo and requests
 
-Requests don't follow undo and redo. Undoing never brings a declined request back or removes an accepted one, and request buttons (**Decline**, **Return to queue**, **Clear closed**, and so on) aren't undo steps.
+Requests don't follow undo and redo. Undoing never brings a declined request back or removes an accepted one, and request buttons (**Decline**, **Return to queue**, and so on) aren't undo steps.
 
-**Accept** is one undo step: undoing it removes the new train and puts back any trains you moved. The request stays accepted, with the note **Accepted — train no longer exists**. Press **Reopen** to send it back to pending and plot it again.
+**Accept** is one undo step: undoing it removes the new train and puts back any trains you moved. The request stays accepted but, with no train, drops out of the drawer and the crew's list; redo brings the train back. If the crew still needs the path, they send a new request.
 
 ## Asks to cancel
 

@@ -77,7 +77,7 @@ Crew jobs is the phone view at `…/mobile`; see [Crew jobs](crew-jobs.md). The 
 | **Too many open requests (50)** | The timetable already has 50 open requests | Tell Control, who can decline or clear some |
 | **Can't withdraw it: the request is …** or **Can't ask to cancel it: …** (409) | Control acted at the same moment, so the card was out of date | The card updates itself; read its new status |
 | **Only the crew that made this request can …** | The phone was switched to another crew | **☰ → Change crew** back to the crew that sent it |
-| The request is accepted but the train isn't in My jobs | Control assigned it to another crew or left it unassigned | The card says **assigned to …**; ask Control |
+| A request disappeared from My jobs without becoming a job | Control assigned the train to another crew or left it unassigned, or deleted it | Ask Control |
 | Jobs on the Running board but not in Crew jobs | Running board shows everyone's jobs unless filtered by crew | Use the **Crew** filter on the Running board, or **Change crew** in Crew jobs |
 | The dot isn't green | Reconnecting | It catches up by itself when it's back |
 | **Select Timetable** appears (Running board) | No timetable is active and none is chosen | Pick one, or ask Control to make the session's timetable active |
@@ -90,7 +90,6 @@ Crew jobs is the phone view at `…/mobile`; see [Crew jobs](crew-jobs.md). The 
 | **Finish or cancel plotting … first** | One request is already being plotted | **Accept** or **Cancel** that one |
 | Accept fails and says a train changed | Someone edited a train you moved while you were plotting | Your drafts are kept: **Accept** again, or **Cancel** and redo the move |
 | After a reload the draft is gone | Drafts live in the browser page only | The request is still **Plotting**: **Resume plotting** in the drawer |
-| **Accepted — train no longer exists** | The train was deleted or the accept was undone | **Reopen** to plot it again |
 | **times from** says **No path or timetable data** | No path template and no timetabled train links those stations | Add paths ([Paths](planner.md#paths-route-templates)), or accept the **Default leg time** and adjust on the graph |
 | A leg is timed **from timetabled trains** and looks wrong | No path template reaches that station, so the trains' median running time was used | Add a path covering it, or drag the draft / use **Edit stops** |
 | Plotted times look wrong | The route was timed from the wrong path, or the default leg time | Check the **times from** line; drag the draft or use **Edit stops** |

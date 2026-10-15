@@ -55,7 +55,7 @@ Crews mark trains running and completed from the Running board (**Run** → **Do
 
 Crews can ask for extra paths from Crew jobs. A toast tells you (**… requests a path: …**) and the **Requests** button shows a badge. Open the drawer, **Acknowledge & plot**, adjust on the graph and **Accept**, or **Decline** with a reason. The crew sees every step on their phone. Crews can also withdraw a request, or ask to cancel an accepted one, which you approve or reject. If you'd rather not take requests for a while, switch off ⚙ → **Path requests** → **Crews can request paths**. See [Path requests](path-requests.md).
 
-At the end of the session, **Clear closed** in the drawer tidies the finished requests. The audit log keeps the record.
+Settled requests leave the drawer by themselves; the audit log keeps the record.
 
 ### Limit of authority
 

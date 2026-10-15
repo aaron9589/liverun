@@ -6,7 +6,7 @@
 - [Opening it](#opening-it)
 - [My jobs](#my-jobs)
 - [Requesting a path](#requesting-a-path)
-- [My requests](#my-requests)
+- [Your requests in My jobs](#your-requests-in-my-jobs)
 
 ![Crew jobs on a phone: the crew's next job open, with a special instruction at Berry](images/jobs-overview.png)
 
@@ -38,14 +38,14 @@ The header shows your crew's colour and name, the fast clock (grey while it's di
 
 ## My jobs
 
-**My jobs** lists the trains assigned to your crew, in the order they run. Each card shows the train's name, its loco (train ID), and where it runs from and to with the start and end times.
+**My jobs** is one list of everything for your crew: requests you've sent that aren't a job yet come first (see [below](#your-requests-in-my-jobs)), then the trains assigned to your crew, in the order they run. Each job card shows the train's name, its loco (train ID), and where it runs from and to with the start and end times.
 
 - Tap a card to open or close it. The job you're on, or the next one, opens by itself.
 - An open card lists each stop in running order with its **Arr** and **Dep** times. If Control gave a stop a different name for this train (a siding or staging road), it's shown after the station name.
 - A line starting with an amber flag (⚑) is a **special instruction** for that stop. Read these before you start.
 - With the fast clock running, the stop you should be at is highlighted and marked **now** (standing at it) or **next**.
-- **Notes** from Control are shown under the stops. A blue **Requested** badge means the job was created from a path request.
-- A green **Running** or grey **Done** badge shows the train's run status. You can't change it here; use the [Running board](crew-view.md#marking-runs) to mark runs started and finished.
+- **Notes** from Control are shown under the stops.
+- Badges on the right say where a job stands: **Accepted** (made from a path request), **Cancel asked** or **Cancel refused** (see below), and **Running** or **Done** for the train's run status. You can't change run status here; use the [Running board](crew-view.md#marking-runs) to mark runs started and finished.
 
 Crew jobs follows Control's changes live, with no refresh and no sounds. A new job gets a **New job** toast and a green ring for a minute, and retimed stops are highlighted for 10 seconds. The same notices as on the Running board appear when a job is retimed, renamed or taken off your crew, and **Control changed n of your jobs** when there are more than five changes at once. See [When Control changes something](crew-view.md#when-control-changes-something).
 
@@ -79,28 +79,26 @@ If Control's server refuses the request, the reason appears in red above the but
 
 > **Note** The **+ Request a path** button is only there while your timetable is the active one and Control hasn't turned requests off. The whole timetable can hold 50 open requests at once.
 
-## My requests
+## Your requests in My jobs
 
-Sent requests appear as cards under **My requests**, above **My jobs**. Open ones come first, then the newest.
+A request you've sent shows at the top of **My jobs** with a dashed border, closed: its header gives the route's ends, where it's at, and a badge. Tap it to see the full route (for example *Kiama → Bombo (shunt 20) → Kembla Heights*), when you're ready, your note and **Withdraw**.
 
-![My requests: one waiting, one declined, one accepted](images/jobs-requests.png)
+![My jobs: a waiting and a declined request above the jobs](images/jobs-requests.png)
 
 | Badge | Meaning | What you can do |
 |-------|---------|-----------------|
 | **Waiting** | Control hasn't picked it up yet | **Withdraw** |
 | **Plotting** | Control is working out your path | **Withdraw** |
-| **Accepted** | Your train is on the timetable. The card names it (**Accepted → PR1**), and says so if Control gave it to another crew | **Ask to cancel** |
-| **Declined** | Control refused it, and gave a reason | Nothing; send a new request if you still need one |
-| **Withdrawn** | You took it back | Nothing |
-| **Cancelled** | Control agreed to your ask to cancel and removed the train | Nothing |
+| **Declined** | Control refused it; the reason is on the card. It drops off the list after 10 minutes | Nothing; send a new request if you still need one |
+| **Accepted** | Control accepted it: it's now a job in the list, with Control's note when you open it | **Ask to cancel** (open the job) |
 
-Each card shows the route (for example *Kiama → Bombo (shunt 20) → Kembla Heights*), when you're ready, the loco, and any **Control:** note.
+A request you withdraw disappears straight away. So does an accepted job that Control cancels or deletes.
 
-**Withdraw** asks you to confirm (**Yes, withdraw** or **Keep**). If Control picked the request up at the same moment, you may be told the request has moved on; the card then shows what happened.
+**Withdraw** asks you to confirm (**Yes, withdraw** or **Keep**). If Control picked the request up at the same moment, you may be told the request has moved on.
 
-**Ask to cancel** is for an accepted request you no longer need. It's on the request card and on the job itself in **My jobs** (open the job). You can type a reason, then **Send request**. The train stays on the timetable until Control agrees: the card shows **Cancel asked: Waiting for Control**, and then either **Cancelled** or **Cancel refused** with Control's note. You can ask again after a refusal.
+**Ask to cancel** is for an accepted job you no longer need: open the job, tap **Ask to cancel**, type a reason if you like, then **Send request**. The job stays until Control agrees: it shows **Cancel asked**, then either disappears (cancelled) or shows **Cancel refused** with Control's note. You can ask again after a refusal. Only the crew that sent the request can ask to cancel it.
 
-You also get a toast when something changes: **Control is plotting your path**, **Path accepted → PR1**, **Declined: …**, **Cancelled: …** or **Cancel refused: …**. An accepted card shrinks to one line after five minutes but keeps **Ask to cancel** while its train exists; declined, withdrawn and cancelled ones stay dimmed until Control clears closed requests.
+You also get a toast when something changes: **Control is plotting your path**, **Path accepted → PR1**, **Declined: …**, **Cancelled: …** or **Cancel refused: …**.
 
 For what Control does with your request, and what is recorded about it, see [Path requests](path-requests.md).
 

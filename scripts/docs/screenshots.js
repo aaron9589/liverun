@@ -722,8 +722,9 @@ const SHOTS = [
           loco: 'CityRail 4T',
         });
         await openJobs(page, ctx, { crew: GUARD_CREW, clock: '12:05' });
-        await page.getByText('My requests').waitFor();
-        await page.getByText('My requests').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+        // One list: the requests (collapsed) sit at the top of My jobs, the accepted one is its job below.
+        await page.getByText('My jobs').waitFor();
+        await page.getByText('My jobs').evaluate((el) => el.scrollIntoView({ block: 'start' }));
         await page.waitForTimeout(400);
         await page.screenshot({ path: ctx.out('jobs-requests') });
       } finally { await cleanRequests(ctx); }

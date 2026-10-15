@@ -1004,9 +1004,9 @@ export default function App() {
                       className={`flex items-center gap-1.5 text-xs transition-colors px-1.5 py-1 rounded hover:bg-slate-800 ${requestsOpen ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
                     >
                       Requests
-                      {badgeCount(timetable.path_requests) > 0 && (
+                      {badgeCount(timetable.path_requests, timetable.trains) > 0 && (
                         <span className="min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-semibold flex items-center justify-center">
-                          {badgeCount(timetable.path_requests)}
+                          {badgeCount(timetable.path_requests, timetable.trains)}
                         </span>
                       )}
                     </button>

@@ -1,7 +1,8 @@
 import type { PathRequest, Station, Train } from '../../types';
 import { currentStop, type SeqStop } from '../../lib/stops';
 import { jobSummary } from '../../lib/crewJobs';
-import { cancelAskText } from '../../lib/pathRequests';
+import { cancelAskText, jobBadges } from '../../lib/pathRequests';
+import { Badge } from './Badge';
 import { RequestActions } from './RequestCard';
 
 interface Props {
@@ -27,9 +28,8 @@ export function JobCard({ train, seq, stations, clock, expanded, onToggle, isNew
   const askLine = request ? cancelAskText(request) : null;
   const stationName = new Map(stations.map((s) => [s.id, s.name]));
   const done = train.status === 'completed';
-  const running = train.status === 'running';
+  const badges = jobBadges(train, request);
   const cur = expanded ? currentStop(seq, clock, null) : { index: -1, state: 'none' as const };
-  const requested = !!train.request_id;
   const summary = jobSummary(seq, stations);
   const flashCell = (id: string) => (retimedStopIds.has(id) ? 'bg-amber-500/30 rounded' : '');
 
@@ -48,8 +48,11 @@ export function JobCard({ train, seq, stations, clock, expanded, onToggle, isNew
           </span>
           {summary && <span className="block text-sm text-slate-400 truncate">{summary}</span>}
         </span>
-        {running && <span className="shrink-0 text-xs font-semibold px-2 py-1 rounded-full bg-emerald-900/60 text-emerald-300">Running</span>}
-        {done && <span className="shrink-0 text-xs font-semibold px-2 py-1 rounded-full bg-slate-800 text-slate-400">Done</span>}
+        {badges.length > 0 && (
+          <span className="shrink-0 flex flex-col items-end gap-1">
+            {badges.map((b) => <Badge key={b.label} badge={b} />)}
+          </span>
+        )}
       </button>
       {expanded && (
         <div className="px-4 pb-4">
@@ -85,11 +88,11 @@ export function JobCard({ train, seq, stations, clock, expanded, onToggle, isNew
               </tbody>
             </table>
           )}
-          {(train.notes?.trim() || requested) && (
-            <div className="mt-3 flex items-start gap-3 text-sm">
-              <p className="flex-1 whitespace-pre-wrap text-slate-300">{train.notes?.trim() ? `Notes: ${train.notes.trim()}` : ''}</p>
-              {requested && <span className="shrink-0 text-xs font-semibold px-2 py-1 rounded-full bg-blue-900/60 text-blue-300">Requested</span>}
-            </div>
+          {train.notes?.trim() && (
+            <p className="mt-3 text-sm whitespace-pre-wrap text-slate-300">Notes: {train.notes.trim()}</p>
+          )}
+          {request?.control_note?.trim() && (
+            <p className="mt-2 text-sm text-amber-300 whitespace-pre-wrap">Control: {request.control_note.trim()}</p>
           )}
           {request && askLine && (
             <p className={`mt-2 text-sm ${request.cancel_ask?.status === 'rejected' ? 'text-amber-300' : 'text-slate-400'}`}>

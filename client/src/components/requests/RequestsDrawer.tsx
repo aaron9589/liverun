@@ -3,7 +3,7 @@ import type { PathRequest, Timetable } from '../../types';
 import { api } from '../../api';
 import { describeSource, planRoute } from '../../lib/pathPlan';
 import { AuditLogTab, RequestHistory } from './AuditLog';
-import { ageLabel, hasOpenAsk, isOpenRequest, routeSummary, sortRequests } from '../../lib/requestQueue';
+import { ageLabel, hasOpenAsk, isOpenRequest, queueRequests, routeSummary } from '../../lib/requestQueue';
 
 // Right-hand drawer for Control's path-request queue (docs/path-requests-spec.md §5.1).
 // Request actions are not undoable: results go straight to onTimetable, never through the history stacks.
@@ -36,25 +36,14 @@ const STATUS_LABEL: Record<PathRequest['status'], string> = {
 };
 
 export function RequestsDrawer({ timetable, focusId, onTimetable, onStartPlot, onHighlightTrain, onClose }: Props) {
-  const requests = useMemo(() => sortRequests(timetable.path_requests ?? []), [timetable.path_requests]);
+  // Only what still needs Control; settled requests live on in the Audit log tab.
+  const requests = useMemo(() => queueRequests(timetable.path_requests, timetable.trains), [timetable.path_requests, timetable.trains]);
   const [now, setNow] = useState(() => Date.now());
-  const [clearError, setClearError] = useState<string | null>(null);
   const [tab, setTab] = useState<'requests' | 'audit'>('requests');
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
-  const hasClosed = requests.some((r) => !isOpenRequest(r));
-
-  async function handleClearClosed() {
-    if (!window.confirm('Clear all closed requests (accepted, declined, withdrawn, cancelled)?')) return;
-    try {
-      onTimetable(await api.clearClosedPathRequests(timetable.id));
-      setClearError(null);
-    } catch (e) {
-      setClearError(errorMessage(e));
-    }
-  }
 
   return (
     <aside
@@ -84,7 +73,7 @@ export function RequestsDrawer({ timetable, focusId, onTimetable, onStartPlot, o
 
       {tab === 'requests' && <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {requests.length === 0 && (
-          <p className="text-sm text-slate-500 text-center py-8">No requests yet.</p>
+          <p className="text-sm text-slate-500 text-center py-8">No requests waiting. Settled ones are in the Audit log.</p>
         )}
         {requests.map((r) => (
           <RequestRow
@@ -100,16 +89,6 @@ export function RequestsDrawer({ timetable, focusId, onTimetable, onStartPlot, o
         ))}
       </div>}
 
-      {tab === 'requests' && <div className="px-4 py-2.5 border-t border-slate-800 shrink-0 flex items-center gap-3">
-        <button
-          onClick={handleClearClosed}
-          disabled={!hasClosed}
-          className="text-xs px-2.5 py-1.5 rounded border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          Clear closed
-        </button>
-        {clearError && <span className="text-xs text-red-400">{clearError}</span>}
-      </div>}
     </aside>
   );
 }

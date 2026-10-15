@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PathRequest, Station } from '../types';
-import { sortRequests, badgeCount, routeSummary, newRequestEvents, ageLabel } from './requestQueue';
+import { sortRequests, badgeCount, queueRequests, routeSummary, newRequestEvents, ageLabel } from './requestQueue';
 
 const st = (id: string, name: string) => ({ id, name } as Station);
 const stations = [st('a', 'Kiama'), st('b', 'Bombo'), st('c', 'Dunmore')];
@@ -30,11 +30,27 @@ describe('sortRequests', () => {
 
 describe('badgeCount', () => {
   it('counts pending and open asks only', () => {
-    expect(badgeCount(undefined)).toBe(0);
+    expect(badgeCount(undefined, [])).toBe(0);
     expect(badgeCount([
-      req('1', 'pending'), req('2', 'in_review'), req('3', 'accepted', undefined, { cancel_ask: ask }),
-      req('4', 'accepted', undefined, { cancel_ask: { ...ask, status: 'rejected' } }),
-    ])).toBe(2);
+      req('1', 'pending'), req('2', 'in_review'), req('3', 'accepted', undefined, { cancel_ask: ask, train_id_created: 't3' }),
+      req('4', 'accepted', undefined, { cancel_ask: { ...ask, status: 'rejected' }, train_id_created: 't4' }),
+    ], [{ id: 't3' }, { id: 't4' }])).toBe(2);
+  });
+  it('does not count an ask whose train is gone', () => {
+    expect(badgeCount([req('3', 'accepted', undefined, { cancel_ask: ask, train_id_created: 'gone' })], [])).toBe(0);
+  });
+});
+
+describe('queueRequests', () => {
+  it('keeps only what Control still has to deal with', () => {
+    const list = [
+      req('p', 'pending'), req('r', 'in_review', '2026-01-01T11:00:00Z'),
+      req('acc', 'accepted', undefined, { train_id_created: 't1' }),
+      req('ask', 'accepted', undefined, { train_id_created: 't1', cancel_ask: ask }),
+      req('ask-gone', 'accepted', undefined, { train_id_created: 'deleted', cancel_ask: ask }),
+      req('dec', 'declined'), req('wd', 'withdrawn'), req('can', 'cancelled'),
+    ];
+    expect(queueRequests(list, [{ id: 't1' }]).map((r) => r.id)).toEqual(['r', 'p', 'ask']);
   });
 });
 

@@ -1,4 +1,4 @@
-import type { PathRequest, Station } from '../types';
+import type { PathRequest, Station, Train } from '../types';
 import { PATH_REQUEST_OPEN } from '../types';
 
 // Planner-side helpers for the path-request queue (docs/path-requests-spec.md §5.1). Pure.
@@ -18,9 +18,20 @@ export function sortRequests(requests: PathRequest[]): PathRequest[] {
   });
 }
 
-/** Header badge: pending requests plus open cancel asks. */
-export function badgeCount(requests: PathRequest[] | undefined): number {
-  return (requests ?? []).filter((r) => r.status === 'pending' || hasOpenAsk(r)).length;
+/**
+ * What Control still has to deal with, sorted (newest first): pending, being plotted, and
+ * accepted with an open cancel ask whose train still exists. Everything else (accepted,
+ * declined, withdrawn, cancelled, or a train deleted since) drops out; it stays in the audit log.
+ */
+export function queueRequests(requests: PathRequest[] | undefined, trains: Pick<Train, 'id'>[]): PathRequest[] {
+  const exists = new Set(trains.map((t) => t.id));
+  return sortRequests((requests ?? []).filter((r) =>
+    PATH_REQUEST_OPEN.includes(r.status) || (hasOpenAsk(r) && !!r.train_id_created && exists.has(r.train_id_created))));
+}
+
+/** Header badge: pending requests plus open cancel asks (whose train still exists). */
+export function badgeCount(requests: PathRequest[] | undefined, trains: Pick<Train, 'id'>[]): number {
+  return queueRequests(requests, trains).filter((r) => r.status === 'pending' || hasOpenAsk(r)).length;
 }
 
 /** "Kiama → Bombo (shunt 20, note) → Dunmore", with the siding where one is named. */

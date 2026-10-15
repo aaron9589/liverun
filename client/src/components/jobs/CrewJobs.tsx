@@ -10,7 +10,7 @@ import { autoSelectTrain, sequenceStops, sortByRun } from '../../lib/stops';
 import { describeJobChange, diffJobs } from '../../lib/jobDiff';
 import { fmtMins } from '../../lib/crewJobs';
 import { setClockHint } from '../../lib/device';
-import { defaultFrom, myRequests, requestToasts } from '../../lib/pathRequests';
+import { defaultFrom, requestForTrain, requestItems, requestToasts } from '../../lib/pathRequests';
 import type { PathRequestSubmit, Timetable } from '../../types';
 import { ChangeToasts, useToasts } from '../ChangeToasts';
 import { CrewPicker } from './CrewPicker';
@@ -118,9 +118,9 @@ export function CrewJobs() {
   const [open, setOpen] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   const autoId = autoSelectTrain(trains, clock)?.id ?? null;
 
-  // My requests: this crew's, open first. A 30 s tick lets accepted cards fade without other updates.
-  const requests = useMemo(() => myRequests(timetable?.path_requests, crew?.id ?? ''), [timetable?.path_requests, crew?.id]);
+  // This crew's requests that aren't a job yet. A 30 s tick lets a declined one drop out after ten minutes.
   const [now, setNow] = useState(() => Date.now());
+  const requests = useMemo(() => requestItems(timetable?.path_requests, crew?.id ?? '', now), [timetable?.path_requests, crew?.id, now]);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
@@ -223,24 +223,21 @@ export function CrewJobs() {
             className="min-h-[56px] rounded-xl bg-blue-600 hover:bg-blue-500 text-lg font-semibold"
           >+ Request a path</button>
         )}
-        {requests.length > 0 && (
-          <>
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">My requests</h2>
-            {requests.map((r) => (
-              <RequestCard
-                key={r.id}
-                request={r}
-                timetable={timetable}
-                crewId={crew!.id}
-                now={now}
-                onWithdraw={withdraw}
-                onAskCancel={askCancel}
-              />
-            ))}
-          </>
-        )}
         <h1 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">My jobs</h1>
-        {trains.length === 0 && <p className="text-slate-400">No jobs for this crew yet.</p>}
+        {requests.length === 0 && trains.length === 0 && <p className="text-slate-400">No jobs for this crew yet.</p>}
+        {/* Requests not yet a job come first, collapsed; accepted ones are their job below. */}
+        {requests.map((r) => (
+          <RequestCard
+            key={r.id}
+            request={r}
+            timetable={timetable}
+            crewId={crew!.id}
+            expanded={open.get(r.id) ?? false}
+            onToggle={() => setOpen((prev) => new Map(prev).set(r.id, !(prev.get(r.id) ?? false)))}
+            onWithdraw={withdraw}
+            onAskCancel={askCancel}
+          />
+        ))}
         {trains.map((t) => (
           <JobCard
             key={t.id}
@@ -252,7 +249,7 @@ export function CrewJobs() {
             onToggle={() => setOpen((prev) => new Map(prev).set(t.id, !(prev.get(t.id) ?? t.id === autoId)))}
             isNew={newIds.has(t.id)}
             retimedStopIds={retimedIds}
-            request={timetable.path_requests?.find((r) => r.train_id_created === t.id && r.crew_id === crew!.id && r.status === 'accepted')}
+            request={requestForTrain(timetable.path_requests, t.id)}
             trains={timetable.trains}
             onWithdraw={withdraw}
             onAskCancel={askCancel}

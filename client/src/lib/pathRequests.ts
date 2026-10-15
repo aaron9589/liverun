@@ -104,14 +104,50 @@ export const canAskCancel = (r: PathRequest, trains?: Pick<Train, 'id'>[]): bool
   r.status === 'accepted' && !hasOpenAsk(r)
   && (!trains || (!!r.train_id_created && trains.some((t) => t.id === r.train_id_created)));
 
-/** How long an accepted card stays prominent before it fades. */
-export const ACCEPTED_FADE_MS = 5 * 60_000;
+// ── One list of jobs and requests (Crew jobs) ─────────────────────────────────
 
-/** True once an accepted request has been settled for a while (no open ask to deal with). Only its looks fade: Ask to cancel stays. */
-export function isFaded(r: PathRequest, now: number): boolean {
-  if (r.status !== 'accepted' || hasOpenAsk(r)) return false;
-  const t = Date.parse(r.updated_at);
-  return Number.isFinite(t) && now - t > ACCEPTED_FADE_MS;
+/** How long a declined request stays in the list so the crew sees Control's reason. */
+export const DECLINED_SHOW_MS = 10 * 60_000;
+
+/**
+ * This crew's requests that aren't a job (yet): waiting, being plotted, or declined in the
+ * last ten minutes; newest first. Accepted ones show as their job instead; withdrawn,
+ * cancelled and ones whose train was deleted drop out.
+ */
+export function requestItems(requests: PathRequest[] | undefined, crewId: string, now: number): PathRequest[] {
+  const recent = (r: PathRequest) => now - (Date.parse(r.updated_at) || 0) < DECLINED_SHOW_MS;
+  return myRequests(requests, crewId).filter((r) => isOpen(r) || (r.status === 'declined' && recent(r)));
+}
+
+/** The accepted request a train was made from, if any. */
+export function requestForTrain(requests: PathRequest[] | undefined, trainId: string): PathRequest | undefined {
+  return (requests ?? []).find((r) => r.status === 'accepted' && r.train_id_created === trainId);
+}
+
+export type BadgeTone = 'amber' | 'blue' | 'green' | 'teal' | 'red' | 'slate';
+export interface Badge { label: string; tone: BadgeTone }
+
+/** The one badge a request card shows. */
+export function requestBadge(r: PathRequest): Badge {
+  switch (r.status) {
+    case 'pending': return { label: 'Waiting', tone: 'amber' };
+    case 'in_review': return { label: 'Plotting', tone: 'blue' };
+    case 'accepted': return { label: 'Accepted', tone: 'green' };
+    case 'declined': return { label: 'Declined', tone: 'red' };
+    case 'withdrawn': return { label: 'Withdrawn', tone: 'slate' };
+    case 'cancelled': return { label: 'Cancelled', tone: 'slate' };
+  }
+}
+
+/** Badges on a job card: made from an accepted request, a cancel ask, then run status. */
+export function jobBadges(train: Pick<Train, 'status' | 'request_id'>, request?: PathRequest): Badge[] {
+  const out: Badge[] = [];
+  if (request || train.request_id) out.push({ label: 'Accepted', tone: 'green' });
+  if (request?.cancel_ask?.status === 'open') out.push({ label: 'Cancel asked', tone: 'amber' });
+  else if (request?.cancel_ask?.status === 'rejected') out.push({ label: 'Cancel refused', tone: 'amber' });
+  if (train.status === 'running') out.push({ label: 'Running', tone: 'teal' });
+  else if (train.status === 'completed') out.push({ label: 'Done', tone: 'slate' });
+  return out;
 }
 
 /** This crew's requests: open ones first, then newest first. */
