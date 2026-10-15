@@ -7,6 +7,7 @@ Notable changes to LiveRun. The [user guide](docs/user-guide/README.md) describe
 ### Fixed
 - **Layout settings previews follow running order.** The Limit of Authority preview showed Up trains' sections reversed (e.g. *Kiama → Berry* for a train running Nowra → Kiama), and the Boarding preview swapped their origin and terminus. Both now match the guard panel.
 - The train editor's en-route guard event wording now says *the next stop the train runs to* (the editor lists stops in station order).
+- The LOA editor no longer claims a section with no elements is granted immediately; such a section is never granted.
 - **Guard events expire after 12 hours on a tablet**, like LOA state: the next session rolls them afresh instead of finding them already fired. Un-ACKed banners expire too.
 
 ### New

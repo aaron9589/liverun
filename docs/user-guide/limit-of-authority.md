@@ -62,7 +62,7 @@ Later sections can be granted early, before the train reaches them, if Control s
 
 The editor warns about two set-ups that can't work:
 
-- **No element is ticked Grants, so this section can never be granted.** The same goes for a section with no elements at all: it never reaches GRANTED.
+- **No element is ticked Grants, so this section can never be granted.** The same goes for a section with no elements at all; the editor shows *No elements yet. A section is never granted until it has at least one element ticked Grants.*
 - **No element is ticked Revokes, so once granted this section is never released and the guard panel stays on it.**
 
 ## What the guard sees
