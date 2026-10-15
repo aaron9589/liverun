@@ -268,7 +268,7 @@ export function Sidebar({
                 </button>
               </div>
             </div>
-            <p className="text-xs text-slate-600 mb-2">Add and manage trains on the graph. Dots indicate: <span className="text-blue-400">●</span> notes &nbsp;<span className="text-amber-400">●</span> special instructions &nbsp;<span className="text-green-400">●</span> crew assigned.</p>
+            <p className="text-xs text-slate-600 mb-2">Add and manage trains on the graph. Badges: <span className="text-blue-300 font-semibold">N</span> notes &nbsp;<span className="text-amber-300 font-semibold">S</span> special instructions &nbsp;and the crew's initials.</p>
             {openSections.trains && (
               <>
                 {timetable.trains.length > 0 && (

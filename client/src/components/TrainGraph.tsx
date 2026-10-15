@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Timetable, Train, TrainStop } from '../types';
 import { timeToMinutes, minutesToTime, stationNameStyle } from '../utils';
+import { dragStopTime, shiftStops, type TimeKind } from '../lib/trainDrag';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const PAD = { top: 24, right: 24, bottom: 48, left: 140 };
@@ -35,6 +36,11 @@ interface PlotPoint {
   y: number;
   minutes: number;
   stationName: string;
+  /** The stop and which of its times this point is (graph editing handles). */
+  stopId: string;
+  kind: TimeKind;
+  /** Pass-through / zero-dwell stop: one point stands for both arrival and departure. */
+  pass: boolean;
 }
 
 function buildTrainPoints(
@@ -45,18 +51,17 @@ function buildTrainPoints(
   posToY: (pos: number) => number,
   gw: number,
 ): PlotPoint[] {
-  type StopEntry = { stop: TrainStop; timeMin: number; isArrival: boolean; graphPos: number; stationName: string };
+  type StopEntry = { stop: TrainStop; timeMin: number; isArrival: boolean; graphPos: number; stationName: string; pass: boolean };
   const entries: StopEntry[] = [];
 
   for (const stop of train.stops) {
     const st = stationMap.get(stop.station_id);
     if (!st) continue;
+    const pass = !!stop.arrival && stop.departure === stop.arrival;
     if (stop.arrival)
-      entries.push({ stop, timeMin: timeToMinutes(stop.arrival), isArrival: true, graphPos: st.graph_pos, stationName: stop.location_alias || st.name });
+      entries.push({ stop, timeMin: timeToMinutes(stop.arrival), isArrival: true, graphPos: st.graph_pos, stationName: stop.location_alias || st.name, pass });
     if (stop.departure && stop.departure !== stop.arrival)
-      entries.push({ stop, timeMin: timeToMinutes(stop.departure), isArrival: false, graphPos: st.graph_pos, stationName: stop.location_alias || st.name });
-    if (stop.departure && !stop.arrival)
-      entries.push({ stop, timeMin: timeToMinutes(stop.departure), isArrival: false, graphPos: st.graph_pos, stationName: stop.location_alias || st.name });
+      entries.push({ stop, timeMin: timeToMinutes(stop.departure), isArrival: false, graphPos: st.graph_pos, stationName: stop.location_alias || st.name, pass: false });
   }
 
   entries.sort((a, b) => a.timeMin !== b.timeMin ? a.timeMin - b.timeMin : (a.isArrival ? -1 : 1));
@@ -68,6 +73,9 @@ function buildTrainPoints(
     y: posToY(e.graphPos),
     minutes: e.timeMin,
     stationName: e.stationName,
+    stopId: e.stop.id,
+    kind: e.isArrival ? 'arr' : 'dep',
+    pass: e.pass,
   }));
 }
 
@@ -197,12 +205,26 @@ interface Props {
   onPan?: (newViewStart: number) => void;
   externalHoveredId?: string | null;
   onScaleChange?: (scale: number | null) => void;
+  /** Enables graph editing (Edit toggle): a train or one of its stop times was dragged to new times. */
+  onTrainTimesChange?: (train: Train, stops: TrainStop[]) => void;
+}
+
+/** A drag in progress (edit mode): the whole train, or one stop time and everything after it. */
+interface GraphDrag {
+  trainId: string;
+  /** null = whole train; else the stop time being moved ('either' = a pass point, decided by direction). */
+  handle: { stopId: string; kind: TimeKind | 'either' } | null;
+  startX: number;
+  /** Preview: the train's stops with the drag applied, and the minutes moved. */
+  stops: TrainStop[];
+  delta: number;
+  moved: boolean;
 }
 
 export function TrainGraph({
   timetable, onTrainClick, labelMode = 'code', distanceUnit = 'km',
   viewStart: viewStartProp, viewEnd: viewEndProp,
-  clockTime, onPan, externalHoveredId, onScaleChange,
+  clockTime, onPan, externalHoveredId, onScaleChange, onTrainTimesChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -212,6 +234,13 @@ export function TrainGraph({
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [userScale, setUserScale] = useState<number | null>(timetable.settings.graph_scale ?? null);
+  // Graph editing: off on every load, so a stray drag during a live session can't move a train.
+  const [editMode, setEditMode] = useState(false);
+  const [drag, setDrag] = useState<GraphDrag | null>(null);
+  const dragState = useRef<GraphDrag | null>(null);
+  /** Swallows the click that ends a drag, so dropping a train doesn't open its editor. */
+  const suppressClick = useRef(false);
+  const [dragAt, setDragAt] = useState<{ x: number; y: number } | null>(null);
   // Ref to stable layout values used in external-hover effect (avoids stale closures)
   const layoutRef = useRef({ stationMap: new Map<string, { graph_pos: number; name: string }>(), viewStart: 0, viewEnd: 0, posToY: (_: number) => PAD.top, gw: 0, timetable });
   const needsVScrollRef = useRef(false);
@@ -335,6 +364,64 @@ export function TrainGraph({
 
   const handleMouseLeave = () => { setTooltip(null); setHoveredId(null); };
 
+  /**
+   * Edit mode: drags a whole train (handle null) or one stop time (and every
+   * later time on the run) left/right in whole minutes. The preview is drawn
+   * live; releasing saves once (one undo step). Escape cancels.
+   */
+  function startDrag(e: React.MouseEvent, train: Train, handle: GraphDrag['handle']) {
+    if (!editMode || !onTrainTimesChange || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const pxPerMin = gw / viewWidth;
+    const begin: GraphDrag = { trainId: train.id, handle, startX: e.clientX, stops: train.stops, delta: 0, moved: false };
+    dragState.current = begin;
+    setDrag(begin);
+    setTooltip(null);
+    setDragAt({ x: e.clientX, y: e.clientY });
+
+    const onMove = (ev: MouseEvent) => {
+      const d = dragState.current;
+      if (!d) return;
+      setDragAt({ x: ev.clientX, y: ev.clientY });
+      const dx = ev.clientX - d.startX;
+      const moved = d.moved || Math.abs(dx) > 3;
+      const want = moved ? Math.round(dx / pxPerMin) : 0;
+      let stops = train.stops;
+      let delta = 0;
+      if (want !== 0 && !d.handle) {
+        stops = shiftStops(train.stops, want);
+        delta = want;
+      } else if (want !== 0 && d.handle) {
+        // A pass point: pulling right opens a dwell (departure), left moves the arrival earlier.
+        const kind = d.handle.kind === 'either' ? (want > 0 ? 'dep' : 'arr') : d.handle.kind;
+        ({ stops, delta } = dragStopTime(train.stops, d.handle.stopId, kind, want));
+      }
+      const next = { ...d, moved, stops, delta };
+      dragState.current = next;
+      setDrag(next);
+    };
+    const finish = (save: boolean) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('keydown', onKey);
+      const d = dragState.current;
+      dragState.current = null;
+      setDrag(null);
+      if (d?.moved) {
+        // The click that follows this mouseup must not open the editor.
+        suppressClick.current = true;
+        setTimeout(() => { suppressClick.current = false; }, 0);
+      }
+      if (save && d && d.delta !== 0) onTrainTimesChange(train, d.stops);
+    };
+    const onUp = () => finish(true);
+    const onKey = (ev: KeyboardEvent) => { if (ev.key === 'Escape') finish(false); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('keydown', onKey);
+  }
+
   const handleVZoomIn = () => {
     const next = Math.min(fitPxPerUnit * MAX_V_ZOOM_FACTOR, Math.round(pxPerUnit * 1.25 * 100) / 100);
     setUserScale(next);
@@ -456,6 +543,14 @@ export function TrainGraph({
     <div ref={containerRef} className="w-full h-full relative flex flex-col select-none overflow-hidden">
       {/* Vertical scale controls */}
       <div className="absolute z-10 flex items-center gap-0.5 bg-slate-900/80 backdrop-blur-sm rounded border border-slate-700/50 overflow-hidden" style={{ top: PAD.top + 4, right: PAD.right + 4 }}>
+        {onTrainTimesChange && (
+          <button
+            onClick={() => { setEditMode((v) => !v); setTooltip(null); }}
+            aria-pressed={editMode}
+            title={editMode ? 'Stop editing the graph' : 'Edit the graph: drag a train to move it, drag a stop handle to change that time (later stops follow)'}
+            className={`h-5 px-1.5 flex items-center gap-1 text-[11px] font-medium transition-colors border-r border-slate-700/50 ${editMode ? 'bg-amber-500/90 text-slate-950' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
+          >✎ {editMode ? 'Editing' : 'Edit'}</button>
+        )}
         <button
           onClick={handleVZoomOut}
           disabled={pxPerUnit <= minPxPerUnit + 0.01}
@@ -597,8 +692,14 @@ export function TrainGraph({
 
           {/* Train paths — clipped */}
           <g clipPath="url(#graphClip)">
-            {timetable.trains.map((train) => {
-              const points = buildTrainPoints(train, stationMap, viewStart, viewEnd, distToY, gw);
+            {/* The hovered / dragged train is drawn last, on top, so its line and handles get the mouse first. */}
+            {[...timetable.trains].sort((a, b) => {
+              const top = drag?.trainId ?? effectiveHoveredId;
+              return (a.id === top ? 1 : 0) - (b.id === top ? 1 : 0);
+            }).map((train) => {
+              const dragging = drag?.trainId === train.id;
+              const shown = dragging ? { ...train, stops: drag!.stops } : train;
+              const points = buildTrainPoints(shown, stationMap, viewStart, viewEnd, distToY, gw);
               if (points.length < 2) return null;
               const ptStr = points.map((p) => `${p.x},${p.y}`).join(' ');
               const isHovered = effectiveHoveredId === train.id;
@@ -609,11 +710,13 @@ export function TrainGraph({
               return (
                 <g
                   key={train.id}
-                  style={{ cursor: 'pointer' }}
-                  onMouseEnter={(e) => handleTrainHover(train, points, e)}
-                  onMouseMove={handleMouseMove}
-                  onMouseLeave={() => { setHoveredId(null); setTooltip(null); }}
-                  onClick={() => onTrainClick?.(train)}
+                  data-train-id={train.id}
+                  style={{ cursor: editMode ? (dragging ? 'grabbing' : 'grab') : 'pointer' }}
+                  onMouseEnter={(e) => { if (!dragState.current) handleTrainHover(train, points, e); }}
+                  onMouseMove={(e) => { if (!dragState.current) handleMouseMove(e); }}
+                  onMouseLeave={() => { if (!dragState.current) { setHoveredId(null); setTooltip(null); } }}
+                  onMouseDown={(e) => startDrag(e, train, null)}
+                  onClick={() => { if (!suppressClick.current) onTrainClick?.(train); }}
                 >
                   <polyline points={ptStr} fill="none" stroke="transparent" strokeWidth="12" />
                   {/* Glow layers for running trains */}
@@ -623,6 +726,19 @@ export function TrainGraph({
                   <polyline points={ptStr} fill="none" stroke={lineColor} strokeOpacity={lineOpacity} strokeWidth={isHovered || isRunning ? 2.5 : 2} strokeLinejoin="round" strokeLinecap="round" strokeDasharray={undefined} />
                   {points.map((p, i) => (
                     <circle key={i} cx={p.x} cy={p.y} r="2.5" fill={lineColor} opacity={lineOpacity} />
+                  ))}
+                  {/* Edit mode: a handle per stop time; drag to change it (later stops follow) */}
+                  {editMode && (isHovered || dragging) && points.map((p, i) => (
+                    <circle
+                      key={`h${i}`}
+                      data-handle={`${p.stopId}:${p.pass ? 'either' : p.kind}`}
+                      cx={p.x} cy={p.y} r="5"
+                      fill="#0f172a" stroke={lineColor} strokeWidth="2"
+                      style={{ cursor: 'ew-resize' }}
+                      onMouseDown={(e) => startDrag(e, train, { stopId: p.stopId, kind: p.pass ? 'either' : p.kind })}
+                    >
+                      <title>{`${p.stationName} ${p.pass ? 'pass — drag right to add a dwell' : p.kind === 'arr' ? 'arrival' : 'departure'}`}</title>
+                    </circle>
                   ))}
                 </g>
               );
@@ -678,6 +794,26 @@ export function TrainGraph({
       )}
 
       {tooltip && <GraphTooltip data={tooltip} />}
+      {drag?.moved && dragAt && (() => {
+        const train = timetable.trains.find((t) => t.id === drag.trainId);
+        if (!train) return null;
+        const sign = drag.delta > 0 ? '+' : '';
+        let text = `${train.name} ${sign}${drag.delta} min`;
+        if (drag.handle) {
+          const stop = drag.stops.find((st) => st.id === drag.handle!.stopId);
+          const name = stop ? (stop.location_alias || stationMap.get(stop.station_id)?.name || '') : '';
+          const time = stop ? (drag.handle.kind === 'arr' ? stop.arrival : stop.departure) ?? stop.departure ?? stop.arrival : null;
+          const what = stop && stop.arrival && stop.departure && stop.arrival !== stop.departure
+            ? `${stop.arrival}–${stop.departure}` : time;
+          text = `${name} ${what ?? ''}  (${sign}${drag.delta} min, later stops follow)`;
+        }
+        return (
+          <div
+            className="fixed z-50 pointer-events-none px-2 py-1 rounded bg-slate-800/95 border border-amber-500/60 text-xs text-amber-100 font-mono whitespace-nowrap shadow-lg"
+            style={{ left: dragAt.x + 14, top: dragAt.y + 14 }}
+          >{text}</div>
+        );
+      })()}
     </div>
   );
 }

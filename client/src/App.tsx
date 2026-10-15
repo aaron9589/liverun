@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { modeUrl } from './lib/mode';
-import type { LayoutConfig, Timetable, TimetableSummary, TimetableSettings, Train, ModalState, TrainRequest, Path, PathRequest } from './types';
+import type { LayoutConfig, Timetable, TimetableSummary, TimetableSettings, Train, TrainStop, ModalState, TrainRequest, Path, PathRequest } from './types';
 import { api } from './api';
 import { useLocalStorage, timeToMinutes, exportCatsXml, exportCrewsXml, escapeHtml, stationNameStyle } from './utils';
 import { useFastClock } from './hooks/useFastClock';
@@ -499,18 +499,16 @@ export default function App() {
     return unassigned;
   }
 
-  async function handleUnassignTrain(trainId: string) {
-    if (!selectedId || !timetable) return;
-    const train = timetable.trains.find((t) => t.id === trainId);
-    if (!train) return;
-    const updated = await api.updateTrain(selectedId, trainId, {
+  /** A full update request for a train, keeping every stop field (notes, aliases, guard events). */
+  function trainRequest(train: Train, over: { crewId?: string | null; stops?: TrainStop[] } = {}): TrainRequest {
+    return {
       name: train.name,
       color: train.color,
       notes: train.notes,
       trainId: train.train_id,
       direction: train.direction,
-      crewId: undefined,
-      stops: train.stops.map((s) => ({
+      crewId: over.crewId === undefined ? train.crew_id : over.crewId ?? undefined,
+      stops: (over.stops ?? train.stops).map((s) => ({
         stationId: s.station_id,
         arrival: s.arrival,
         departure: s.departure,
@@ -518,8 +516,28 @@ export default function App() {
         locationAlias: s.location_alias ?? undefined,
         guardEvents: s.guard_events,
       })),
-    });
+    };
+  }
+
+  async function handleUnassignTrain(trainId: string) {
+    if (!selectedId || !timetable) return;
+    const train = timetable.trains.find((t) => t.id === trainId);
+    if (!train) return;
+    const updated = await api.updateTrain(selectedId, trainId, trainRequest(train, { crewId: null }));
     recordAndSet(updated);
+  }
+
+  // Graph editing: a train (or one of its stop times) was dragged. One save = one undo step.
+  async function handleTrainTimesChange(dragged: Train, stops: TrainStop[]) {
+    if (!selectedId || !timetable) return;
+    const train = timetable.trains.find((t) => t.id === dragged.id);
+    if (!train) return;
+    try {
+      const updated = await api.updateTrain(selectedId, train.id, trainRequest(train, { stops }));
+      recordAndSet(updated);
+    } catch (e) {
+      window.alert(`Could not move ${train.name}: ${e instanceof Error ? e.message : 'save failed'}`);
+    }
   }
 
   async function handleToggleTrainComplete(trainId: string) {
@@ -981,6 +999,7 @@ export default function App() {
               onPan={handlePan}
               externalHoveredId={hoveredCrewTrainId}
               onScaleChange={(scale) => handleSettingsSave({ ...displayTimetable.settings, graph_scale: scale })}
+              onTrainTimesChange={handleTrainTimesChange}
             />
           )}
         </div>
