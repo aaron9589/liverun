@@ -450,7 +450,8 @@ Same model as the guard-panel spec §14.
 | | 1 ∥ | 2A (Opus) | `server/path-requests.js`: submit, withdraw (pending/in_review), acknowledge, release, decline, cancel-ask, cancel-reject, clear; validation, 409 state rules, active-timetable check, open-request cap; `{ notify: false }` mutations; `path-requests` message in `sync.js` (on change + after `hello`); tests |
 | | 1 ∥ | 2B (Sonnet) | `server/audit.js`: append-only JSONL, 5 MB rotation, `shortUa()`, query + CSV, `GET /api/audit`; tests. Client device id + header in `api.ts` |
 | | 1 ∥ | 2C (Sonnet) | Crew jobs: request form (stations, sidings, work stops, ready-at, notes, roster combobox), My requests cards (status, Control's note, Withdraw, Ask to cancel) |
-| | 2 | 2D (Sonnet) | Planner: new-request and ask-to-cancel toasts, **Requests** badge, drawer (list, "times from" placeholder, Decline, Return to queue, Reject cancel); sync handling in `App.tsx`. Hooks 2A's handlers into `audit.js` |
+| | 2 | 2D (Sonnet) | Planner: new-request and ask-to-cancel toasts, **Requests** badge, drawer (list, "times from" placeholder, Decline, Return to queue, Reject cancel); sync handling in `App.tsx` |
+| | 2 | Supervisor | Merge 2A + 2B: call `audit.js` from every path-request handler (ok and rejected) |
 | **3** Plot + accept | 0 | Supervisor | Contracts: `planDraft(request, timetable, clock) → { train, source, warnings }`, `pendingTrain` prop and edit-bar callbacks, accept / cancel-approve bodies |
 | | 1 ∥ | 3A (Opus) | `lib/pathPlan.ts`: single-path match (forward/reversed, most direct), leg graph + Dijkstra on median leg times, no-data fallback, duplicate-station fallback, passing points, start time, terminal-stop rule, station-order storage; Vitest |
 | | 1 ∥ | 3B (Opus) | Server `/accept` (one mutation: state check, `validateRetime`, shared train creation, retime, request update) and `/cancel-approve` (delete train + `cancelled`); audit details for both; tests incl. withdraw-vs-accept race |
