@@ -517,6 +517,7 @@ LOA is driven **only by the safeworking elements (L6)**. The guard's doors are n
 - **Frozen**: a completed section is never re-granted, so a following train getting the same staff can't bring it back.
 - **Current section**: the first section on the train's route that isn't COMPLETE.
 - **Persistence**: latch and complete state are stored per device under timetable + train id, the same as guard events, so a reload keeps them. There is **no manual reset**: LOA is governed entirely by Control through the field elements.
+- **Operating note**: a tablet only knows grants and releases it saw happen. Open the train on the guard panel **before Control starts setting up** its first section; a device that picks the train up mid-run shows the first section as AWAIT. Accepted as the way of working (no position input, by design).
 
 ### 11.5 Initial state: server-side topic cache
 
