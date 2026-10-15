@@ -2,6 +2,22 @@
 
 Notable changes to LiveRun. The [user guide](docs/user-guide/README.md) describes the current behaviour in full.
 
+## Unreleased
+
+### New
+- **Crew jobs**: a phone view for train crews. Pick your crew and see your jobs with their timetables and instructions, and read-only run status. Crews can't start, complete or edit anything here.
+- **Path requests**: a crew asks Control for a path from Crew jobs (start and destination, optional intermediate stops with shunt, work or stop minutes, a siding where the station has one, and a ready time or as soon as possible). The request appears in the planner with a toast and a **Requests** badge.
+  - Control **acknowledges** a request, which opens the graph in edit mode with the path drawn as a dashed draft train timed from the layout's path templates. Control can move it and other trains, change its stops or crew, then **Accept** (saves the train and any other moves in one undo step) or **Decline** with a note.
+  - An accepted request becomes an ordinary train in the assigned crew's jobs, with the note from Control. Crews can **withdraw** a request while it's pending or being plotted. After accept they can **ask to cancel**; Control approves (the train is removed) or rejects with a note.
+  - Control gets a **Requests** drawer with the queue and each request's history. Plotting can be resumed or returned to the queue, an accepted request whose train was undone can be **Reopen**ed, and **Clear closed** removes finished requests.
+  - Settings: **Crews can request paths** on/off, train ID prefix (default `PR`), default leg minutes (5) and lead time for ASAP requests (2). Requests only take effect on the active timetable.
+- **Audit log**: every path-request action, accepted or refused, is recorded with the time, IP address, device, the acting crew (or Control) and what changed. Control reads it in the Requests drawer and can export CSV. The log is kept in `<data>/audit.jsonl` (rotated at 5 MB) and survives undo, timetable deletion and restore. `GET /api/audit` returns it, with filters and `format=csv`.
+- **Mobile view picker** at `/mobile`: choose **Crew jobs** or **Running board**. The choice is remembered on the device; **View** on the Running board changes it. `/mobile?view=jobs` and `?view=board` link straight to a view.
+- **Mode picker** card **Mobile** (replaces **Crew view**) leads to the mobile views.
+
+### Changed
+- **The crew view is now the Running board**: the owner's view of everything running and when, with run and complete marking as before. Trains with a pending request show a **Requested** badge.
+
 ## 2.1.0 (2026-10-15)
 
 ### Fixed

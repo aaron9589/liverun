@@ -1,5 +1,7 @@
-import type { PathRequest, Train, TrainRequest, TrainStop } from '../types';
+import type { PathRequest, Timetable, Train, TrainRequest, TrainStop } from '../types';
+import { minutesToTime } from '../utils';
 import { pendingTrainId } from './pathPlan';
+import { runSpan } from './stops';
 
 // Pure helpers for plotting a path request in the planner (docs/path-requests-spec.md §1, §5.3).
 
@@ -50,4 +52,40 @@ export function plotRequestState(requests: PathRequest[] | undefined, requestId:
   if (!r) return 'gone';
   if (r.status === 'in_review') return 'ok';
   return r.status === 'withdrawn' ? 'withdrawn' : 'gone';
+}
+
+const wrap = (m: number) => ((m % 1440) + 1440) % 1440;
+const hhmm = (m: number) => minutesToTime(wrap(Math.round(m)));
+
+/**
+ * Warnings shown while plotting (spec §5.3): the plan's own (path data, kept from when plotting
+ * started) plus, recomputed from the current draft, a start before the fast clock and overlaps
+ * with the assigned crew's other jobs. Midnight-safe; no clock → no clock warning.
+ */
+export function plotWarnings(
+  train: Train,
+  timetable: Pick<Timetable, 'trains' | 'crews'>,
+  clockMinutes: number | null,
+  planWarnings: string[],
+): string[] {
+  const out = [...planWarnings];
+  const span = runSpan(train);
+  if (!span) return out;
+  if (typeof clockMinutes === 'number' && Number.isFinite(clockMinutes)) {
+    // Up to 12 h behind the clock counts as "already started"; further is the future (next day).
+    const behind = wrap(Math.floor(clockMinutes) - span.start);
+    if (behind > 0 && behind < 720) out.push(`starts ${behind} min before the fast clock`);
+  }
+  const crew = train.crew_id ? timetable.crews.find((c) => c.id === train.crew_id) : undefined;
+  if (crew) {
+    for (const other of timetable.trains) {
+      if (other.id === train.id || other.crew_id !== crew.id) continue;
+      const o = runSpan(other);
+      if (!o) continue;
+      // Spans are unwrapped from their own first stop, so compare across day shifts.
+      const clash = [-1440, 0, 1440].some((d) => span.start < o.end + d && o.start + d < span.end);
+      if (clash) out.push(`${crew.name} has another job overlapping ${hhmm(o.start)}\u2013${hhmm(o.end)}`);
+    }
+  }
+  return out;
 }

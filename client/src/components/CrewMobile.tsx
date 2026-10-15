@@ -155,6 +155,9 @@ function TrainCard({
               New
             </span>
           )}
+          {train.request_id && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-300 shrink-0">Requested</span>
+          )}
           {crew && (
             <span
               className="text-xs px-1.5 py-0.5 rounded-full shrink-0"

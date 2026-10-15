@@ -1,6 +1,6 @@
 # Path Requests — Design Spec (draft 4)
 
-Status: **draft 2, decisions recorded**. Nothing implemented yet. Draft 1's open questions are answered and logged in §0 (P11–P20).
+Status: **implemented** on branch `feat/path-requests`, phases 1–4 (§10, §12.3). The decisions in §0 are recorded and still apply; where a later section's wording differs from the code, the code is the reference. Draft 1's open questions are answered and logged in §0 (P11–P20).
 
 ## Summary
 
@@ -349,7 +349,7 @@ If inferred routes would put a station in the train twice, that leg falls back t
 
 ### 5.3 Plotting on the graph
 
-`TrainGraph` gets an optional **`pendingTrain`** prop: a train that isn't in `timetable.trains`.
+`TrainGraph` gets an optional **`plotting`** prop (`PlottingState`, `client/src/lib/plotting.ts`): the draft train, which isn't in `timetable.trains` (its id comes from `pendingTrainId()`). Its callbacks are `onPlotChange` (a moved draft), `onPlotEditStops`, `onPlotAccept(others, note)` and `onPlotCancel`.
 
 - Drawn on top, **dashed**, in the crew colour, labelled "PR3 (request)". The usual hover tooltip lists the work stops.
 - Drag-to-shift and dwell handles work on it exactly as on a draft (`shiftStops`, `changeDwell`, midnight-safe). Running times stay as planned, matching today's rule that graph edits never change running times. To change a leg's running time, Control uses **Edit stops**.

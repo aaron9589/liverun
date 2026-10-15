@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PathRequest, Timetable } from '../../types';
 import { api } from '../../api';
 import { describeSource, planRoute } from '../../lib/pathPlan';
+import { AuditLogTab, RequestHistory } from './AuditLog';
 import { ageLabel, hasOpenAsk, isOpenRequest, routeSummary, sortRequests } from '../../lib/requestQueue';
 
 // Right-hand drawer for Control's path-request queue (docs/path-requests-spec.md §5.1).
@@ -38,6 +39,7 @@ export function RequestsDrawer({ timetable, focusId, onTimetable, onStartPlot, o
   const requests = useMemo(() => sortRequests(timetable.path_requests ?? []), [timetable.path_requests]);
   const [now, setNow] = useState(() => Date.now());
   const [clearError, setClearError] = useState<string | null>(null);
+  const [tab, setTab] = useState<'requests' | 'audit'>('requests');
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
@@ -56,7 +58,7 @@ export function RequestsDrawer({ timetable, focusId, onTimetable, onStartPlot, o
 
   return (
     <aside
-      className="fixed top-0 right-0 bottom-0 z-40 w-[min(26rem,100vw)] flex flex-col bg-slate-900 border-l border-slate-700 shadow-2xl"
+      className={`fixed top-0 right-0 bottom-0 z-40 ${tab === 'audit' ? 'w-[min(40rem,100vw)]' : 'w-[min(26rem,100vw)]'} flex flex-col bg-slate-900 border-l border-slate-700 shadow-2xl`}
       aria-label="Path requests"
     >
       <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800 shrink-0">
@@ -64,7 +66,23 @@ export function RequestsDrawer({ timetable, focusId, onTimetable, onStartPlot, o
         <button onClick={onClose} className="ml-auto text-slate-400 hover:text-slate-200" title="Close" aria-label="Close">✕</button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      <div className="flex border-b border-slate-800 shrink-0 text-xs" role="tablist">
+        {([['requests', 'Requests'], ['audit', 'Audit log']] as const).map(([k, label]) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={tab === k}
+            onClick={() => setTab(k)}
+            className={`px-4 py-2 border-b-2 ${tab === k ? 'border-blue-500 text-slate-100' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'audit' && <AuditLogTab timetable={timetable} />}
+
+      {tab === 'requests' && <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {requests.length === 0 && (
           <p className="text-sm text-slate-500 text-center py-8">No requests yet.</p>
         )}
@@ -80,9 +98,9 @@ export function RequestsDrawer({ timetable, focusId, onTimetable, onStartPlot, o
             onHighlightTrain={onHighlightTrain}
           />
         ))}
-      </div>
+      </div>}
 
-      <div className="px-4 py-2.5 border-t border-slate-800 shrink-0 flex items-center gap-3">
+      {tab === 'requests' && <div className="px-4 py-2.5 border-t border-slate-800 shrink-0 flex items-center gap-3">
         <button
           onClick={handleClearClosed}
           disabled={!hasClosed}
@@ -91,7 +109,7 @@ export function RequestsDrawer({ timetable, focusId, onTimetable, onStartPlot, o
           Clear closed
         </button>
         {clearError && <span className="text-xs text-red-400">{clearError}</span>}
-      </div>
+      </div>}
     </aside>
   );
 }
@@ -122,6 +140,7 @@ function RequestRow({ request: r, timetable, now, focused, onTimetable, onStartP
   const [error, setError] = useState<string | null>(null);
   const [noteMode, setNoteMode] = useState<NoteMode>(null);
   const [note, setNote] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if (focused) ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [focused]);
 
@@ -262,6 +281,11 @@ function RequestRow({ request: r, timetable, now, focused, onTimetable, onStartP
         <div className="mt-2 text-xs text-slate-400">Note: {r.control_note}</div>
       )}
       {error && <div className="mt-2 text-xs text-red-400">{error}</div>}
+
+      <button className="mt-2 text-xs text-slate-500 hover:text-slate-300" onClick={() => setShowHistory(!showHistory)}>
+        {showHistory ? 'Hide history' : 'History'}
+      </button>
+      {showHistory && <RequestHistory requestId={r.id} updatedAt={r.updated_at} timetable={timetable} />}
     </div>
   );
 }

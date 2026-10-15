@@ -18,7 +18,7 @@ On a real railway a train needs an authority before it may enter a section of li
 
 LOA is driven **only by the safeworking elements you configure**. The doors, the guard's pinned stop and the fast clock play no part. Doors aren't a safeworking element and are never interlocked with LOA in either direction. There's no reset button on the tablet: Control governs LOA entirely through the signalling.
 
-LOA appears on the guard panel only (not in the crew view). On layouts where one person drives and guards, that's the same person.
+LOA appears on the guard panel only (not in Crew jobs or the Running board). On layouts where one person drives and guards, that's the same person.
 
 ## Sections and which trains get them
 
@@ -123,7 +123,7 @@ The example layout has four sections: *Kiama → Berry*, *Berry → Nowra*, *Now
 
 > **Important** **Open the train on the guard panel before Control starts setting up its first section.** A tablet only knows about grants and releases it saw happen. A tablet that picks a train up mid-run never saw its earlier sections granted, so it can't see them released either: the first section shows **AWAIT** and the strip stays on it.
 
-- **LOA is guard panel only.** The crew view doesn't show it.
+- **LOA is guard panel only.** Crew jobs and the Running board do not show it.
 - **There is no manual reset.** Control governs LOA through the signalling.
 - **A tablet remembers each train's LOA state for 12 hours** after it last changed, so a reload mid-session keeps it. Running the same timetable the next week starts clean.
 - **The doors don't matter.** Opening or closing doors, pinning a stop or the clock time never grants or releases anything.

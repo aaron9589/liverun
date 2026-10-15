@@ -61,9 +61,22 @@ export function SettingsPanel({
     return url.toString();
   })();
 
+  // Path-request values are brought into the server's ranges here: a value it refuses
+  // would otherwise fail silently (the save handler only logs errors).
+  const clampInt = (v: number | undefined, min: number, max: number, fallback: number) =>
+    Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v as number))) : fallback;
+
   async function handleSave() {
+    const prefix = (local.request_train_prefix ?? '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 8);
+    const tidy: TimetableSettings = {
+      ...local,
+      request_train_prefix: prefix || 'PR',
+      request_default_leg_min: clampInt(local.request_default_leg_min, 1, 120, 5),
+      request_lead_min: clampInt(local.request_lead_min, 0, 60, 2),
+    };
+    setLocal(tidy);
     setSaving(true);
-    try { await onSettingsSave(local); } finally { setSaving(false); }
+    try { await onSettingsSave(tidy); } finally { setSaving(false); }
   }
 
   const statusDot: Record<ClockStatus, string> = {
@@ -197,6 +210,56 @@ export function SettingsPanel({
               </li>
             </ol>
           </details>
+        </div>
+
+        {/* Path requests (spec §7) */}
+        <div className="mb-3 pt-3 border-t border-slate-800">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Path requests</p>
+          <label className="flex items-center justify-between mb-3 cursor-pointer">
+            <span className="text-slate-300">Crews can request paths</span>
+            <button
+              role="switch"
+              aria-checked={local.requests_enabled ?? true}
+              onClick={() => setLocal((p) => ({ ...p, requests_enabled: !(p.requests_enabled ?? true) }))}
+              className={`relative w-9 h-5 rounded-full transition-colors ${(local.requests_enabled ?? true) ? 'bg-blue-600' : 'bg-slate-700'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${(local.requests_enabled ?? true) ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
+          </label>
+          <label className="block mb-2">
+            <span className="text-xs text-slate-500 block mb-1">Train name prefix</span>
+            <input
+              type="text"
+              maxLength={8}
+              value={local.request_train_prefix ?? 'PR'}
+              onChange={(e) => setLocal((p) => ({ ...p, request_train_prefix: e.target.value }))}
+              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-600"
+            />
+          </label>
+          <label className="block mb-2">
+            <span className="text-xs text-slate-500 block mb-1">Default leg time (min)</span>
+            <input
+              type="number"
+              min={1}
+              max={120}
+              value={local.request_default_leg_min ?? 5}
+              onChange={(e) => setLocal((p) => ({ ...p, request_default_leg_min: Number(e.target.value) }))}
+              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-600"
+            />
+            <span className="text-xs text-slate-600 block mt-1">used where path templates have no data</span>
+          </label>
+          <label className="block">
+            <span className="text-xs text-slate-500 block mb-1">Lead time from the fast clock (min)</span>
+            <input
+              type="number"
+              min={0}
+              max={60}
+              value={local.request_lead_min ?? 2}
+              onChange={(e) => setLocal((p) => ({ ...p, request_lead_min: Number(e.target.value) }))}
+              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-600"
+            />
+            <span className="text-xs text-slate-600 block mt-1">for &lsquo;as soon as possible&rsquo; requests</span>
+          </label>
         </div>
 
         <button

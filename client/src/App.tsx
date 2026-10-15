@@ -18,7 +18,7 @@ import { ChangeToasts, useToasts } from './components/ChangeToasts';
 import { RequestsDrawer } from './components/requests/RequestsDrawer';
 import { badgeCount, newRequestEvents, routeEnds } from './lib/requestQueue';
 import { planDraft } from './lib/pathPlan';
-import { draftFromRequest, plotRequestState, retimeFromDrafts } from './lib/plotting';
+import { draftFromRequest, plotRequestState, plotWarnings, retimeFromDrafts } from './lib/plotting';
 import type { PlottingState } from './components/TrainGraph';
 
 // ─── Print helpers ────────────────────────────────────────────────────────────
@@ -257,9 +257,14 @@ export default function App() {
 
   // Plotting a request (docs/path-requests-spec.md §1): the draft train lives here only —
   // never in timetable.trains or the history stacks — until Accept saves it with the request.
-  type Plotting = { request: PathRequest; train: Train; withdrawn: boolean; busy: boolean; warnings: string[] };
+  type Plotting = { request: PathRequest; train: Train; withdrawn: boolean; busy: boolean; planWarnings: string[] };
   const [plotting, setPlotting] = useState<Plotting | null>(null);
   const [editingPending, setEditingPending] = useState(false);
+  // Plan warnings are fixed when plotting starts; the clock and crew-overlap ones follow the draft and the clock.
+  const plotWarningsNow = useMemo(
+    () => (plotting && timetable ? plotWarnings(plotting.train, timetable, clockTime, plotting.planWarnings) : []),
+    [plotting, timetable, clockTime],
+  );
   useEffect(() => { setPlotting(null); setEditingPending(false); }, [selectedId]);
   // The request left review (withdrawn by the crew, declined or returned from the drawer, …).
   const plottedId = plotting?.request.id;
@@ -619,8 +624,7 @@ export default function App() {
     const request = tt?.path_requests?.find((r) => r.id === requestId);
     if (!tt || !request) throw new Error('Request not found');
     const plan = planDraft(request, tt, clockTime);
-    // Phase 4 adds crew-overlap / clock warnings to this list.
-    setPlotting({ request, train: plan.train, withdrawn: false, busy: false, warnings: [...plan.warnings] });
+    setPlotting({ request, train: plan.train, withdrawn: false, busy: false, planWarnings: [...plan.warnings] });
     setRequestsOpen(false);
   }
 
@@ -750,7 +754,9 @@ export default function App() {
 
   function handleExportTimetable() {
     if (!timetable) return;
-    const json = JSON.stringify(timetable, null, 2);
+    // Path requests belong to the live session, not the timetable (spec P2): never exported.
+    const { path_requests: _requests, ...exported } = timetable;
+    const json = JSON.stringify(exported, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1156,7 +1162,7 @@ export default function App() {
                 train: plotting.train,
                 requesterName: displayTimetable.crews.find((c) => c.id === plotting.request.crew_id)?.name ?? 'a crew',
                 withdrawn: plotting.withdrawn,
-                warnings: plotting.warnings,
+                warnings: plotWarningsNow,
                 busy: plotting.busy,
               } satisfies PlottingState : null}
               onPlotChange={(train) => setPlotting((p) => (p ? { ...p, train } : p))}
@@ -1246,7 +1252,8 @@ export default function App() {
           onClose={() => setRequestsOpen(false)}
         />
       )}
-      <ChangeToasts toasts={requestToasts.toasts} onDismiss={requestToasts.dismiss} />
+      {/* Bottom: at the top they would cover the plotting bar's Cancel / Accept. */}
+      <ChangeToasts toasts={requestToasts.toasts} onDismiss={requestToasts.dismiss} placement="bottom" />
 
       {modal.type === 'stationReport' && timetable && (
         <StationReport

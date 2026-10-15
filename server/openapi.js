@@ -258,6 +258,39 @@ const spec = {
         },
       },
     },
+    '/api/timetables/{id}/settings': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+      ],
+      put: {
+        tags: ['Path requests'],
+        summary: 'Update timetable settings (path-request keys shown)',
+        description:
+          'Only the path-request keys are documented here; the same body also takes the clock keys (`clock_enabled`, `clock_broker_url`, `clock_topic`), `graph_scale` and `auto_assign_min_break`. ' +
+          'Keys that are sent are validated and stored; a bad value is refused with 400 and nothing is saved. Returns the full timetable.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  requests_enabled: { type: 'boolean', description: 'Default true. Off: new submits are refused (400)' },
+                  request_train_prefix: { type: 'string', pattern: '^[A-Za-z0-9-]{1,8}$', default: 'PR', description: 'Prefix for the train IDs created on accept' },
+                  request_default_leg_min: { type: 'integer', minimum: 1, maximum: 120, default: 5, description: 'Minutes per leg when no path template gives a time' },
+                  request_lead_min: { type: 'integer', minimum: 0, maximum: 60, default: 2, description: 'Lead time (minutes) for "as soon as possible" requests' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'The updated timetable' },
+          400: { description: 'A value is out of range or malformed (see error)' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
     '/api/timetables/{id}/path-requests': {
       parameters: [
         { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },

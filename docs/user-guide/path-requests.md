@@ -1,0 +1,148 @@
+# Path requests
+
+**What this page is for:** how a crew's request for a path becomes a train on the graph, from both sides, and what LiveRun records about it.
+**Who it's for:** Control, and crews who want to know what happens after they tap **Send request**.
+
+- [How a request travels](#how-a-request-travels)
+- [Handling requests in the planner](#handling-requests-in-the-planner)
+- [Plotting a request](#plotting-a-request)
+- [Where the times come from](#where-the-times-come-from)
+- [Undo and requests](#undo-and-requests)
+- [Asks to cancel](#asks-to-cancel)
+- [Settings](#settings)
+- [Audit log](#audit-log)
+
+A **path request** is a crew asking for a train to be plotted for them: from where they are, through any stops or shunts, to where they want to go. Crews send it from [Crew jobs](crew-jobs.md#requesting-a-path). Control reviews it in the planner, plots it on the graph and accepts it, and the new train appears in the crew's jobs.
+
+Requests go to the **active timetable** only, and only while **Crews can request paths** is on in [Settings](#settings). The timetable holds up to 50 open requests at a time.
+
+## How a request travels
+
+| Status | Crew sees | Control sees | Moves on when |
+|--------|-----------|--------------|---------------|
+| **Pending** | **Waiting** | In the drawer, counted in the **Requests** badge | Control picks **Acknowledge & plot** or **Decline**; the crew can **Withdraw** |
+| **Plotting** (in review) | **Plotting** | **Plotting**, with **Resume plotting** and **Return to queue** | Control accepts or declines, or returns it to pending; the crew can **Withdraw** |
+| **Accepted** | **Accepted → PR1** | A link to the new train | The crew asks to cancel, or Control clears closed requests |
+| **Declined** | **Declined** and Control's reason | **Declined** | Cleared by Control |
+| **Withdrawn** | **Withdrawn** | **Withdrawn by crew** | Cleared by Control |
+| **Cancelled** | **Cancelled** | **Cancelled** | Cleared by Control |
+
+## Handling requests in the planner
+
+![The Requests drawer with four rows](images/planner-requests-drawer.png)
+
+When a crew sends a request, a toast appears: **Local Operator 2 requests a path: Kiama → Kembla Heights**, with a **Review** button that opens the drawer at that request. Crews withdrawing a request, or asking to cancel a train, get a toast too.
+
+The **Requests** button in the planner header opens the drawer. A number badge counts the requests waiting for you: pending ones plus accepted ones with an open ask to cancel. The button shows while the timetable is active, or while it still has requests.
+
+Each row shows the crew, the loco, how long ago it was sent, the route (with shunt and work stops and their notes), **Ready** (a time or **ASAP**), the crew's notes, and a **times from** line saying where plotting will get its running times (see [Where the times come from](#where-the-times-come-from)). Rows with a cancel ask are outlined in amber.
+
+What you can do depends on the request's state:
+
+| State | Buttons |
+|-------|---------|
+| Pending | **Acknowledge & plot**, **Decline** |
+| Plotting | **Resume plotting**, **Return to queue**, **Decline** |
+| Accepted | A link to the train (hover it to highlight the train on the graph). With an ask to cancel: **Approve cancel**, **Reject** |
+| Accepted, but the train has since been deleted | **Reopen**, which puts the request back to pending |
+| Declined, Withdrawn, Cancelled | None |
+
+**Decline** needs a reason; the crew sees it on their card. At the bottom of the drawer, **Clear closed** removes every accepted, declined, withdrawn and cancelled request (an accepted one with an open ask to cancel stays). Each row's **History** shows what has been done to that request; see [Audit log](#audit-log).
+
+## Plotting a request
+
+**Acknowledge & plot** moves the request to **Plotting** (the crew sees it straight away), closes the drawer, and draws a draft train on the graph as a dashed line labelled with its name and **(request)**. Nothing is saved yet: the draft is not in the timetable until you accept it. You can plot one request at a time.
+
+![Plotting a request: the plotting bar above the graph and the dashed draft train](images/planner-plotting.png)
+
+The graph switches to edit mode and the **plotting bar** appears above it:
+
+| Control | Does |
+|---------|------|
+| **Plotting PR1 for Local Operator 2** | The draft train's name (from [Settings](#settings)) and the crew that asked |
+| **No other trains moved** / **n other trains moved** | Counts other trains you've dragged while plotting, for example to make room |
+| **Crew ▾** | Who the train goes to. It starts as the crew that asked; **Unassigned** is allowed. Changing it recolours the train |
+| **Edit stops** | Opens the train editor on the draft, to change stops, times, notes or the train's name |
+| **Note to crew (optional)** | A note the crew sees on their request card, up to 300 characters |
+| **Cancel** | Throws away the draft and every move, and returns the request to pending |
+| **Accept** | Saves the train and any moves of other trains, and marks the request accepted |
+
+Drag the draft train, or one of its dwell handles, as you would any train in [graph edit mode](planner.md#move-trains-on-the-graph). You can also move other trains to make room. Dragging never changes running times.
+
+Warnings appear under the bar, in amber. They don't stop you accepting:
+
+- A leg with no path data: **Bombo → Dunmore: no path data, 5 min used**.
+- **starts n min before the fast clock**: the draft begins in the past.
+- **Local Operator 2 has another job overlapping 12:10–13:00**: the chosen crew is already busy.
+
+If the crew **withdraws** while you're plotting, the bar says **Local Operator 2 withdrew this request**, **Accept** is disabled and your drafts stay on the graph until you **Cancel**. If you reload the page while plotting, the draft is lost but the request stays in **Plotting**: use **Resume plotting** in the drawer to start again. If the request leaves review some other way (you returned or declined it from another window), plotting closes.
+
+**Accept** makes the train, applies any moves to other trains, and sends your note to the crew. The crew gets a **Path accepted → PR1** toast and a **New job** notice. If another train you moved was changed by someone else in the meantime, the accept is refused and your drafts are kept: accept again, or cancel.
+
+## Where the times come from
+
+The draft is timed from the timetable's [path templates](planner.md#paths-route-templates), so it's only as good as that data. The drawer's **times from** line says what plotting will use:
+
+| Line | Meaning |
+|------|---------|
+| **Path Kiama–Bombo** | Every requested station lies in order on one path template, forwards or in reverse. Its running times are used |
+| **Inferred from 2 paths** | No single path covers the route, so the fastest chain of path legs between the stations is used (where paths overlap, their median time) |
+| **No path data** | None of the requested stations are linked by any path. Each leg uses the **Default leg time** from [Settings](#settings) |
+| a line ending **⚠ Bombo → Dunmore: no path data** | Some legs of an inferred route had no data and used the default leg time |
+
+Stations the train passes between the requested stops are included as timing points with no dwell. The start time is the **Ready** time if it hasn't already passed on the fast clock; otherwise the fast clock plus the **Lead time** setting; with no fast clock, the timetable's start time. A **Stop** with minutes on site becomes a dwell (at least a minute); **Shunt** and **Work** stops become a dwell plus a special instruction.
+
+## Undo and requests
+
+Requests don't follow undo and redo. Undoing never brings a declined request back or removes an accepted one, and request buttons (**Decline**, **Return to queue**, **Clear closed**, and so on) aren't undo steps.
+
+**Accept** is one undo step: undoing it removes the new train and puts back any trains you moved. The request stays accepted, with the note **Accepted — train no longer exists**. Press **Reopen** to send it back to pending and plot it again.
+
+## Asks to cancel
+
+A crew can ask to cancel an accepted request. The drawer row turns amber and reads **Asks to cancel**, with their reason, the **Requests** badge counts it, and a toast appears.
+
+- **Approve cancel** asks for an optional note, then **Approve and delete train** removes the train and marks the request **Cancelled**. This deletes the train for good, and isn't an undo step.
+- **Reject** asks for a note (required, so the crew knows why). The train stays, and the crew can ask again.
+
+## Settings
+
+⚙ → **Path requests** (per timetable; press **Save changes**):
+
+| Setting | Default | Does |
+|---------|---------|------|
+| **Crews can request paths** | On | Turns **+ Request a path** on or off for crews. Turning it off doesn't touch requests already made |
+| **Train name prefix** | `PR` | Names new trains `PR1`, `PR2`, … using the lowest number not in use. Up to 8 letters, digits or hyphens |
+| **Default leg time (min)** | 5 | Running time for legs where no path has data (1 to 120) |
+| **Lead time from the fast clock (min)** | 2 | How long after the fast clock a train that's ready "as soon as possible" starts (0 to 60) |
+
+![Settings, with the Path requests group](images/settings-path-requests.png)
+
+## Audit log
+
+Everything that happens to a request is written to an append-only log, so that Control can see what happened, when, and from which device. This includes refused attempts.
+
+Each entry records:
+
+- **Time**, and the **fast clock** reading the phone had at that moment, if it was running
+- **Who**: **Control** or the crew named in the request
+- **What**: Submitted, Withdrawn, Acknowledged, Released (returned to the queue), Declined, Accepted, Asked to cancel, Cancel approved, Cancel rejected or Cleared closed
+- **Outcome**: OK, or **rejected** with the reason (for example, a withdraw after the request was accepted)
+- **IP address**, **device id** (a random id each phone keeps), and **browser** (for example *Safari iOS 18*)
+- The details: the route, what the accepted train looked like, which trains were moved and how, and the notes
+
+> **Note** There are no logins in LiveRun, so the crew is whatever the phone said it was. The log shows which device, address and browser said it, which is usually enough to see who did what on a trusted layout network. It can't prove who was holding the phone.
+
+![The Audit log tab](images/planner-audit-log.png)
+
+**Where to find it:**
+
+- **History** on a request row shows the entries for that request, newest first.
+- The drawer's **Audit log** tab shows everything for the timetable, newest first, 200 at a time (**Load older** for more). Each entry expands with **Detail**. Narrow it with the filters: **crew**, **action**, **outcome** (OK or rejected), **request**, **IP** and **device** (the last two match exactly).
+- **Export CSV** downloads what the filters currently show (up to 1000 entries) as `path-request-audit.csv`, for a spreadsheet.
+
+**On disk:** entries go to `audit.jsonl`, one per line, in the server's data folder (next to the timetable database, `server/data/` by default, or the folder of `DB_PATH`). It is separate from the timetable, so undo, deleting a timetable and restoring a backup don't touch it. At 5 MB the file is renamed `audit.1.jsonl` and a new one starts, so about the last two files' worth are kept. Back up the data folder to keep the log.
+
+---
+
+Last checked against v2.1.0.

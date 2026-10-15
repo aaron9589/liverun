@@ -10,6 +10,7 @@ const events = require('./events');
 const { readDB, writeDB, getTimetable, mutateTimetable, onTimetableChange, uuidv4, getLayout, setLayout } = require('./db');
 const openApiSpec = require('./openapi');
 const { stripTrainType } = require('./migrations');
+const { parseRequestSettings } = require('./request-settings');
 const { newTrain, buildStops, stripTerminalTimes, withGuardEvents, normTime } = require('./trains');
 const layoutRoutes = require('./layout');
 const { WS_SYNC_PATH, createSync } = require('./sync');
@@ -399,8 +400,11 @@ app.put('/api/timetables/:id/settings', (req, res) => {
       return res.status(400).json({ error: 'clock_broker_url must use ws:// or wss://' });
     }
   }
+  const reqSettings = parseRequestSettings(req.body);
+  if (reqSettings.error) return res.status(400).json({ error: reqSettings.error });
   const updated = mutateTimetable(req.params.id, (tt) => {
     if (!tt.settings) tt.settings = { ...DEFAULT_SETTINGS };
+    Object.assign(tt.settings, reqSettings.values);
     if (clock_enabled !== undefined) tt.settings.clock_enabled = Boolean(clock_enabled);
     if (clock_broker_url !== undefined) tt.settings.clock_broker_url = String(clock_broker_url);
     if (clock_topic !== undefined) tt.settings.clock_topic = String(clock_topic);
