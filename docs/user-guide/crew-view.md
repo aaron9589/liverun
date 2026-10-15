@@ -12,7 +12,7 @@
 
 ## Opening it
 
-Open LiveRun on your phone and choose **Crew view** in the [mode picker](README.md#the-three-screens), or go straight to `…/mobile`. Tick **Remember this choice on this device** and your phone opens the crew view every time. **Switch** in the top right takes you back to the mode picker.
+Open LiveRun on your phone and choose **Crew view** in the [mode picker](README.md#the-three-screens), or go straight to `…/mobile`. Tick **Remember this choice on this device** and your phone opens the crew view every time. **Switch** in the top right takes you back to the mode picker, and **?** opens this page. Tapping **LiveRun Mobile** opens the planner.
 
 The crew view shows the **active timetable** (the one Control has marked active in the planner). If Control switches to another timetable, your screen follows it and tells you. To pin one timetable regardless of what's active, open `…/mobile?id=<timetable id>`.
 

@@ -202,6 +202,7 @@ Control can change the timetable during the session; the panel shows changes wit
 | **Change crew** | Back to **Who are you?** |
 | **Changes from Control** | This session's list of changes |
 | **Reset events for this train** | Forget this train's rolled guard events and roll them again (asks first) |
+| **Help** | Opens this page |
 | **Switch mode** | Back to the mode picker (crew view, planner) |
 | **Reload** | Reload the page |
 

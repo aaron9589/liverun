@@ -144,7 +144,7 @@ The `>_` icon on a timetable (**Export timetable as CATS XML**) downloads two fi
 
 > **Important** CATS needs **ORIGIN** and **DESTINATION** fields set up before you import. In CATS Designer open **Train → Edit Train Fields**. `f3` and `f4` mean the **3rd and 4th fields** in that list, whatever they are called, so make the 3rd and 4th fields String fields labelled `ORIGIN` and `DESTINATION`:
 >
-> ![CATS Designer: Edit Train Fields with ORIGIN 3rd and DESTINATION 4th](../screenshots/cats-edit-train-fields.png)
+> ![CATS Designer: Edit Train Fields with ORIGIN 3rd and DESTINATION 4th](images/cats-edit-train-fields.png)
 >
 > If they don't exist or are a different type, CATS silently ignores the origin and destination on import.
 

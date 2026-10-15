@@ -58,6 +58,9 @@ A web app for planning and running model railway operating sessions. Features: v
 | `client/src/lib/jmri.ts` | JMRI roster helpers (HTTP base from WS URL, normalise, rank matches) |
 | `client/src/components/RosterCombobox.tsx` | Train ID combobox fed by the JMRI roster |
 | `docs/guard-panel-spec.md` | Guard panel design spec — source of truth for the v2 work |
+| `docs/user-guide/` | User guide (Markdown on GitHub): index, planner, running a session, layout settings, guard panel, crew view, LOA, integrations, troubleshooting; images in `images/` |
+| `scripts/docs/screenshots.js` | `npm run docs:screenshots` — regenerates the guide's images on a throwaway stack (aedes broker, mock JMRI, temp DB, Vite dev) seeded from `docs/user-guide/demo/`; `--serve` keeps it up, `--list`, glob filters |
+| `client/src/lib/help.ts` | `HELP_BASE` / `helpUrl()` — the in-app Help links (planner header, guard ☰, crew view) |
 
 ## Data Model (types.ts)
 
@@ -130,6 +133,7 @@ All mutation endpoints return the full updated Timetable.
 - **Station name style defaults:** `stationNameStyle()` in utils.ts returns `bold:true` when none of the three flags are set — preserving legacy bold appearance for existing stations.
 - **`reset-complete` route ordering:** The `POST /trains/reset-complete` route is registered before `/:trainId` routes so Express doesn't match the literal string "reset-complete" as a train ID.
 - **Feature modules:** New server features live in their own module exporting `register(app, deps)`, called from `server/index.js` (routes themselves are still flat Express handlers, no router framework). See `server/layout.js`.
+- **User guide upkeep:** any change to user-visible behaviour (labels, buttons, rules) updates the matching `docs/user-guide/` page in the same commit, and `npm run docs:screenshots -- <shot>` for affected images. Write it from the code, not from the spec. Demo crew names are anonymised (public repo) — keep them that way. Changelog in `CHANGELOG.md`.
 - **`train_type` removed in v2:** A startup migration (`stripTrainType` in `server/migrations.js`) deletes the field from all trains; the `?trainType=` station-board filter is gone. Don't reintroduce either.
 
 ## Dev Commands
@@ -141,6 +145,7 @@ npm run build     # tsc + vite build → client/dist/
 npm run start     # Express serving client/dist/ (production)
 docker compose up -d  # production; UI at localhost:3001
 npm test          # server node:test + client Vitest
+npm run docs:screenshots   # regenerate docs/user-guide/images (needs: npx playwright install chromium)
 LIVERUN_API=http://localhost:3011 npm run dev --workspace=client   # point the Vite dev proxy at another server
 npm run mock:jmri  # mock JMRI JSON server: ws://localhost:12080/json/ + /json/roster (env PORT, ROSTER=file.json, HEARTBEAT)
                    # logs every throttle command/broadcast; set Layout → JMRI URL to ws://localhost:12080/json/

@@ -1,6 +1,6 @@
 # User Guide — Docs Spec (draft 1)
 
-Status: **in progress** — steps 1–3 done (2026-10-15: rebased on `main` at v2.0.0; page list in §4 locked; screenshot set generated; pages written). This spec plans a full user guide for LiveRun v2 under `docs/user-guide/`, and a slimmer README that points into it.
+Status: **in progress** — steps 1–4 done (2026-10-15); step 5 (review pass) next. This spec plans a full user guide for LiveRun v2 under `docs/user-guide/`, and a slimmer README that points into it.
 
 ## 1. Why
 
@@ -178,5 +178,5 @@ Consequences for the outlines above:
 | 1 | ~~Decisions §9; bring this branch up to date with `main`; lock the page list~~ (done 2026-10-15) |
 | 2 | ~~Screenshot script + demo data (§7); generate the image set~~ (done 2026-10-15: 35 images from 28 shots) |
 | 3 | ~~Write pages: planner + running a session; layout settings + LOA; guard panel + crew view; integrations + troubleshooting~~ (done 2026-10-15) |
-| 4 | Slim README; `CHANGELOG.md`; in-app Help links; CLAUDE.md upkeep rule |
+| 4 | ~~Slim README; `CHANGELOG.md`; in-app Help links; CLAUDE.md upkeep rule~~ (done 2026-10-15) |
 | 5 | Review pass: every UI label checked against the running app; every link and image checked; a "new user" read-through of the quick start |
