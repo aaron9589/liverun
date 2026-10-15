@@ -1,6 +1,6 @@
 # User Guide — Docs Spec (draft 1)
 
-Status: **parked for review**. Nothing written yet. This spec plans a full user guide for LiveRun v2 under `docs/user-guide/`, and a slimmer README that points into it. Build only after the decisions in §9 are made.
+Status: **decisions made (§9), parked**. Nothing written yet. Build starts after `feat/guard-panel` (v2.0.0) is merged to `main` and this branch is brought up to date. This spec plans a full user guide for LiveRun v2 under `docs/user-guide/`, and a slimmer README that points into it.
 
 ## 1. Why
 
@@ -155,23 +155,28 @@ Symptom → likely cause → fix, grouped by screen. Seeded from real issues met
 - A CLAUDE.md rule: *any change to user-visible behaviour updates the matching guide page in the same commit.*
 - README "Upgrading to 2.0" and a short **Changelog** section (or `CHANGELOG.md`) for breaking changes.
 
-## 9. Decisions needed
+## 9. Decisions
 
-| # | Question | Options | Suggested |
-|---|----------|---------|-----------|
-| Q1 | One long guide or several pages? | Single `USER_GUIDE.md` / pages per role (§4) | **Pages** — the guide will be large; GitHub renders each page with its own outline |
-| Q2 | Screenshot data | Demo timetable (generic stations) / Illawarra B session | **Illawarra B session**, since it's real and shows LOA, aliases and Up/Down — unless you'd rather keep docs generic |
-| Q3 | Where it's read | GitHub Markdown only / also a hosted site (GitHub Pages, MkDocs) / in-app Help link | **GitHub Markdown now**, plus a **Help** link in the planner and guard ☰ menu pointing at the page |
-| Q4 | README | Keep long / slim to overview + install + links | **Slim** — move CATS, API and feature detail into the guide |
-| Q5 | Changelog | README section / `CHANGELOG.md` / GitHub releases only | **`CHANGELOG.md`**, starting at 2.0.0 |
-| Q6 | Depth of boarding / guard events maths | Plain-language only / plus formulas | **Plain language with an expandable "how it's calculated"** |
+| # | Question | Decision |
+|---|----------|----------|
+| Q1 | One long guide or several pages? | **Separate pages** (§4) |
+| Q2 | Screenshot data | **Illawarra B session** (Base MTP – B Session), with the example layout (LOA sections) loaded |
+| Q3 | Where it's read | **GitHub Markdown only**, plus an in-app **Help** link (planner header and guard panel ☰ menu) to the relevant guide page |
+| Q4 | README | **Slim** it to overview, install, upgrading to 2.0, security and links into the guide; CATS, API and feature detail move into the guide |
+| Q5 | Changelog | **`CHANGELOG.md`**, starting at 2.0.0 |
+| Q6 | Boarding / guard events maths | **Plain language only** — no formulas |
+
+Consequences for the outlines above:
+- §5.4 Boarding and §5.4/§5.5 guard events: describe behaviour in words (what raises or lowers the count, what the timing feels like); no formula blocks.
+- §7: screenshots seeded from the B session export plus `docs/layout.example.json`; the KN-6 run (Nowra → Berry → Kiama) is the LOA walkthrough.
+- Help links: a small **Help** (?) in the planner header → `user-guide/README.md`; ☰ → **Help** on the guard panel → `user-guide/guard-panel.md`; crew view → `user-guide/crew-view.md`. They open the GitHub page in a new tab (URL from a single constant so forks can repoint it).
 
 ## 10. Delivery plan (when un-parked)
 
 | Step | Work |
 |------|------|
-| 1 | Decisions §9; lock the page list and outlines |
+| 1 | ~~Decisions §9~~ (done); bring this branch up to date with `main` after v2.0.0 merges; lock the page list |
 | 2 | Screenshot script + demo data (§7); generate the image set |
 | 3 | Write pages in parallel by area: planner + running a session; layout settings + LOA; guard panel + crew view; integrations + troubleshooting |
-| 4 | Slim README; CHANGELOG; Help links (if Q3); CLAUDE.md upkeep rule |
+| 4 | Slim README; `CHANGELOG.md`; in-app Help links; CLAUDE.md upkeep rule |
 | 5 | Review pass: every UI label checked against the running app; every link and image checked; a "new user" read-through of the quick start |
