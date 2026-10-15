@@ -63,7 +63,7 @@ function mergeStatuses(tt: Timetable, statuses: Record<string, 'running' | 'comp
  * Subscribes to /api/live/sync. The server's notices carry no data: the hook
  * re-fetches on 'timetable-updated' with a newer rev and on a rev mismatch at
  * 'hello' (reconnect / server restart), and on visibilitychange→visible
- * (tablets waking). 'completions' are merged in place; 'loa-values' feed
+ * (tablets waking). 'completions' and 'path-requests' are merged in place; 'loa-values' feed
  * `loaValues` (spec §11.5: full snapshot replaces, deltas merge). Fetches are serialised
  * and a response older than what is held is discarded.
  */
@@ -178,6 +178,23 @@ export function useLiveTimetable(timetableId: string | null): LiveTimetable {
           const merged = mergeStatuses(s.held, msg.statuses);
           // A rev on completions means only run status changed. One step ahead: adopt it;
           // further ahead: we missed an edit, so re-fetch.
+          if (msg.rev !== undefined && s.rev !== null && msg.rev === s.rev + 1) {
+            s.adopt({ ...merged, rev: msg.rev });
+          } else {
+            s.held = merged;
+            setTimetable(merged);
+            if (msg.rev !== undefined && s.rev !== null && msg.rev > s.rev + 1) s.fetchNow();
+          }
+          return;
+        }
+        case 'path-requests': {
+          if (msg.timetableId !== id) return;
+          if (!s.held) {
+            if (msg.rev !== undefined) want(msg.rev);
+            return;
+          }
+          const merged = { ...s.held, path_requests: msg.requests };
+          // Same rev rules as completions: a rev means only requests changed.
           if (msg.rev !== undefined && s.rev !== null && msg.rev === s.rev + 1) {
             s.adopt({ ...merged, rev: msg.rev });
           } else {

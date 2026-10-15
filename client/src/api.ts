@@ -5,8 +5,13 @@ import type {
   LayoutConfig,
   LoaValue,
   TrainRequest,
+  PathSaveRequest,
   PathRequest,
+  PathRequestSubmit,
+  AuditEntry,
+  AuditQuery,
 } from './types';
+import { auditHeaders } from './lib/device';
 
 // In dev, BASE_URL is '/' so this resolves to '/api' (caught by the Vite proxy).
 // In production, BASE_URL is './' so fetch('./api/...') resolves relative to
@@ -40,7 +45,61 @@ export interface SoundFile {
 
 // ── Timetables ────────────────────────────────────────────────
 
+/** POST to a path-request endpoint with the audit headers. Returns the full timetable. */
+function prPost(timetableId: string, suffix: string, body?: unknown): Promise<Timetable> {
+  return req<Timetable>(`/timetables/${timetableId}/path-requests${suffix}`, {
+    method: 'POST',
+    headers: auditHeaders(),
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+function auditQueryString(q: AuditQuery & { format?: 'csv' }): string {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== '') params.set(k, String(v));
+  const s = params.toString();
+  return s ? `?${s}` : '';
+}
+
 export const api = {
+  // ── Path requests (docs/path-requests-spec.md §4.2). Each returns the full timetable. ──
+  // Crew actions carry the acting crew (self-declared, for the audit log); it must be the requester.
+  listPathRequests: (timetableId: string) =>
+    req<PathRequest[]>(`/timetables/${timetableId}/path-requests`, { headers: auditHeaders() }),
+
+  submitPathRequest: (timetableId: string, data: PathRequestSubmit) =>
+    prPost(timetableId, '', data),
+
+  withdrawPathRequest: (timetableId: string, requestId: string, crewId: string) =>
+    prPost(timetableId, `/${requestId}/withdraw`, { crewId }),
+
+  askCancelPathRequest: (timetableId: string, requestId: string, crewId: string, reason?: string) =>
+    prPost(timetableId, `/${requestId}/cancel-ask`, { crewId, reason }),
+
+  // Control actions
+  acknowledgePathRequest: (timetableId: string, requestId: string) =>
+    prPost(timetableId, `/${requestId}/acknowledge`),
+
+  releasePathRequest: (timetableId: string, requestId: string) =>
+    prPost(timetableId, `/${requestId}/release`),
+
+  declinePathRequest: (timetableId: string, requestId: string, note: string) =>
+    prPost(timetableId, `/${requestId}/decline`, { note }),
+
+  rejectCancelPathRequest: (timetableId: string, requestId: string, note: string) =>
+    prPost(timetableId, `/${requestId}/cancel-reject`, { note }),
+
+  clearClosedPathRequests: (timetableId: string) =>
+    req<Timetable>(`/timetables/${timetableId}/path-requests?closed=true`, { method: 'DELETE', headers: auditHeaders() }),
+
+  // ── Audit log (Control only in the UI). Newest first. ──
+  getAudit: (q: AuditQuery = {}) =>
+    req<AuditEntry[]>(`/audit${auditQueryString(q)}`),
+
+  /** URL for the CSV export (open / download directly). */
+  auditCsvUrl: (q: AuditQuery = {}) =>
+    `${BASE}/audit${auditQueryString({ ...q, format: 'csv' })}`,
+
   // ── Limit of Authority: last known topic values (server cache) ──
   getLoaValues: () =>
     req<Record<string, LoaValue>>('/loa/values'),
@@ -197,13 +256,13 @@ export const api = {
 
   // ── Paths ──────────────────────────────────────────────────
 
-  addPath: (timetableId: string, data: Omit<PathRequest, 'id'>) =>
+  addPath: (timetableId: string, data: Omit<PathSaveRequest, 'id'>) =>
     req<Timetable>(`/timetables/${timetableId}/paths`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updatePath: (timetableId: string, pathId: string, data: Omit<PathRequest, 'id'>) =>
+  updatePath: (timetableId: string, pathId: string, data: Omit<PathSaveRequest, 'id'>) =>
     req<Timetable>(`/timetables/${timetableId}/paths/${pathId}`, {
       method: 'PUT',
       body: JSON.stringify(data),

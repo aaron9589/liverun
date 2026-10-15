@@ -82,6 +82,11 @@ const DEFAULT_SETTINGS = {
   clock_topic: 'trains/jmri/memory/currentTime',
   auto_assign_min_break: 0,
   graph_scale: null,
+  // Path requests (docs/path-requests-spec.md §7)
+  requests_enabled: true,
+  request_train_prefix: 'PR',
+  request_default_leg_min: 5,
+  request_lead_min: 2,
 };
 
 app.get('/api/timetables', (_req, res) => {
@@ -167,6 +172,9 @@ layoutRoutes.register(app, { getLayout, setLayout: (layout) => { const saved = s
 require('./sounds').register(app, { dataDir: require('./db').dataDir });
 // Graph editing: times-only, all-or-nothing batch retime (before the /trains/:trainId routes)
 require('./retime').register(app, { getTimetable, mutateTimetable, normalise });
+// Path-request audit log (GET /api/audit) and path requests — docs/path-requests-spec.md §4
+const audit = require('./audit').register(app, { dataDir: require('./db').dataDir });
+require('./path-requests').register(app, { readDB, getTimetable, mutateTimetable, normalise, sync, audit });
 
 // Must be defined before /:id routes to avoid 'import' being matched as an id
 app.post('/api/timetables/import', (req, res) => {
@@ -274,8 +282,9 @@ app.post('/api/timetables/:id/duplicate', (req, res) => {
   (original.paths || []).forEach((p) => { pathIdMap[p.id] = uuidv4(); });
   const crewIdMap = {};
   (original.crews || []).forEach((c) => { crewIdMap[c.id] = uuidv4(); });
+  const { path_requests: _requests, ...originalRest } = original;
   const duplicate = {
-    ...original,
+    ...originalRest,
     id: newId,
     name: original.name + ' (copy)',
     created_at: now,
@@ -286,6 +295,7 @@ app.post('/api/timetables/:id/duplicate', (req, res) => {
       return {
         ...tr, id: trainId, timetable_id: newId,
         status: undefined,
+        request_id: undefined,
         crew_id: tr.crew_id ? (crewIdMap[tr.crew_id] || null) : null,
         stops: (tr.stops || []).map((stop) => ({
           ...stop, id: uuidv4(), train_id: trainId,
@@ -339,6 +349,7 @@ app.post('/api/timetables/:id/restore', (req, res) => {
       direction: String(tr.direction || ''),
       crew_id: tr.crew_id ? String(tr.crew_id) : null,
       ...(VALID_TRAIN_STATUSES.has(tr.status) ? { status: tr.status } : {}),
+      ...(tr.request_id ? { request_id: String(tr.request_id) } : {}),
       stops: (tr.stops || []).map((s) => ({
         id: String(s.id),
         train_id: String(tr.id),
@@ -747,6 +758,7 @@ function normalise(tt) {
     ...tt,
     paths: tt.paths ?? [],
     crews: tt.crews ?? [],
+    path_requests: tt.path_requests ?? [],
     settings: { ...DEFAULT_SETTINGS, ...(tt.settings ?? {}) },
     stations: [...tt.stations].sort(
       (a, b) =>

@@ -11,6 +11,8 @@
  *   timetable-updated  coalesced notice after any mutation (carries no data)
  *   timetable-deleted  the subscribed timetable is gone; socket then closes
  *   active-changed     Control switched the active timetable (all clients)
+ *   path-requests      the timetable's path requests (docs/path-requests-spec.md
+ *                      §4.3): on connect and on every request change
  *   loa-values         LOA topic cache (server/loa-cache.js, spec §11.5): full
  *                      snapshot on connect, then coalesced deltas (all clients)
  */
@@ -135,6 +137,18 @@ function createSync({
   }
 
   /**
+   * Pushes the path-request list. requestsOnly: the mutation changed nothing
+   * but requests (notify:false), so the message carries the new rev, as
+   * statusOnly completions do. Accept / cancel-approve also change trains and
+   * rely on the 'timetable-updated' that follows.
+   */
+  function broadcastPathRequests(timetableId, tt, { requestsOnly = false } = {}) {
+    const msg = { type: 'path-requests', timetableId, requests: tt.path_requests || [] };
+    if (requestsOnly) msg.rev = tt.rev || 0;
+    broadcast(timetableId, msg);
+  }
+
+  /**
    * The timetable was deleted: tell its subscribers, then close their sockets.
    * activeCleared: it was the active timetable, so every client (its own
    * subscribers included, before they close) also gets active-changed → null.
@@ -172,6 +186,7 @@ function createSync({
 
     send(ws, { type: 'hello', timetableId, rev: tt.rev || 0, activeId: getActiveId() });
     send(ws, { type: 'completions', timetableId, statuses: completionStatuses(tt) });
+    send(ws, { type: 'path-requests', timetableId, requests: tt.path_requests || [] });
     send(ws, { type: 'loa-values', values: getLoaSnapshot(), full: true });
 
     ws.on('close', () => {
@@ -207,7 +222,7 @@ function createSync({
     wss.close();
   }
 
-  return { handleUpgrade, broadcast, broadcastCompletions, timetableDeleted, activeChanged, close };
+  return { handleUpgrade, broadcast, broadcastCompletions, broadcastPathRequests, timetableDeleted, activeChanged, close };
 }
 
 module.exports = { WS_SYNC_PATH, createSync, createCoalescer, completionStatuses };

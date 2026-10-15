@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { modeUrl } from './lib/mode';
-import type { LayoutConfig, Timetable, TimetableSummary, TimetableSettings, Train, TrainStop, ModalState, TrainRequest, Path, PathRequest } from './types';
+import type { LayoutConfig, Timetable, TimetableSummary, TimetableSettings, Train, TrainStop, ModalState, TrainRequest, Path, PathSaveRequest, PathRequest } from './types';
 import { api } from './api';
 import { helpUrl } from './lib/help';
 import { useLocalStorage, timeToMinutes, exportCatsXml, exportCrewsXml, escapeHtml, stationNameStyle } from './utils';
@@ -14,6 +14,9 @@ import { TimetableForm } from './components/TimetableForm';
 import { TrainEditor } from './components/TrainEditor';
 import { PathEditor } from './components/PathEditor';
 import { StationReport } from './components/StationReport';
+import { ChangeToasts, useToasts } from './components/ChangeToasts';
+import { RequestsDrawer } from './components/requests/RequestsDrawer';
+import { badgeCount, newRequestEvents, routeEnds } from './lib/requestQueue';
 
 // ─── Print helpers ────────────────────────────────────────────────────────────
 
@@ -242,6 +245,13 @@ export default function App() {
     clockSettings.clock_enabled
   );
 
+  // ── Path requests: toasts + drawer (docs/path-requests-spec.md §5.1) ──
+  const [requestsOpen, setRequestsOpen] = useState(false);
+  const [focusRequestId, setFocusRequestId] = useState<string | null>(null);
+  useEffect(() => { setRequestsOpen(false); setFocusRequestId(null); }, [selectedId]);
+  const requestToasts = useToasts({ ttlMs: 15_000 });
+  const pushRequestToast = requestToasts.push;
+
   // ── Sync WebSocket — keep completion state in sync across all clients ────────
   useEffect(() => {
     if (!selectedId) return;
@@ -252,9 +262,27 @@ export default function App() {
     // a reverse-proxy sub-path. Strip a trailing '/mobile' and any trailing slash.
     const basePath = window.location.pathname.replace(/\/mobile\/?$/, '').replace(/\/+$/, '');
     const ws = new WebSocket(`${proto}//${window.location.host}${basePath}/api/live/sync?id=${selectedId}`);
+    // The first path-requests message after connecting is a snapshot: adopt it without toasts.
+    let lastRequests: PathRequest[] | null = null;
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
+        if (msg.type === 'path-requests' && msg.timetableId === selectedId) {
+          const next: PathRequest[] = msg.requests ?? [];
+          const stations = timetableRef.current?.stations ?? [];
+          const crews = timetableRef.current?.crews ?? [];
+          for (const ev of newRequestEvents(lastRequests, next)) {
+            const who = crews.find((c) => c.id === ev.request.crew_id)?.name ?? 'A crew';
+            const review = { label: 'Review', onClick: () => { setFocusRequestId(ev.request.id); setRequestsOpen(true); } };
+            if (ev.kind === 'new') pushRequestToast(`${who} requests a path: ${routeEnds(ev.request, stations)}`, 'info', review);
+            else if (ev.kind === 'cancel-ask') {
+              const trainName = timetableRef.current?.trains.find((t) => t.id === ev.request.train_id_created)?.name;
+              pushRequestToast(`${who} asks to cancel ${trainName ?? 'a train'}`, 'warning', review);
+            } else pushRequestToast(`${who} withdrew a path request`, 'info');
+          }
+          lastRequests = next;
+          setTimetable((prev) => (prev ? { ...prev, path_requests: next } : prev));
+        }
         if (msg.type === 'completions' && msg.timetableId === selectedId) {
           setTimetable((prev) => {
             if (!prev) return prev;
@@ -266,7 +294,7 @@ export default function App() {
       } catch { /* ignore */ }
     };
     return () => { ws.close(); };
-  }, [selectedId]);
+  }, [selectedId, pushRequestToast]);
 
   async function handleSettingsSave(updated: TimetableSettings) {
     if (!selectedId) return;
@@ -447,7 +475,7 @@ export default function App() {
 
   // ── Path CRUD ────────────────────────────────────────────────
 
-  async function handleSavePath(data: PathRequest) {
+  async function handleSavePath(data: PathSaveRequest) {
     if (!selectedId) return;
     let updated: Timetable;
     if (data.id) {
@@ -575,8 +603,10 @@ export default function App() {
     const cur = timetableRef.current;
     setHistoryPast((p) => p.slice(0, -1));
     if (cur) setHistoryFuture((f) => [stripStatus(cur), ...f.slice(0, 19)]);
-    setTimetable(prev);
-    await api.restoreTimetable(selectedId, prev);
+    // Requests never follow undo/redo (spec P2): keep the current list.
+    const restored = { ...prev, path_requests: cur?.path_requests ?? [] };
+    setTimetable(restored);
+    await api.restoreTimetable(selectedId, restored);
   }, [historyPast, selectedId]);
 
   const handleRedo = useCallback(async () => {
@@ -585,8 +615,9 @@ export default function App() {
     const cur = timetableRef.current;
     setHistoryFuture((f) => f.slice(1));
     if (cur) setHistoryPast((p) => [...p.slice(-19), stripStatus(cur)]);
-    setTimetable(next);
-    await api.restoreTimetable(selectedId, next);
+    const restored = { ...next, path_requests: cur?.path_requests ?? [] };
+    setTimetable(restored);
+    await api.restoreTimetable(selectedId, restored);
   }, [historyFuture, selectedId]);
 
   useEffect(() => {
@@ -871,6 +902,23 @@ export default function App() {
                     </button>
                   </>
                 )}
+                {(timetables.some((t) => t.id === timetable.id && t.active) || (timetable.path_requests?.length ?? 0) > 0) && (
+                  <>
+                    <span className="text-slate-700 mx-1">|</span>
+                    <button
+                      onClick={() => { setFocusRequestId(null); setRequestsOpen((v) => !v); }}
+                      title="Path requests from crews"
+                      className={`flex items-center gap-1.5 text-xs transition-colors px-1.5 py-1 rounded hover:bg-slate-800 ${requestsOpen ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      Requests
+                      {badgeCount(timetable.path_requests) > 0 && (
+                        <span className="min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-semibold flex items-center justify-center">
+                          {badgeCount(timetable.path_requests)}
+                        </span>
+                      )}
+                    </button>
+                  </>
+                )}
                 <span className="text-slate-700 mx-1">|</span>
                 {/* Print menu */}
                 <div className="relative">
@@ -1073,6 +1121,17 @@ export default function App() {
           onClose={() => setModal({ type: 'none' })}
         />
       )}
+
+      {requestsOpen && timetable && (
+        <RequestsDrawer
+          timetable={timetable}
+          focusId={focusRequestId}
+          onTimetable={setTimetable}
+          onHighlightTrain={setHoveredCrewTrainId}
+          onClose={() => setRequestsOpen(false)}
+        />
+      )}
+      <ChangeToasts toasts={requestToasts.toasts} onDismiss={requestToasts.dismiss} />
 
       {modal.type === 'stationReport' && timetable && (
         <StationReport

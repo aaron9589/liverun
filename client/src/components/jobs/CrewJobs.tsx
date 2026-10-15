@@ -9,10 +9,14 @@ import { helpUrl } from '../../lib/help';
 import { autoSelectTrain, sequenceStops, sortByRun } from '../../lib/stops';
 import { describeJobChange, diffJobs } from '../../lib/jobDiff';
 import { fmtMins } from '../../lib/crewJobs';
-import type { Timetable } from '../../types';
+import { setClockHint } from '../../lib/device';
+import { defaultFrom, myRequests, requestToasts } from '../../lib/pathRequests';
+import type { PathRequestSubmit, Timetable } from '../../types';
 import { ChangeToasts, useToasts } from '../ChangeToasts';
 import { CrewPicker } from './CrewPicker';
 import { JobCard } from './JobCard';
+import { RequestCard } from './RequestCard';
+import { RequestForm } from './RequestForm';
 
 const crewKey = (ttId: string) => `jobs:crew:${ttId}`;
 
@@ -86,10 +90,14 @@ export function CrewJobs() {
   const clock = clockConfigured ? (clockTime ?? lastClock.current) : null;
   const clockLive = clockStatus === 'connected' && clockTime !== null;
 
+  // The fast clock rides along on request calls so the audit log can carry it.
+  useEffect(() => { setClockHint(clock); }, [clock]);
+
   // Crew choice, per timetable on this device. A stored crew that no longer exists reopens the picker.
   const [pickedCrew, setPickedCrew] = useState<{ ttId: string; crewId: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickingCrew, setPickingCrew] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const crewId = timetable ? (pickedCrew?.ttId === timetable.id ? pickedCrew.crewId : readStore(crewKey(timetable.id))) : null;
   const crew = timetable?.crews.find((c) => c.id === crewId) ?? null;
   const showPicker = !!timetable && (pickingCrew || !crew);
@@ -110,12 +118,36 @@ export function CrewJobs() {
   const [open, setOpen] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   const autoId = autoSelectTrain(trains, clock)?.id ?? null;
 
+  // My requests: this crew's, open first. A 30 s tick lets accepted cards fade without other updates.
+  const requests = useMemo(() => myRequests(timetable?.path_requests, crew?.id ?? ''), [timetable?.path_requests, crew?.id]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const canRequest = !!timetable && !!crew && timetable.settings.requests_enabled !== false;
+
+  const submitRequest = async (body: PathRequestSubmit) => {
+    if (!timetable) return;
+    live.replace(await api.submitPathRequest(timetable.id, body));
+    setRequesting(false);
+  };
+  const withdraw = async (requestId: string) => {
+    if (!timetable || !crew) return;
+    live.replace(await api.withdrawPathRequest(timetable.id, requestId, crew.id));
+  };
+  const askCancel = async (requestId: string, reason: string) => {
+    if (!timetable || !crew) return;
+    live.replace(await api.askCancelPathRequest(timetable.id, requestId, crew.id, reason || undefined));
+  };
+
   // Control's changes: toasts, green ring for new jobs, flashed cells for retimed stops. No sounds.
   const prevTt = useRef<Timetable | null>(null);
   useEffect(() => {
     const prev = prevTt.current;
     prevTt.current = timetable;
     if (!prev || !timetable || prev.id !== timetable.id || !crew) return;
+    for (const t of requestToasts(prev.path_requests, timetable.path_requests, crew.id, timetable)) toasts.push(t.message, t.tone);
     const changes = diffJobs(prev, timetable, [crew.id]);
     if (changes.length === 0) return;
     if (changes.length > 5) toasts.push(`Control changed ${changes.length} of your jobs`, 'warning');
@@ -185,6 +217,28 @@ export function CrewJobs() {
   } else {
     body = (
       <main className="flex-1 overflow-auto p-3 flex flex-col gap-3 content-start">
+        {canRequest && (
+          <button
+            onClick={() => setRequesting(true)}
+            className="min-h-[56px] rounded-xl bg-blue-600 hover:bg-blue-500 text-lg font-semibold"
+          >+ Request a path</button>
+        )}
+        {requests.length > 0 && (
+          <>
+            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">My requests</h2>
+            {requests.map((r) => (
+              <RequestCard
+                key={r.id}
+                request={r}
+                timetable={timetable}
+                crewId={crew!.id}
+                now={now}
+                onWithdraw={withdraw}
+                onAskCancel={askCancel}
+              />
+            ))}
+          </>
+        )}
         <h1 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">My jobs</h1>
         {trains.length === 0 && <p className="text-slate-400">No jobs for this crew yet.</p>}
         {trains.map((t) => (
@@ -208,6 +262,17 @@ export function CrewJobs() {
     <div className="h-[100dvh] flex flex-col bg-slate-950 text-slate-100">
       {header}
       {body}
+      {requesting && canRequest && (
+        <RequestForm
+          crew={crew!}
+          stations={timetable!.stations}
+          clock={clock}
+          initialFrom={defaultFrom(timetable!.trains, crew!.id, clock)}
+          initialLoco={trains.find((t) => t.id === autoId)?.train_id ?? ''}
+          onSubmit={submitRequest}
+          onClose={() => setRequesting(false)}
+        />
+      )}
       <ChangeToasts toasts={toasts.toasts} onDismiss={toasts.dismiss} placement="bottom" />
     </div>
   );

@@ -21,8 +21,7 @@ export function JobCard({ train, seq, stations, clock, expanded, onToggle, isNew
   const done = train.status === 'completed';
   const running = train.status === 'running';
   const cur = expanded ? currentStop(seq, clock, null) : { index: -1, state: 'none' as const };
-  // request_id is added to Train by the path-requests work (phase 2); read defensively until then.
-  const requested = !!(train as Train & { request_id?: string }).request_id;
+  const requested = !!train.request_id;
   const summary = jobSummary(seq, stations);
   const flashCell = (id: string) => (retimedStopIds.has(id) ? 'bg-amber-500/30 rounded' : '');
 
