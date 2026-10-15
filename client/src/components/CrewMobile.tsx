@@ -1,8 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Crew, Timetable, TimetableSummary, Train } from '../types';
 import { api } from '../api';
 import { useFastClock } from '../hooks/useFastClock';
+import { useLiveTimetable } from '../hooks/useLiveTimetable';
+import { describeJobChange, diffJobs } from '../lib/jobDiff';
+import { switchMode } from '../lib/mode';
 import { timeToMinutes, useLocalStorage } from '../utils';
+import { ChangeToasts, useToasts } from './ChangeToasts';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -50,32 +54,34 @@ function formatMins(mins: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-// ─── Sync WebSocket hook ───────────────────────────────────────────────────────
+// ─── Change highlights ────────────────────────────────────────────────────────
 
-function useSyncWs(
-  timetableId: string | null,
-  onCompletions: (c: Record<string, 'running' | 'completed'>) => void,
-) {
-  const cbRef = useRef(onCompletions);
-  cbRef.current = onCompletions;
+/** A set of ids that each drop out durationMs after they were last flagged. */
+function useTimedFlags(durationMs: number): [ReadonlySet<string>, (ids: string[]) => void] {
+  const [flags, setFlags] = useState<ReadonlySet<string>>(() => new Set());
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  const flag = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    setFlags((prev) => new Set([...prev, ...ids]));
+    for (const id of ids) {
+      clearTimeout(timers.current.get(id));
+      timers.current.set(id, setTimeout(() => {
+        timers.current.delete(id);
+        setFlags((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      }, durationMs));
+    }
+  }, [durationMs]);
 
   useEffect(() => {
-    if (!timetableId) return;
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Derive the deployment base path from the current URL so the WS works under
-    // a reverse-proxy sub-path. Strip a trailing '/mobile' and any trailing slash.
-    const basePath = window.location.pathname.replace(/\/mobile\/?$/, '').replace(/\/+$/, '');
-    const ws = new WebSocket(`${proto}//${window.location.host}${basePath}/api/live/sync?id=${timetableId}`);
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'completions' && msg.timetableId === timetableId) cbRef.current(msg.statuses ?? {});
-      } catch { /* ignore */ }
-    };
-    return () => ws.close();
-  }, [timetableId]);
+    const pending = timers.current;
+    return () => { pending.forEach(clearTimeout); pending.clear(); };
+  }, []);
+
+  return [flags, flag];
 }
 
+/** Toast text + tone for one job change. */
 // ─── Train card ────────────────────────────────────────────────────────────────
 
 function trainEndpoints(train: Train, stationMap: Map<string, { name: string }>): { from: string | null; to: string | null } {
@@ -100,11 +106,17 @@ function TrainCard({
   train,
   crew,
   stationMap,
+  isNew,
+  isRetimed,
   onToggle,
 }: {
   train: Train;
   crew?: Crew;
   stationMap: Map<string, { name: string }>;
+  /** Just added to my jobs by Control. */
+  isNew: boolean;
+  /** Times just changed by Control. */
+  isRetimed: boolean;
   onToggle: () => void;
 }) {
   const first = trainFirstMinute(train);
@@ -123,7 +135,7 @@ function TrainCard({
           : isRunning
           ? 'bg-slate-800/80 border-slate-600/80 shadow-lg'
           : 'bg-slate-800/60 border-slate-700/50'
-      }`}
+      }${isNew ? ' ring-2 ring-green-400/80' : ''}`}
       style={isRunning ? { boxShadow: `0 0 12px 2px ${(crew?.color ?? train.color)}33` } : undefined}
     >
       {/* Crew / train colour dot */}
@@ -137,6 +149,11 @@ function TrainCard({
           <span className={`font-medium text-sm ${isDone ? 'line-through text-slate-500' : isRunning ? 'text-white' : 'text-slate-100'}`}>
             {train.name}
           </span>
+          {isNew && (
+            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-green-500 text-slate-950 shrink-0">
+              New
+            </span>
+          )}
           {crew && (
             <span
               className="text-xs px-1.5 py-0.5 rounded-full shrink-0"
@@ -153,13 +170,15 @@ function TrainCard({
           </div>
         )}
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {train.train_type && (
-            <span className="text-xs text-slate-500 bg-slate-700/50 rounded px-1.5 py-0.5">{train.train_type}</span>
-          )}
           {train.train_id && (
             <span className="text-xs text-slate-500 font-mono tabular-nums">{train.train_id}</span>
           )}
-          <span className="text-xs text-slate-500 font-mono tabular-nums">
+          <span
+            className={`text-xs font-mono tabular-nums rounded px-1 -mx-1 transition-colors duration-700 ${
+              isRetimed ? 'bg-amber-400/25 text-amber-200' : 'text-slate-500'
+            }`}
+            title={isRetimed ? 'Times changed by Control' : undefined}
+          >
             {formatMins(first)}–{formatMins(last)}
           </span>
         </div>
@@ -217,12 +236,16 @@ function TimelineList({
   crewMap,
   stationMap,
   currentMinute,
+  newIds,
+  retimedIds,
   onToggle,
 }: {
   trains: Train[];
   crewMap: Map<string, Crew>;
   stationMap: Map<string, { name: string }>;
   currentMinute: number | null;
+  newIds: ReadonlySet<string>;
+  retimedIds: ReadonlySet<string>;
   onToggle: (id: string) => void;
 }) {
   // Compute each train's first minute once (used for dot classification + now-line interpolation)
@@ -327,6 +350,8 @@ function TimelineList({
               train={train}
               crew={train.crew_id ? crewMap.get(train.crew_id) : undefined}
               stationMap={stationMap}
+              isNew={newIds.has(train.id)}
+              isRetimed={retimedIds.has(train.id)}
               onToggle={() => onToggle(train.id)}
             />
           </div>
@@ -364,14 +389,23 @@ function useWallClock(): string {
 
 export function CrewMobile() {
   const [timetables, setTimetables] = useState<TimetableSummary[]>([]);
-  const [timetable, setTimetable] = useState<Timetable | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useLocalStorage<string[]>('mob:typeFilter', []);
+  const [listLoaded, setListLoaded] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [crewFilter, setCrewFilter] = useLocalStorage<string[]>('mob:crewFilter', []);
-  const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const [crewFilterOpen, setCrewFilterOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const wallClock = useWallClock();
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
+  const [newIds, flagNew] = useTimedFlags(60_000);
+  const [retimedIds, flagRetimed] = useTimedFlags(10_000);
+
+  // Which timetable to show: an explicit choice (URL ?id= or the picker), else
+  // follow Control's active timetable live (first timetable if none is active).
+  const urlId = new URLSearchParams(window.location.search).get('id') ?? null;
+  const [explicitId, setExplicitId] = useState<string | null>(urlId);
+  const [selectedId, setSelectedId] = useState<string | null>(urlId);
+  const following = explicitId === null;
+  const { timetable, error, status, activeId, deleted, replace } = useLiveTimetable(selectedId);
 
   const clockSettings = timetable?.settings;
   const { clockTime } = useFastClock(
@@ -384,10 +418,6 @@ export function CrewMobile() {
     ? `${String(Math.floor(clockTime / 60) % 24).padStart(2, '0')}:${String(clockTime % 60).padStart(2, '0')}`
     : wallClock;
 
-  // Determine which timetable to show: URL ?id= param, else active timetable
-  const urlId = new URLSearchParams(window.location.search).get('id') ?? null;
-  const [selectedId, setSelectedId] = useState<string | null>(urlId);
-
   // Reset filters when switching timetables (stored crew IDs / types won't match).
   // We compare inside the effect body (not a ref) so we only reset when the effect
   // fires for a *new* selectedId — the cleanup of the previous effect runs before
@@ -397,38 +427,76 @@ export function CrewMobile() {
     const prev = prevSelectedId.current;
     prevSelectedId.current = selectedId;
     if (prev !== null && prev !== selectedId) {
-      setTypeFilter([]);
       setCrewFilter([]);
     }
   }, [selectedId]);
 
-  // Load timetable list then resolve active one if no explicit ID
+  // Timetable list: on load, and again whenever Control switches or deletes one
   useEffect(() => {
-    api.listTimetables().then((list) => {
-      setTimetables(list);
-      if (!urlId) {
-        const active = list.find((t) => t.active) ?? list[0] ?? null;
-        setSelectedId(active?.id ?? null);
+    api.listTimetables()
+      .then((list) => { setTimetables(list); setListError(null); })
+      .catch(() => setListError('Could not load timetables'))
+      .finally(() => setListLoaded(true));
+  }, [activeId, deleted]);
+
+  useEffect(() => {
+    if (explicitId) { setSelectedId(explicitId); return; }
+    if (activeId === undefined) return; // not known yet
+    setSelectedId(activeId ?? timetables[0]?.id ?? null);
+  }, [explicitId, activeId, timetables]);
+
+  // Control switched the active timetable while we follow it: announce once it has loaded
+  const prevActiveId = useRef<string | null | undefined>(undefined);
+  const announceSwitch = useRef(false);
+  useEffect(() => {
+    const prev = prevActiveId.current;
+    prevActiveId.current = activeId;
+    if (prev !== undefined && activeId && activeId !== prev && following) announceSwitch.current = true;
+  }, [activeId, following]);
+
+  // The shown timetable was deleted: say so and fall back to following the active one
+  useEffect(() => {
+    if (!deleted) return;
+    setNotice(`"${timetable?.name ?? 'The selected timetable'}" was deleted by Control.`);
+    setExplicitId(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deleted]);
+
+  // Diff each new version against the last one and tell the crew what Control changed
+  const prevTimetable = useRef<Timetable | null>(null);
+  useEffect(() => {
+    const prev = prevTimetable.current;
+    prevTimetable.current = timetable;
+    if (!timetable || prev === timetable) return;
+    if (!prev || prev.id !== timetable.id) {
+      // Initial load or a different timetable: no per-job toasts
+      if (announceSwitch.current && timetable.id === activeId) pushToast(`Control switched to ${timetable.name}`, 'warning');
+      announceSwitch.current = false;
+      return;
+    }
+    // "My jobs" = the crews the filter showed before this change ('' = unassigned trains); no filter = all trains
+    const prevCrewIds = new Set(prev.crews.map((c) => c.id));
+    const filter = crewFilter.filter((f) => f === '' || prevCrewIds.has(f));
+    const nextCrewIds = new Set(timetable.crews.map((c) => c.id));
+    const goneCrews = prev.crews.filter((c) => filter.includes(c.id) && !nextCrewIds.has(c.id));
+    if (goneCrews.length > 0) {
+      // Its trains are now unassigned and the filter widens; one notice beats a toast per train
+      pushToast(`Crew ${goneCrews.map((c) => c.name).join(', ')} removed by Control`, 'warning');
+      return;
+    }
+    const changes = diffJobs(prev, timetable, filter.length > 0 ? filter : null);
+    if (changes.length > 5) {
+      pushToast(`Control changed ${changes.length} of your jobs`, 'warning');
+    } else {
+      for (const change of changes) {
+        const { message, tone } = describeJobChange(change);
+        pushToast(message, tone);
       }
-    }).catch(() => setError('Could not load timetables'));
-  }, [urlId]);
-
-  useEffect(() => {
-    if (!selectedId) { setTimetable(null); setLoading(false); return; }
-    setLoading(true);
-    api.getTimetable(selectedId)
-      .then((tt) => { setTimetable(tt); setLoading(false); })
-      .catch(() => { setError('Could not load timetable'); setLoading(false); });
-  }, [selectedId]);
-
-  // Real-time completion sync
-  useSyncWs(selectedId, (statuses) => {
-    setTimetable((prev) => {
-      if (!prev) return prev;
-      const trains = prev.trains.map((t) => ({ ...t, status: statuses[t.id] ?? undefined }));
-      return { ...prev, trains };
-    });
-  });
+    }
+    flagNew(changes.filter((c) => c.type === 'added').map((c) => c.train.id));
+    flagRetimed(changes.filter((c) => c.type === 'retimed').map((c) => c.train.id));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timetable]);
 
   async function cycleStatus(trainId: string) {
     if (!selectedId || !timetable) return;
@@ -437,7 +505,7 @@ export function CrewMobile() {
     const next = train.status === 'running' ? 'completed' : train.status === 'completed' ? null : 'running';
     try {
       const updated = await api.setTrainStatus(selectedId, trainId, next);
-      setTimetable(updated);
+      replace(updated);
     } catch { /* ignore */ }
   }
 
@@ -445,30 +513,20 @@ export function CrewMobile() {
     if (!selectedId) return;
     try {
       const updated = await api.resetAllCompleted(selectedId);
-      setTimetable(updated);
+      replace(updated);
     } catch { /* ignore */ }
   }
-
-  // Derived: unique train types in this timetable ('' = no type set)
-  const allTypes = timetable
-    ? [
-        ...([...new Set(timetable.trains.map((t) => t.train_type ?? '').filter(Boolean))].sort()),
-        ...(timetable.trains.some((t) => !t.train_type) ? [''] : []),
-      ]
-    : [];
 
   const crewMap = new Map((timetable?.crews ?? []).map((c) => [c.id, c]));
   const stationMap = new Map((timetable?.stations ?? []).map((s) => [s.id, { name: s.name }]));
 
   // Drop any stored filter values that don't exist in the current timetable
   // (avoids blank screen when stale localStorage values don't match loaded data)
-  const validTypeFilter = typeFilter.filter((f) => allTypes.includes(f));
   const validCrewIds = new Set((timetable?.crews ?? []).map((c) => c.id));
   const validCrewFilter = crewFilter.filter((f) => f === '' || validCrewIds.has(f));
 
   // Filtered + sorted trains
   const visibleTrains = (timetable?.trains ?? []).filter((t) => {
-    if (validTypeFilter.length > 0 && !validTypeFilter.includes(t.train_type ?? '')) return false;
     if (validCrewFilter.length > 0 && !validCrewFilter.includes(t.crew_id ?? '')) return false;
     return true;
   });
@@ -485,7 +543,8 @@ export function CrewMobile() {
   const completedCount = visibleTrains.filter((t) => t.status === 'completed').length;
   const runningCount = visibleTrains.filter((t) => t.status === 'running').length;
 
-  if (loading) {
+  const waiting = selectedId ? !timetable && !error : !listLoaded;
+  if (waiting) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-slate-500 text-sm">Loading…</div>
@@ -493,10 +552,11 @@ export function CrewMobile() {
     );
   }
 
-  if (error) {
+  const loadError = timetable ? null : (selectedId && error ? 'Could not load timetable' : listError);
+  if (loadError) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-6">
-        <div className="text-red-400 text-sm text-center">{error}</div>
+        <div className="text-red-400 text-sm text-center">{loadError}</div>
       </div>
     );
   }
@@ -510,7 +570,7 @@ export function CrewMobile() {
             {timetables.map((tt) => (
               <button
                 key={tt.id}
-                onClick={() => setSelectedId(tt.id)}
+                onClick={() => setExplicitId(tt.id)}
                 className="w-full text-left px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 transition-colors"
               >
                 <div className="font-medium">{tt.name}</div>
@@ -525,6 +585,8 @@ export function CrewMobile() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      <ChangeToasts toasts={toasts} onDismiss={dismissToast} />
+
       {/* ── Header ── */}
       <header className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3">
         <div className="max-w-lg mx-auto space-y-2">
@@ -545,6 +607,11 @@ export function CrewMobile() {
               style={{ color: clockTime !== null ? '#4ade80' : '#94a3b8' }}
               title={clockTime !== null ? 'Fast clock' : 'Wall clock'}
             >{displayClock}</span>
+            <button
+              onClick={switchMode}
+              title="Switch mode (guard panel, crew view, planner)"
+              className="text-xs text-slate-400 hover:text-slate-200 border border-slate-700 rounded-md px-2 py-1 shrink-0"
+            >Switch</button>
           </div>
 
           {/* ── Row 2: timetable name / selector ── */}
@@ -552,7 +619,7 @@ export function CrewMobile() {
             {timetables.length > 1 ? (
               <select
                 value={selectedId ?? ''}
-                onChange={(e) => setSelectedId(e.target.value || null)}
+                onChange={(e) => setExplicitId(e.target.value || null)}
                 className="flex-1 min-w-0 text-sm bg-slate-800 border border-slate-700 text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-500"
               >
                 {timetables.map((tt) => (
@@ -562,64 +629,27 @@ export function CrewMobile() {
             ) : (
               <span className="flex-1 min-w-0 text-sm text-slate-400 truncate">{timetable?.name ?? '—'}</span>
             )}
+            {/* Live link to Control: changes arrive without a refresh while green */}
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${status === 'live' ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`}
+              title={status === 'live' ? 'Live — changes from Control appear automatically' : 'Reconnecting to Control…'}
+            />
           </div>
+
+          {notice && (
+            <div className="flex items-start gap-2 text-xs bg-amber-500/10 border border-amber-500/40 text-amber-200 rounded-lg px-3 py-2">
+              <span className="flex-1">{notice}</span>
+              <button onClick={() => setNotice(null)} className="text-amber-300 hover:text-white" aria-label="Dismiss">✕</button>
+            </div>
+          )}
 
           {/* ── Row 3: filters + progress ── */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Train type filter */}
-            {allTypes.length > 0 && (
-              <div className="relative">
-                <button
-                  onClick={() => { setTypeFilterOpen((v) => !v); setCrewFilterOpen(false); }}
-                  className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                    validTypeFilter.length > 0
-                      ? 'bg-blue-600/20 border-blue-500/50 text-blue-300'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Type {validTypeFilter.length > 0 ? `(${validTypeFilter.length})` : ''}
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${typeFilterOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9" /></svg>
-                </button>
-                {typeFilterOpen && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setTypeFilterOpen(false)} />
-                    <div className="absolute left-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[160px]">
-                      {allTypes.map((type) => (
-                        <label key={type || '__blank__'} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-700 transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={validTypeFilter.includes(type)}
-                            onChange={(e) =>
-                              setTypeFilter((prev) =>
-                                e.target.checked ? [...prev, type] : prev.filter((t) => t !== type)
-                              )
-                            }
-                            className="accent-blue-500 w-4 h-4"
-                          />
-                          <span className={`text-sm ${type ? 'text-slate-200' : 'text-slate-500 italic'}`}>
-                            {type || '(blank)'}
-                          </span>
-                        </label>
-                      ))}
-                      {validTypeFilter.length > 0 && (
-                        <button
-                          onClick={() => { setTypeFilter([]); setTypeFilterOpen(false); }}
-                          className="w-full text-left px-3 py-2 text-xs text-slate-500 hover:text-slate-300 border-t border-slate-700 transition-colors"
-                        >
-                          Clear filter
-                        </button>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
             {/* Crew filter */}
             {(timetable?.crews ?? []).length > 0 && (
               <div className="relative">
                 <button
-                  onClick={() => { setCrewFilterOpen((v) => !v); setTypeFilterOpen(false); }}
+                  onClick={() => { setCrewFilterOpen((v) => !v); }}
                   className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                     validCrewFilter.length > 0
                       ? 'bg-blue-600/20 border-blue-500/50 text-blue-300'
@@ -695,6 +725,8 @@ export function CrewMobile() {
             crewMap={crewMap}
             stationMap={stationMap}
             currentMinute={clockTime ?? null}
+            newIds={newIds}
+            retimedIds={retimedIds}
             onToggle={cycleStatus}
           />
         )}

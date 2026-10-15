@@ -2,6 +2,8 @@ import type {
   Timetable,
   TimetableSummary,
   TimetableSettings,
+  LayoutConfig,
+  LoaValue,
   TrainRequest,
   PathRequest,
 } from './types';
@@ -26,11 +28,53 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** URL of a sound-library file (served by GET /api/sounds/:file). */
+export function soundUrl(file: string): string {
+  return `${BASE}/sounds/${encodeURIComponent(file)}`;
+}
+
+export interface SoundFile {
+  file: string;
+  size: number;
+}
+
 // ── Timetables ────────────────────────────────────────────────
 
 export const api = {
+  // ── Limit of Authority: last known topic values (server cache) ──
+  getLoaValues: () =>
+    req<Record<string, LoaValue>>('/loa/values'),
+
+  // ── Layout-wide config ──
+  getLayout: () =>
+    req<LayoutConfig>('/layout'),
+
+  updateLayout: (layout: LayoutConfig) =>
+    req<LayoutConfig>('/layout', {
+      method: 'PUT',
+      body: JSON.stringify(layout),
+    }),
+
+  // ── Sound library (acts immediately; not part of the layout draft) ──
+  listSounds: () =>
+    req<SoundFile[]>('/sounds'),
+
+  /** Raw body with the file's own content type (not JSON). Rejects with a 409 body if it exists and !overwrite. */
+  uploadSound: (file: File, overwrite = false) =>
+    req<SoundFile>(`/sounds?name=${encodeURIComponent(file.name)}${overwrite ? '&overwrite=1' : ''}`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    }),
+
+  deleteSound: (name: string) =>
+    req<{ ok: true }>(`/sounds/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+
   listTimetables: () =>
     req<TimetableSummary[]>('/timetables'),
+
+  getActiveTimetable: () =>
+    req<{ id: string | null }>('/active-timetable'),
 
   setActiveTimetable: (id: string | null) =>
     req<{ id: string | null }>('/active-timetable', {
@@ -89,7 +133,7 @@ export const api = {
 
   addStation: (
     timetableId: string,
-    data: { name: string; shortCode: string; distance: number | null; graphPos: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean }
+    data: { name: string; shortCode: string; distance: number | null; graphPos: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boardingWeight?: number | null }
   ) =>
     req<Timetable>(`/timetables/${timetableId}/stations`, {
       method: 'POST',
@@ -99,7 +143,7 @@ export const api = {
   updateStation: (
     timetableId: string,
     stationId: string,
-    data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean }
+    data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boardingWeight?: number | null }
   ) =>
     req<Timetable>(`/timetables/${timetableId}/stations/${stationId}`, {
       method: 'PUT',
@@ -117,6 +161,16 @@ export const api = {
     req<Timetable>(`/timetables/${timetableId}/trains`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  /** Graph editing: new times only, matched by station; all-or-nothing (409 if a train's stops changed since). */
+  retimeTrains: (
+    timetableId: string,
+    changes: { trainId: string; times: { stationId: string; arrival: string | null; departure: string | null }[] }[],
+  ) =>
+    req<Timetable>(`/timetables/${timetableId}/trains/retime`, {
+      method: 'POST',
+      body: JSON.stringify({ changes }),
     }),
 
   updateTrain: (timetableId: string, trainId: string, data: Omit<TrainRequest, 'id'>) =>
@@ -162,13 +216,13 @@ export const api = {
 
   // ── Crews ──────────────────────────────────────────────────
 
-  addCrew: (timetableId: string, data: { name: string; color: string }) =>
+  addCrew: (timetableId: string, data: { name: string; color: string; guardVisible?: boolean }) =>
     req<Timetable>(`/timetables/${timetableId}/crews`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateCrew: (timetableId: string, crewId: string, data: { name: string; color: string }) =>
+  updateCrew: (timetableId: string, crewId: string, data: { name: string; color: string; guardVisible?: boolean }) =>
     req<Timetable>(`/timetables/${timetableId}/crews/${crewId}`, {
       method: 'PUT',
       body: JSON.stringify(data),

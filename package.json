@@ -1,6 +1,6 @@
 {
   "name": "train-graph",
-  "version": "1.12.0",
+  "version": "2.0.0",
   "private": true,
   "workspaces": [
     "server",
@@ -9,7 +9,9 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=server\" \"npm run dev --workspace=client\"",
     "build": "npm run build --workspace=client",
-    "start": "npm run start --workspace=server"
+    "start": "npm run start --workspace=server",
+    "test": "npm test --workspace=server && npm test --workspace=client",
+    "mock:jmri": "node scripts/dev/mock-jmri.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

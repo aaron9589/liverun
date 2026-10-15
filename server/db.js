@@ -52,15 +52,114 @@ function getTimetable(id) {
   return timetables.find((t) => t.id === id) ?? null;
 }
 
-/** Persist a mutation to a specific timetable. fn receives the timetable and may mutate it. */
-function mutateTimetable(id, fn) {
+// ── Change notifications ───────────────────────────────────────────────────
+// Every timetable mutation bumps tt.rev and tells registered listeners, so the
+// live sync socket (server/sync.js) can push it to clients. Listeners receive
+// { type: 'updated', timetableId, rev, notify }.
+
+const changeListeners = new Set();
+
+/** Registers a change listener. Returns a function that unregisters it. */
+function onTimetableChange(listener) {
+  changeListeners.add(listener);
+  return () => changeListeners.delete(listener);
+}
+
+function emitChange(event) {
+  for (const listener of changeListeners) {
+    try { listener(event); } catch (err) { console.error('Timetable change listener failed:', err); }
+  }
+}
+
+/**
+ * Persist a mutation to a specific timetable. fn receives the timetable and may mutate it.
+ * Bumps tt.rev. notify:false marks the change as not worth a 'timetable-updated'
+ * broadcast (e.g. train run status, which has its own 'completions' message).
+ */
+function mutateTimetable(id, fn, { notify = true } = {}) {
   const db = readDB();
   const idx = db.timetables.findIndex((t) => t.id === id);
   if (idx === -1) return null;
-  fn(db.timetables[idx]);
-  db.timetables[idx].updated_at = new Date().toISOString();
+  const tt = db.timetables[idx];
+  fn(tt);
+  tt.updated_at = new Date().toISOString();
+  tt.rev = (tt.rev || 0) + 1;
   writeDB(db);
-  return db.timetables[idx];
+  emitChange({ type: 'updated', timetableId: id, rev: tt.rev, notify });
+  return tt;
 }
 
-module.exports = { readDB, writeDB, getTimetable, mutateTimetable, uuidv4 };
+// ── Layout-wide configuration ──────────────────────────────────────────────
+// Physical-layout settings shared by every timetable (JMRI, guard panel, …).
+// Stored under db.layout; always read through getLayout() so callers see
+// defaults for any section that hasn't been saved yet.
+
+const NEUTRAL_BOARDING_MODEL = {
+  max_passengers: 60,
+  demand_curve: [['00:00', 1], ['24:00', 1]],
+  rules: [],
+  position: { origin: 1, intermediate: 1, terminus: 0 },
+  spread: 0.15,
+};
+
+// Neutral defaults only (spec D13): layout-specific values belong in the
+// layout's own config, e.g. docs/layout.example.json.
+const LAYOUT_DEFAULTS = {
+  jmri: { url: '' },
+  guard: { event_alert_sound: '' },
+  train_profiles: [],
+  boarding: {
+    ...NEUTRAL_BOARDING_MODEL,
+    tick_s: 1,
+    jitter: 0.3,
+    flow_rate: 3,
+    straggler_threshold: 5,
+    straggler_rate: 0.5,
+    runner_chance: 0.2,
+    runner_count: [1, 3],
+    runner_delay_s: [2, 6],
+    start_delay_s: 4,
+    doil_off_delay_s: 8,
+    show_alighting: false,
+    alighting: { ...NEUTRAL_BOARDING_MODEL, position: { origin: 0, intermediate: 1, terminus: 1.5 } },
+  },
+  stats: { enabled: false, topic: '', payload: 'count', publish_on: 'door_close' },
+  events: { library: [], publish_topic: '' },
+  loa: { sections: [] },
+};
+
+function isPlainObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** Deep-merge stored values over defaults. Arrays and scalars replace wholesale. */
+function mergeLayout(defaults, stored) {
+  if (!isPlainObject(stored)) return structuredClone(defaults);
+  const out = {};
+  for (const key of Object.keys(defaults)) {
+    out[key] = isPlainObject(defaults[key])
+      ? mergeLayout(defaults[key], stored[key])
+      : (stored[key] !== undefined ? stored[key] : structuredClone(defaults[key]));
+  }
+  return out;
+}
+
+/** Returns the layout config with defaults applied. Unknown keys are dropped. */
+function getLayout() {
+  return mergeLayout(LAYOUT_DEFAULTS, readDB().layout);
+}
+
+/** Replaces the stored layout config (caller validates). Returns the merged result. */
+function setLayout(layout) {
+  const db = readDB();
+  db.layout = mergeLayout(LAYOUT_DEFAULTS, layout);
+  writeDB(db);
+  return db.layout;
+}
+
+/** Directory holding the DB file (the Docker data volume); sounds/ lives here. */
+function dataDir() {
+  return path.dirname(DB_PATH);
+}
+
+module.exports = { dataDir, readDB, writeDB, getTimetable, mutateTimetable, onTimetableChange, uuidv4, getLayout, setLayout, LAYOUT_DEFAULTS };

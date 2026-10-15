@@ -6,8 +6,13 @@ const rateLimit = require('express-rate-limit');
 const { WebSocketServer } = require('ws');
 const mqtt = require('mqtt');
 const path = require('path');
-const { readDB, writeDB, getTimetable, mutateTimetable, uuidv4 } = require('./db');
+const events = require('./events');
+const { readDB, writeDB, getTimetable, mutateTimetable, onTimetableChange, uuidv4, getLayout, setLayout } = require('./db');
 const openApiSpec = require('./openapi');
+const { stripTrainType } = require('./migrations');
+const layoutRoutes = require('./layout');
+const { WS_SYNC_PATH, createSync } = require('./sync');
+const loaCacheRoutes = require('./loa-cache');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -23,9 +28,12 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || null;
 app.use(cors(ALLOWED_ORIGIN ? { origin: ALLOWED_ORIGIN } : {}));
 app.use(express.json({ limit: '1mb' }));
 
-// 200 requests per minute across all API routes
-app.use('/api', rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false }));
+// Behind a reverse proxy every client would otherwise share the proxy's IP
+// (and its rate-limit bucket). Trust X-Forwarded-For only from proxies on
+// loopback/private networks, which covers Docker bridges and LAN proxies.
+app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 
+// Strip BASE_PATH before anything path-based (rate limiter, routes, static).
 if (BASE_PATH) {
   app.use((req, _res, next) => {
     if (req.url.startsWith(BASE_PATH + '/') || req.url === BASE_PATH) {
@@ -35,9 +43,38 @@ if (BASE_PATH) {
   });
 }
 
+// 200 requests per minute per client across all API routes
+app.use('/api', rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false }));
+
+// '/guard/' and '/mobile/' would resolve the relative ./assets and ./api URLs
+// one level too deep. Redirect to the slash-less form with a *relative*
+// Location so it is correct with or without BASE_PATH / proxy prefixes.
+// (A middleware with an exact path check: Express routes ignore a trailing
+// slash, so app.get('/guard/') would also catch '/guard' and loop.)
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || (req.path !== '/guard/' && req.path !== '/mobile/')) return next();
+  const name = req.path.replace(/\//g, '');
+  const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  res.redirect(301, `../${name}${qs}`);
+});
+
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
 }
+
+// LOA topic cache (GET /api/loa/values) — see server/loa-cache.js. refresh()
+// after the layout or the active timetable changes; edits to the active
+// timetable (its broker URL) are picked up through onTimetableChange.
+const loaCache = loaCacheRoutes.register(app, { getLayout, readDB, onTimetableChange });
+
+// Live sync socket (/api/live/sync) — see server/sync.js
+const sync = createSync({
+  getTimetable,
+  getActiveId: () => readDB().active_timetable_id || null,
+  onTimetableChange,
+  getLoaSnapshot: loaCache.snapshot,
+  onLoaChange: loaCache.onChange,
+});
 
 const DEFAULT_SETTINGS = {
   clock_enabled: false,
@@ -94,7 +131,12 @@ app.put('/api/timetables/:id', (req, res) => {
 app.delete('/api/timetables/:id', (req, res) => {
   const db = readDB();
   db.timetables = db.timetables.filter((t) => t.id !== req.params.id);
+  // Don't leave the active flag pointing at a timetable that no longer exists
+  const wasActive = db.active_timetable_id === req.params.id;
+  if (wasActive) db.active_timetable_id = null;
   writeDB(db);
+  sync.timetableDeleted(req.params.id, { activeCleared: wasActive });
+  if (wasActive) loaCache.refresh();
   res.json({ ok: true });
 });
 
@@ -114,8 +156,17 @@ app.put('/api/active-timetable', (req, res) => {
   }
   db.active_timetable_id = id || null;
   writeDB(db);
+  sync.activeChanged(db.active_timetable_id);
+  loaCache.refresh();
   res.json({ id: db.active_timetable_id });
 });
+
+// ── Layout-wide config (see server/layout.js) ────────────────
+
+layoutRoutes.register(app, { getLayout, setLayout: (layout) => { const saved = setLayout(layout); loaCache.refresh(); return saved; } });
+require('./sounds').register(app, { dataDir: require('./db').dataDir });
+// Graph editing: times-only, all-or-nothing batch retime (before the /trains/:trainId routes)
+require('./retime').register(app, { getTimetable, mutateTimetable, normalise });
 
 // Must be defined before /:id routes to avoid 'import' being matched as an id
 app.post('/api/timetables/import', (req, res) => {
@@ -157,6 +208,7 @@ app.post('/api/timetables/import', (req, res) => {
       bold_name: Boolean(s.bold_name),
       italic_name: Boolean(s.italic_name),
       underline_name: Boolean(s.underline_name),
+      ...(parseBoardingWeight(s.boarding_weight) !== undefined && { boarding_weight: parseBoardingWeight(s.boarding_weight) }),
     })),
     trains: (data.trains || []).map((tr) => {
       const trainId = uuidv4();
@@ -166,7 +218,6 @@ app.post('/api/timetables/import', (req, res) => {
         name: String(tr.name || '').trim(),
         color: /^#[0-9a-fA-F]{3,8}$/.test(tr.color) ? tr.color : '#3b82f6',
         notes: String(tr.notes || ''),
-        train_type: String(tr.train_type || ''),
         train_id: String(tr.train_id || ''),
         direction: String(tr.direction || ''),
         crew_id: tr.crew_id ? (crewIdMap[tr.crew_id] || null) : null,
@@ -178,6 +229,7 @@ app.post('/api/timetables/import', (req, res) => {
           departure: stop.departure ? String(stop.departure) : null,
           special_instructions: stop.special_instructions ? String(stop.special_instructions) : null,
           location_alias: stop.location_alias ? String(stop.location_alias) : null,
+          ...withGuardEvents(stop.guard_events),
         })),
       };
     }),
@@ -202,6 +254,7 @@ app.post('/api/timetables/import', (req, res) => {
       timetable_id: newId,
       name: String(c.name || '').trim(),
       color: /^#[0-9a-fA-F]{3,8}$/.test(c.color) ? c.color : '#94a3b8',
+      guard_visible: c.guard_visible === true,
     })),
   };
   db.timetables.push(imported);
@@ -274,6 +327,7 @@ app.post('/api/timetables/:id/restore', (req, res) => {
       bold_name: Boolean(s.bold_name),
       italic_name: Boolean(s.italic_name),
       underline_name: Boolean(s.underline_name),
+      ...(parseBoardingWeight(s.boarding_weight) !== undefined && { boarding_weight: parseBoardingWeight(s.boarding_weight) }),
     }));
     if (Array.isArray(trains)) tt.trains = trains.map((tr) => ({
       id: String(tr.id),
@@ -281,7 +335,6 @@ app.post('/api/timetables/:id/restore', (req, res) => {
       name: String(tr.name || '').trim(),
       color: /^#[0-9a-fA-F]{3,8}$/.test(tr.color) ? tr.color : '#3b82f6',
       notes: String(tr.notes || ''),
-      train_type: String(tr.train_type || ''),
       train_id: String(tr.train_id || ''),
       direction: String(tr.direction || ''),
       crew_id: tr.crew_id ? String(tr.crew_id) : null,
@@ -294,6 +347,7 @@ app.post('/api/timetables/:id/restore', (req, res) => {
         departure: s.departure ? String(s.departure) : null,
         special_instructions: s.special_instructions ? String(s.special_instructions) : null,
         location_alias: s.location_alias ? String(s.location_alias) : null,
+        ...withGuardEvents(s.guard_events),
       })),
     }));
     if (Array.isArray(paths)) tt.paths = paths.map((p) => ({
@@ -314,10 +368,11 @@ app.post('/api/timetables/:id/restore', (req, res) => {
       timetable_id: ttId,
       name: String(c.name || '').trim(),
       color: /^#[0-9a-fA-F]{3,8}$/.test(c.color) ? c.color : '#94a3b8',
+      guard_visible: c.guard_visible === true,
     }));
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcastCompletions(req.params.id, updated);
+  sync.broadcastCompletions(req.params.id, updated);
   res.json(normalise(updated));
 });
 
@@ -344,9 +399,20 @@ app.put('/api/timetables/:id/settings', (req, res) => {
   res.json(normalise(updated));
 });
 
+/** Boarding weight: finite number 0-2, else undefined (= unset, treated as 1.0). */
+function parseBoardingWeight(v) {
+  if (v == null || v === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n <= 2 ? n : undefined;
+}
+function boardingWeightInvalid(v) {
+  return v != null && v !== '' && parseBoardingWeight(v) === undefined;
+}
+
 app.post('/api/timetables/:id/stations', (req, res) => {
-  const { name, shortCode, distance, graphPos, branchName, pushDown, aliasEnabled, boldName, italicName, underlineName } = req.body;
+  const { name, shortCode, distance, graphPos, branchName, pushDown, aliasEnabled, boldName, italicName, underlineName, boardingWeight } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
+  if (boardingWeightInvalid(boardingWeight)) return res.status(400).json({ error: 'boardingWeight must be a number 0-2' });
   if (graphPos == null || graphPos === '') return res.status(400).json({ error: 'graphPos is required' });
   const updated = mutateTimetable(req.params.id, (tt) => {
     const newPos = Number(graphPos);
@@ -367,6 +433,7 @@ app.post('/api/timetables/:id/stations', (req, res) => {
       bold_name: Boolean(boldName),
       italic_name: Boolean(italicName),
       underline_name: Boolean(underlineName),
+      ...(parseBoardingWeight(boardingWeight) !== undefined && { boarding_weight: parseBoardingWeight(boardingWeight) }),
     });
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -374,8 +441,9 @@ app.post('/api/timetables/:id/stations', (req, res) => {
 });
 
 app.put('/api/timetables/:id/stations/:stationId', (req, res) => {
-  const { name, shortCode, distance, graphPos, sortOrder, branchName, pushDown, aliasEnabled, boldName, italicName, underlineName } = req.body;
+  const { name, shortCode, distance, graphPos, sortOrder, branchName, pushDown, aliasEnabled, boldName, italicName, underlineName, boardingWeight } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
+  if (boardingWeightInvalid(boardingWeight)) return res.status(400).json({ error: 'boardingWeight must be a number 0-2' });
   const updated = mutateTimetable(req.params.id, (tt) => {
     const st = tt.stations.find((s) => s.id === req.params.stationId);
     if (st) {
@@ -402,6 +470,8 @@ app.put('/api/timetables/:id/stations/:stationId', (req, res) => {
       st.bold_name = Boolean(boldName);
       st.italic_name = Boolean(italicName);
       st.underline_name = Boolean(underlineName);
+      const bw = parseBoardingWeight(boardingWeight);
+      if (bw === undefined) delete st.boarding_weight; else st.boarding_weight = bw;
     }
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
@@ -464,14 +534,16 @@ app.delete('/api/timetables/:id/paths/:pathId', (req, res) => {
 });
 
 app.post('/api/timetables/:id/trains', (req, res) => {
-  const { name, color, notes, trainType, trainId: trainIdField, direction, crewId, stops } = req.body;
+  const { name, color, notes, trainId: trainIdField, direction, crewId, stops } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
+  const evCheck = events.validateStopsEvents(stops);
+  if (evCheck.error) return res.status(400).json({ error: evCheck.error });
   const trainId = uuidv4();
   const updated = mutateTimetable(req.params.id, (tt) => {
     tt.trains.push({
       id: trainId, timetable_id: req.params.id, name: name.trim(),
       color: color || '#3b82f6', notes: notes || '',
-      train_type: trainType || '', train_id: trainIdField || '', direction: direction || '',
+      train_id: trainIdField || '', direction: direction || '',
       crew_id: crewId || null,
       stops: buildStops(trainId, stops || []),
     });
@@ -481,13 +553,15 @@ app.post('/api/timetables/:id/trains', (req, res) => {
 });
 
 app.put('/api/timetables/:id/trains/:trainId', (req, res) => {
-  const { name, color, notes, trainType, trainId: trainIdField, direction, crewId, stops } = req.body;
+  const { name, color, notes, trainId: trainIdField, direction, crewId, stops } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
+  const evCheck = events.validateStopsEvents(stops);
+  if (evCheck.error) return res.status(400).json({ error: evCheck.error });
   const updated = mutateTimetable(req.params.id, (tt) => {
     const tr = tt.trains.find((t) => t.id === req.params.trainId);
     if (tr) {
       tr.name = name.trim(); tr.color = color || '#3b82f6'; tr.notes = notes || '';
-      tr.train_type = trainType || ''; tr.train_id = trainIdField || ''; tr.direction = direction || '';
+      delete tr.train_type; tr.train_id = trainIdField || ''; tr.direction = direction || '';
       tr.crew_id = crewId || null;
       tr.stops = buildStops(req.params.trainId, stops || []);
     }
@@ -501,17 +575,18 @@ app.delete('/api/timetables/:id/trains/:trainId', (req, res) => {
     tt.trains = tt.trains.filter((t) => t.id !== req.params.trainId);
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcastCompletions(req.params.id, updated);
+  sync.broadcastCompletions(req.params.id, updated);
   res.json(normalise(updated));
 });
 
 // Must be before /:trainId to avoid 'reset-complete' matching as an ID
 app.post('/api/timetables/:id/trains/reset-complete', (req, res) => {
+  // Run status only: crews tap this constantly, so no 'timetable-updated' re-fetch
   const updated = mutateTimetable(req.params.id, (tt) => {
     tt.trains.forEach((t) => { delete t.status; });
-  });
+  }, { notify: false });
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcastCompletions(req.params.id, updated);
+  sync.broadcastCompletions(req.params.id, updated, { statusOnly: true });
   res.json(normalise(updated));
 });
 
@@ -526,20 +601,20 @@ app.patch('/api/timetables/:id/trains/:trainId/complete', (req, res) => {
         delete train.status;
       }
     }
-  });
+  }, { notify: false });
   if (!updated) return res.status(404).json({ error: 'Not found' });
-  broadcastCompletions(req.params.id, updated);
+  sync.broadcastCompletions(req.params.id, updated, { statusOnly: true });
   res.json(normalise(updated));
 });
 
 // ── Crews ─────────────────────────────────────────────────────
 
 app.post('/api/timetables/:id/crews', (req, res) => {
-  const { name, color } = req.body;
+  const { name, color, guardVisible } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const updated = mutateTimetable(req.params.id, (tt) => {
     if (!tt.crews) tt.crews = [];
-    tt.crews.push({ id: uuidv4(), timetable_id: req.params.id, name: name.trim(), color: color || '#94a3b8' });
+    tt.crews.push({ id: uuidv4(), timetable_id: req.params.id, name: name.trim(), color: color || '#94a3b8', guard_visible: guardVisible === true });
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.status(201).json(normalise(updated));
@@ -563,12 +638,17 @@ app.put('/api/timetables/:id/crews/reorder', (req, res) => {
 });
 
 app.put('/api/timetables/:id/crews/:crewId', (req, res) => {
-  const { name, color } = req.body;
+  const { name, color, guardVisible } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const updated = mutateTimetable(req.params.id, (tt) => {
     if (!tt.crews) tt.crews = [];
     const crew = tt.crews.find((c) => c.id === req.params.crewId);
-    if (crew) { crew.name = name.trim(); crew.color = color || crew.color; }
+    if (crew) {
+      crew.name = name.trim();
+      crew.color = color || crew.color;
+      // Omitted = unchanged, so the planner's name/colour edit doesn't clear it.
+      if (typeof guardVisible === 'boolean') crew.guard_visible = guardVisible;
+    }
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.json(normalise(updated));
@@ -637,6 +717,11 @@ function stripTerminalTimes(stops) {
     .filter((s) => s.arrival || s.departure); // drop any null-null stops
 }
 
+function withGuardEvents(list) {
+  const g = events.sanitizePlacements(list);
+  return g ? { guard_events: g } : {};
+}
+
 function buildStops(trainId, stops) {
   const built = stops
     .filter((s) => s.arrival || s.departure)
@@ -645,6 +730,7 @@ function buildStops(trainId, stops) {
       arrival: s.arrival || null, departure: s.departure || null,
       special_instructions: s.specialInstructions || null,
       location_alias: s.locationAlias || null,
+      ...withGuardEvents(s.guardEvents),
     }));
   return stripTerminalTimes(built);
 }
@@ -901,12 +987,11 @@ function deriveDirectionAtStation(train, stationId, stationOrderById) {
   return '';
 }
 
-function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, trainTypeFilter) {
+function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter) {
   const sortedStations = sortStationsForDirection(tt.stations || []);
   const stationOrderById = new Map(sortedStations.map((s, idx) => [s.id, idx]));
   const stationGraphPosById = new Map(sortedStations.map((s) => [s.id, Number(s.graph_pos ?? 0)]));
   const trainIdMatcher = makeLikeMatcher(trainIdFilter);
-  const trainTypeMatcher = makeLikeMatcher(trainTypeFilter);
   const stationNameQuery = String(stationNameParam || '').trim().toLowerCase();
   const station = (sortedStations || []).find((s) => String(s.name || '').trim().toLowerCase() === stationNameQuery);
   if (!station) {
@@ -933,7 +1018,6 @@ function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, 
     const derivedDirection = deriveDirectionAtStation(tr, station.id, stationOrderById);
     if (directionQuery && derivedDirection !== directionQuery) continue;
     if (trainIdMatcher && !trainIdMatcher.test(String(tr.train_id || ''))) continue;
-    if (trainTypeMatcher && !trainTypeMatcher.test(String(tr.train_type || ''))) continue;
     const stoppingPattern = sequencedStops.slice(stationStopIndex).map((stop) => {
       const stopStation = stationMap.get(stop.station_id);
       return {
@@ -947,7 +1031,6 @@ function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, 
     const eventTime = stationStop.arrival || stationStop.departure || null;
     allServices.push({
       name: tr.name,
-      trainType: tr.train_type || '',
       trainId: tr.train_id || '',
       direction: derivedDirection || tr.direction || '',
       notes: tr.notes || '',
@@ -966,7 +1049,6 @@ function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, 
     for (const tr of (tt.trains || [])) {
       if (stoppingTrainIds.has(tr.id)) continue;
       if (trainIdMatcher && !trainIdMatcher.test(String(tr.train_id || ''))) continue;
-      if (trainTypeMatcher && !trainTypeMatcher.test(String(tr.train_type || ''))) continue;
 
       const sequencedStops = getSequencedTimedStops(tr, stationOrderById);
       if (sequencedStops.length < 2) continue;
@@ -1009,7 +1091,6 @@ function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, 
 
         allServices.push({
           name: tr.name,
-          trainType: tr.train_type || '',
           trainId: tr.train_id || '',
           direction: derivedDirection,
           notes: tr.notes || '',
@@ -1031,7 +1112,6 @@ function buildStationBoard(tt, stationNameParam, directionQuery, trainIdFilter, 
     stationName: station.name,
     direction: directionQuery || 'all',
     trainIdFilter: trainIdFilter || null,
-    trainTypeFilter: trainTypeFilter || null,
     services: allServices
       .sort((a, b) => {
         const am = a._sortMinute == null ? Number.POSITIVE_INFINITY : a._sortMinute;
@@ -1061,7 +1141,6 @@ app.get('/api/timetables/:id/live/trains', (req, res) => {
     .sort((a, b) => trainStartMinute(a) - trainStartMinute(b))
     .map((tr) => ({
       name: tr.name,
-      trainType: tr.train_type || '',
       trainId: tr.train_id || '',
       direction: tr.direction || '',
       notes: tr.notes || '',
@@ -1088,7 +1167,6 @@ app.get('/api/timetables/:id/live/trains/:trainName', (req, res) => {
   });
   res.json({
     name: train.name,
-    trainType: train.train_type || '',
     trainId: train.train_id || '',
     direction: train.direction || '',
     notes: train.notes || '',
@@ -1103,12 +1181,11 @@ app.get('/api/timetables/:id/live/stations/:stationName', (req, res) => {
 
   const directionQuery = parseDirection(req.query.direction);
   const trainIdFilter = parseTrainIdFilter(req.query.trainId);
-  const trainTypeFilter = parseTrainIdFilter(req.query.trainType);
   if (directionQuery === null) {
     return res.status(400).json({ error: 'direction must be "up" or "down"' });
   }
 
-  const board = buildStationBoard(tt, req.params.stationName, directionQuery, trainIdFilter, trainTypeFilter);
+  const board = buildStationBoard(tt, req.params.stationName, directionQuery, trainIdFilter);
   if (board.error) return res.status(board.status || 500).json({ error: board.error });
   res.json(board);
 });
@@ -1125,7 +1202,7 @@ function sendStationFeedTick(ws, config, clockMinute) {
     sendWsJson(ws, { type: 'error', error: 'Timetable not found' });
     return;
   }
-  const board = buildStationBoard(tt, config.stationName, config.direction, config.trainIdFilter, config.trainTypeFilter);
+  const board = buildStationBoard(tt, config.stationName, config.direction, config.trainIdFilter);
   if (board.error) {
     sendWsJson(ws, { type: 'error', error: board.error });
     return;
@@ -1302,66 +1379,18 @@ app.use((err, _req, res, _next) => {
 const server = http.createServer(app);
 const wsServer = new WebSocketServer({ noServer: true });
 
-// ── Sync WebSocket — broadcasts completion state to all connected clients ──────
-
-const WS_SYNC_PATH = '/api/live/sync';
-const wsSyncServer = new WebSocketServer({ noServer: true });
-// timetableId → Set<WebSocket>
-const syncClients = new Map();
-
-function broadcastCompletions(timetableId, tt) {
-  const clients = syncClients.get(timetableId);
-  if (!clients || clients.size === 0) return;
-  const statuses = {};
-  for (const train of (tt.trains || [])) {
-    if (train.status) statuses[train.id] = train.status;
-  }
-  const msg = JSON.stringify({ type: 'completions', timetableId, statuses });
-  for (const ws of clients) {
-    if (ws.readyState === 1) ws.send(msg);
-  }
-}
-
-wsSyncServer.on('connection', (ws, req) => {
-  const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const timetableId = String(reqUrl.searchParams.get('id') || '').trim();
-  if (!timetableId) { ws.close(1008, 'id query param required'); return; }
-
-  const tt = getTimetable(timetableId);
-  if (!tt) { ws.close(1008, 'Timetable not found'); return; }
-
-  if (!syncClients.has(timetableId)) syncClients.set(timetableId, new Set());
-  syncClients.get(timetableId).add(ws);
-
-  // Send current status state immediately on connect
-  const statuses = {};
-  for (const train of (tt.trains || [])) {
-    if (train.status) statuses[train.id] = train.status;
-  }
-  if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'completions', timetableId, statuses }));
-
-  ws.on('close', () => {
-    const clients = syncClients.get(timetableId);
-    if (clients) {
-      clients.delete(ws);
-      if (clients.size === 0) syncClients.delete(timetableId);
-    }
-  });
-});
-
 wsServer.on('connection', (ws, req) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const timetableId = String(reqUrl.searchParams.get('id') || '').trim();
   const stationName = String(reqUrl.searchParams.get('station') || '').trim();
   const direction = parseDirection(reqUrl.searchParams.get('direction'));
   const trainIdFilter = parseTrainIdFilter(reqUrl.searchParams.get('trainId'));
-  const trainTypeFilter = parseTrainIdFilter(reqUrl.searchParams.get('trainType'));
   const futureCount = Math.max(1, Math.min(100, Number(reqUrl.searchParams.get('futureCount')) || 10));
 
   if (!timetableId || !stationName || direction === null) {
     sendWsJson(ws, {
       type: 'error',
-      error: 'Expected query: id=<timetableId>&station=<stationName>[&direction=up|down][&trainId=%pattern%][&trainType=%pattern%][&futureCount=10]',
+      error: 'Expected query: id=<timetableId>&station=<stationName>[&direction=up|down][&trainId=%pattern%][&futureCount=10]',
     });
     ws.close(1008, 'Invalid query');
     return;
@@ -1388,7 +1417,6 @@ wsServer.on('connection', (ws, req) => {
     stationName,
     direction,
     trainIdFilter,
-    trainTypeFilter,
     clockTopic: settings.clock_topic,
     futureCount,
   };
@@ -1467,9 +1495,7 @@ server.on('upgrade', (req, socket, head) => {
       wsServer.emit('connection', ws, req);
     });
   } else if (targetPath === WS_SYNC_PATH || targetPath === bpSync) {
-    wsSyncServer.handleUpgrade(req, socket, head, (ws) => {
-      wsSyncServer.emit('connection', ws, req);
-    });
+    sync.handleUpgrade(req, socket, head);
   } else {
     socket.destroy();
   }
@@ -1483,6 +1509,7 @@ server.on('upgrade', (req, socket, head) => {
   const db = readDB();
   let changed = 0;
   for (const tt of db.timetables) {
+    const before = changed;
     for (const tr of (tt.trains ?? [])) {
       const original = JSON.stringify(tr.stops);
       tr.stops = stripTerminalTimes(
@@ -1494,10 +1521,26 @@ server.on('upgrade', (req, socket, head) => {
       );
       if (JSON.stringify(tr.stops) !== original) changed++;
     }
+    // Bump rev so live clients holding the old copy re-fetch on reconnect
+    if (changed > before) tt.rev = (tt.rev || 0) + 1;
   }
   if (changed > 0) {
     writeDB(db);
     console.log(`Startup migration: normalised terminal stop times on ${changed} train(s).`);
+  }
+})();
+
+// ── Startup migration: remove retired train_type field ───────────────────────
+(function migrateStripTrainType() {
+  const db = readDB();
+  const before = db.timetables.map((tt) => JSON.stringify(tt.trains ?? []));
+  const changed = stripTrainType(db);
+  if (changed > 0) {
+    db.timetables.forEach((tt, i) => {
+      if (JSON.stringify(tt.trains ?? []) !== before[i]) tt.rev = (tt.rev || 0) + 1;
+    });
+    writeDB(db);
+    console.log(`Startup migration: removed train_type from ${changed} train(s).`);
   }
 })();
 

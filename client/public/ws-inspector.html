@@ -292,11 +292,6 @@
           </div>
 
           <div>
-            <label for="trainTypeFilter">Train type filter (%/_)</label>
-            <input id="trainTypeFilter" type="text" placeholder="%express%" />
-          </div>
-
-          <div>
             <label for="futureCount">Future services count</label>
             <input id="futureCount" type="number" min="1" max="100" value="10" />
           </div>
@@ -339,7 +334,6 @@
       const stationInput = document.getElementById('station');
       const directionInput = document.getElementById('direction');
       const trainIdFilterInput = document.getElementById('trainIdFilter');
-      const trainTypeFilterInput = document.getElementById('trainTypeFilter');
       const futureCountInput = document.getElementById('futureCount');
       const connectBtn = document.getElementById('connectBtn');
       const disconnectBtn = document.getElementById('disconnectBtn');
@@ -362,13 +356,11 @@
         const station = p.get('station');
         const direction = p.get('direction');
         const trainId = p.get('trainId');
-        const trainType = p.get('trainType');
         const futureCount = p.get('futureCount');
         if (id) timetableIdInput.value = id;
         if (station) stationInput.value = station;
         if (direction === 'up' || direction === 'down') directionInput.value = direction;
         if (trainId) trainIdFilterInput.value = trainId;
-        if (trainType) trainTypeFilterInput.value = trainType;
         if (futureCount) futureCountInput.value = futureCount;
       }
 
@@ -394,7 +386,6 @@
         const station = stationInput.value.trim();
         const direction = directionInput.value;
         const trainId = trainIdFilterInput.value.trim();
-        const trainType = trainTypeFilterInput.value.trim();
         const futureCount = futureCountInput.value.trim();
 
         if (!id) throw new Error('Timetable ID is required');
@@ -404,7 +395,6 @@
         url.searchParams.set('station', station);
         if (direction) url.searchParams.set('direction', direction);
         if (trainId) url.searchParams.set('trainId', trainId);
-        if (trainType) url.searchParams.set('trainType', trainType);
         if (futureCount) url.searchParams.set('futureCount', futureCount);
 
         return url.toString();

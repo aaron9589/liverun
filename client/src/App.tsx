@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { Timetable, TimetableSummary, TimetableSettings, Train, ModalState, TrainRequest, Path, PathRequest } from './types';
+import { modeUrl } from './lib/mode';
+import type { LayoutConfig, Timetable, TimetableSummary, TimetableSettings, Train, TrainStop, ModalState, TrainRequest, Path, PathRequest } from './types';
 import { api } from './api';
 import { useLocalStorage, timeToMinutes, exportCatsXml, exportCrewsXml, escapeHtml, stationNameStyle } from './utils';
 import { useFastClock } from './hooks/useFastClock';
 import { Sidebar } from './components/Sidebar';
 import { TrainGraph } from './components/TrainGraph';
 import { SettingsPanel } from './components/SettingsPanel';
+import { LayoutSettings } from './components/LayoutSettings';
+import { DEFAULT_LAYOUT } from './lib/layoutDefaults';
 import { TimetableForm } from './components/TimetableForm';
 import { TrainEditor } from './components/TrainEditor';
 import { PathEditor } from './components/PathEditor';
@@ -165,6 +168,9 @@ ${pagesHtml}
 
 export default function App() {
   const [timetables, setTimetables] = useState<TimetableSummary[]>([]);
+  const [layout, setLayout] = useState<LayoutConfig | null>(null);
+  // Layout config is optional; if the endpoint fails, JMRI is treated as unconfigured.
+  useEffect(() => { api.getLayout().then(setLayout).catch(() => {}); }, []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [timetable, setTimetable] = useState<Timetable | null>(null);
   const [loading, setLoading] = useState(false);
@@ -393,6 +399,7 @@ export default function App() {
     boldName?: boolean;
     italicName?: boolean;
     underlineName?: boolean;
+    boardingWeight?: number | null;
   }) {
     if (!selectedId) return;
     const updated = await api.addStation(selectedId, data);
@@ -401,7 +408,7 @@ export default function App() {
 
   async function handleUpdateStation(
     stationId: string,
-    data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean }
+    data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean; boardingWeight?: number | null }
   ) {
     if (!selectedId) return;
     const updated = await api.updateStation(selectedId, stationId, data);
@@ -466,7 +473,7 @@ export default function App() {
     recordAndSet(updated);
   }
 
-  async function handleUpdateCrew(crewId: string, data: { name: string; color: string }) {
+  async function handleUpdateCrew(crewId: string, data: { name: string; color: string; guardVisible?: boolean }) {
     if (!selectedId) return;
     const updated = await api.updateCrew(selectedId, crewId, data);
     recordAndSet(updated);
@@ -492,26 +499,52 @@ export default function App() {
     return unassigned;
   }
 
-  async function handleUnassignTrain(trainId: string) {
-    if (!selectedId || !timetable) return;
-    const train = timetable.trains.find((t) => t.id === trainId);
-    if (!train) return;
-    const updated = await api.updateTrain(selectedId, trainId, {
+  /** A full update request for a train, keeping every stop field (notes, aliases, guard events). */
+  function trainRequest(train: Train, over: { crewId?: string | null; stops?: TrainStop[] } = {}): TrainRequest {
+    return {
       name: train.name,
       color: train.color,
       notes: train.notes,
-      trainType: train.train_type,
       trainId: train.train_id,
       direction: train.direction,
-      crewId: undefined,
-      stops: train.stops.map((s) => ({
+      crewId: over.crewId === undefined ? train.crew_id : over.crewId ?? undefined,
+      stops: (over.stops ?? train.stops).map((s) => ({
         stationId: s.station_id,
         arrival: s.arrival,
         departure: s.departure,
         specialInstructions: s.special_instructions,
+        locationAlias: s.location_alias ?? undefined,
+        guardEvents: s.guard_events,
       })),
-    });
+    };
+  }
+
+  async function handleUnassignTrain(trainId: string) {
+    if (!selectedId || !timetable) return;
+    const train = timetable.trains.find((t) => t.id === trainId);
+    if (!train) return;
+    const updated = await api.updateTrain(selectedId, trainId, trainRequest(train, { crewId: null }));
     recordAndSet(updated);
+  }
+
+  // Graph editing: Done hands over every moved train. The server applies only the
+  // new times to each train's current stops, all-or-nothing, as one change (one
+  // undo step, one notice to crews). False = nothing saved; the graph keeps the drafts.
+  async function handleTrainTimesCommit(changes: { trainId: string; stops: TrainStop[] }[]): Promise<boolean> {
+    if (!selectedId) return false;
+    try {
+      const updated = await api.retimeTrains(selectedId, changes.map((c) => ({
+        trainId: c.trainId,
+        times: c.stops.map((s) => ({ stationId: s.station_id, arrival: s.arrival, departure: s.departure })),
+      })));
+      recordAndSet(updated);
+      return true;
+    } catch (e) {
+      let msg = e instanceof Error ? e.message : 'Save failed';
+      try { msg = (JSON.parse(msg) as { error?: string }).error ?? msg; } catch { /* plain text */ }
+      window.alert(`${msg}\n\nYour moves are still on the graph: Done to try again, or Cancel to discard them.`);
+      return false;
+    }
   }
 
   async function handleToggleTrainComplete(trainId: string) {
@@ -912,6 +945,7 @@ export default function App() {
                       clockStatus={clockStatus}
                       clockError={clockError}
                       onClose={() => setSettingsOpen(false)}
+                      onOpenLayoutSettings={() => setModal({ type: 'layoutSettings' })}
                       timetableId={selectedId ?? undefined}
                       firstStationName={timetable.stations?.[0]?.name}
                     />
@@ -919,6 +953,24 @@ export default function App() {
                 </div>
               </>
             )}
+            <a
+              href={modeUrl('guard')}
+              title="Open the guard panel"
+              className="flex items-center gap-1 px-1.5 py-1.5 rounded text-xs transition-colors hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+            >
+              Guard panel
+            </a>
+            {/* Layout settings — reachable without a timetable */}
+            <button
+              onClick={() => setModal({ type: 'layoutSettings' })}
+              title="Layout settings"
+              className={`flex items-center gap-1 px-1.5 py-1.5 rounded text-xs transition-colors hover:bg-slate-800 ${
+                modal.type === 'layoutSettings' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <LayoutIcon />
+              Layout
+            </button>
           </div>
         </header>
 
@@ -944,6 +996,7 @@ export default function App() {
           )}
           {displayTimetable && !loading && (
             <TrainGraph
+              key={displayTimetable.id}
               timetable={displayTimetable}
               onTrainClick={(train) => setModal({ type: 'editTrain', train })}
               labelMode={labelMode}
@@ -954,6 +1007,7 @@ export default function App() {
               onPan={handlePan}
               externalHoveredId={hoveredCrewTrainId}
               onScaleChange={(scale) => handleSettingsSave({ ...displayTimetable.settings, graph_scale: scale })}
+              onTrainTimesCommit={handleTrainTimesCommit}
             />
           )}
         </div>
@@ -976,6 +1030,9 @@ export default function App() {
           crews={timetable.crews}
           existingColors={timetable.trains.map((t) => t.color)}
           distanceUnit={distanceUnit}
+          jmriUrl={layout?.jmri.url}
+          profiles={layout?.train_profiles ?? []}
+          eventLibrary={layout?.events?.library}
           onDraftChange={setDraftTrain}
           onSave={handleSaveTrain}
           onDelete={modal.type === 'editTrain' ? () => handleDeleteTrain(modal.train.id) : undefined}
@@ -994,6 +1051,15 @@ export default function App() {
             handleSavePath({ ...data, id: modal.type === 'editPath' ? modal.path.id : undefined })
           }
           onDelete={modal.type === 'editPath' ? () => handleDeletePath(modal.path.id) : undefined}
+          onClose={() => setModal({ type: 'none' })}
+        />
+      )}
+
+      {modal.type === 'layoutSettings' && (
+        <LayoutSettings
+          layout={layout ?? DEFAULT_LAYOUT}
+          timetable={timetable}
+          onSaved={setLayout}
           onClose={() => setModal({ type: 'none' })}
         />
       )}
@@ -1034,6 +1100,17 @@ function ReportIcon() {
       <line x1="9" y1="7" x2="15" y2="7" />
       <line x1="9" y1="11" x2="15" y2="11" />
       <line x1="9" y1="15" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+function LayoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+      <circle cx="8" cy="6" r="2" fill="currentColor" />
+      <circle cx="16" cy="12" r="2" fill="currentColor" />
+      <circle cx="10" cy="18" r="2" fill="currentColor" />
     </svg>
   );
 }

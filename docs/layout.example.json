@@ -1,0 +1,233 @@
+{
+  "jmri": {
+    "url": ""
+  },
+  "guard": {
+    "event_alert_sound": ""
+  },
+  "train_profiles": [],
+  "boarding": {
+    "max_passengers": 60,
+    "demand_curve": [
+      [
+        "00:00",
+        1
+      ],
+      [
+        "24:00",
+        1
+      ]
+    ],
+    "rules": [],
+    "position": {
+      "origin": 1,
+      "intermediate": 1,
+      "terminus": 0
+    },
+    "spread": 0.15,
+    "tick_s": 1,
+    "jitter": 0.3,
+    "flow_rate": 3,
+    "straggler_threshold": 5,
+    "straggler_rate": 0.5,
+    "runner_chance": 0.2,
+    "runner_count": [
+      1,
+      3
+    ],
+    "runner_delay_s": [
+      2,
+      6
+    ],
+    "start_delay_s": 4,
+    "doil_off_delay_s": 8,
+    "show_alighting": false,
+    "alighting": {
+      "max_passengers": 60,
+      "demand_curve": [
+        [
+          "00:00",
+          1
+        ],
+        [
+          "24:00",
+          1
+        ]
+      ],
+      "rules": [],
+      "position": {
+        "origin": 0,
+        "intermediate": 1,
+        "terminus": 1.5
+      },
+      "spread": 0.15
+    }
+  },
+  "stats": {
+    "enabled": false,
+    "topic": "",
+    "payload": "count",
+    "publish_on": "door_close"
+  },
+  "events": {
+    "library": [],
+    "publish_topic": ""
+  },
+  "loa": {
+    "sections": [
+      {
+        "id": "kiama-berry",
+        "name": "Kiama → Berry",
+        "from": "Kiama",
+        "to": "Berry",
+        "only": [],
+        "except": [],
+        "elements": [
+          {
+            "type": "selector",
+            "label": "Kiama departure",
+            "topic": "trains/track/turnout/Kiama/Down Loop/State",
+            "options": {
+              "CLOSED": {
+                "type": "signal",
+                "label": "Sig 45.25 (Kiama)",
+                "topic": "trains/track/signalmast/KIA-45.25",
+                "clear": [
+                  "R285; Lit; Unheld"
+                ]
+              },
+              "THROWN": {
+                "type": "signal",
+                "label": "Sig 45.27 (Kiama)",
+                "topic": "trains/track/signalmast/KIA-45.27",
+                "clear": [
+                  "R286; Lit; Unheld"
+                ]
+              }
+            },
+            "default": "CLOSED"
+          },
+          {
+            "type": "token",
+            "label": "Kiama–Berry Staff",
+            "topic": "trains/staff/kiama-berry",
+            "clear": [
+              "CATS"
+            ]
+          },
+          {
+            "type": "signal",
+            "label": "Sig 7 (Berry)",
+            "topic": "trains/track/signal/Berry/7",
+            "clear": [
+              "THROWN"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "berry-nowra",
+        "name": "Berry → Nowra",
+        "from": "Berry",
+        "to": "Nowra",
+        "only": [],
+        "except": [],
+        "elements": [
+          {
+            "type": "token",
+            "label": "Berry–Nowra Staff",
+            "topic": "trains/staff/nowra-berry",
+            "clear": [
+              "CATS"
+            ]
+          },
+          {
+            "type": "signal",
+            "label": "Sig 7 (Nowra)",
+            "topic": "trains/track/signal/Nowra/7",
+            "clear": [
+              "THROWN"
+            ]
+          },
+          {
+            "type": "signal",
+            "label": "Sig 8 (Nowra)",
+            "topic": "trains/track/signal/Nowra/8",
+            "clear": [
+              "THROWN"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "nowra-berry",
+        "name": "Nowra → Berry",
+        "from": "Nowra",
+        "to": "Berry",
+        "only": [],
+        "except": [],
+        "elements": [
+          {
+            "type": "signal",
+            "label": "Sig 1 (Nowra)",
+            "topic": "trains/track/signal/Nowra/1",
+            "clear": [
+              "THROWN"
+            ]
+          },
+          {
+            "type": "token",
+            "label": "Nowra–Berry Staff",
+            "topic": "trains/staff/nowra-berry",
+            "clear": [
+              "CATS"
+            ]
+          },
+          {
+            "type": "signal",
+            "label": "Sig 2 (Berry)",
+            "topic": "trains/track/signal/Berry/2",
+            "clear": [
+              "THROWN"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "berry-kiama",
+        "name": "Berry → Kiama",
+        "from": "Berry",
+        "to": "Kiama",
+        "only": [],
+        "except": [],
+        "elements": [
+          {
+            "type": "signal",
+            "label": "Sig 3 (Berry)",
+            "topic": "trains/track/signal/Berry/3",
+            "clear": [
+              "THROWN"
+            ]
+          },
+          {
+            "type": "token",
+            "label": "Berry–Kiama Staff",
+            "topic": "trains/staff/kiama-berry",
+            "clear": [
+              "CATS"
+            ]
+          },
+          {
+            "type": "signal",
+            "label": "Sig 45.4 (Kiama)",
+            "topic": "trains/track/signalmast/KIA-45.4",
+            "clear": [
+              "R285; Lit; Unheld",
+              "R281; Lit; Unheld"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

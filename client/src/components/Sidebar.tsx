@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { Path, Timetable, TimetableSummary, Train } from '../types';
 import { StationPanel } from './StationPanel';
-import { useLocalStorage } from '../utils';
+import { crewInitials, useLocalStorage } from '../utils';
 
 interface Props {
   timetables: TimetableSummary[];
@@ -15,8 +15,8 @@ interface Props {
   onDeleteTimetable: (id: string) => void;
   onDuplicateTimetable: (id: string) => void;
   onSetActiveTimetable: (id: string | null) => void;
-  onAddStation: (data: { name: string; shortCode: string; distance: number | null; graphPos: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean }) => void;
-  onUpdateStation: (id: string, data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean }) => void;
+  onAddStation: (data: { name: string; shortCode: string; distance: number | null; graphPos: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean; boardingWeight?: number | null }) => void;
+  onUpdateStation: (id: string, data: { name: string; shortCode: string; distance: number | null; graphPos: number; sortOrder: number; branchName?: string | null; pushDown?: boolean; aliasEnabled?: boolean; boldName?: boolean; italicName?: boolean; underlineName?: boolean; boardingWeight?: number | null }) => void;
   onDeleteStation: (id: string) => void;
   onNewPath: () => void;
   onEditPath: (path: Path) => void;
@@ -30,7 +30,7 @@ interface Props {
   onExportCatsXml: () => void;
   onImportTimetable: (file: File) => void;
   onAddCrew: (data: { name: string; color: string }) => void;
-  onUpdateCrew: (crewId: string, data: { name: string; color: string }) => void;
+  onUpdateCrew: (crewId: string, data: { name: string; color: string; guardVisible?: boolean }) => void;
   onDeleteCrew: (crewId: string) => void;
   onReorderCrews: (order: string[]) => void;
   onAutoAssignCrews: (data: { crewIds: string[]; trainIds: string[]; onlyUnassigned: boolean; minBreakMins: number }) => Promise<string[]>;
@@ -39,6 +39,9 @@ interface Props {
   onCrewTrainHover?: (trainId: string | null) => void;
   distanceUnit?: 'km' | 'mi';
 }
+
+/** Train list indicator badge: N (notes), S (special instructions), crew initials. */
+const BADGE_CLS = 'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded border bg-slate-900 text-[10px] font-bold leading-none tracking-tight';
 
 export function Sidebar({
   timetables,
@@ -265,7 +268,7 @@ export function Sidebar({
                 </button>
               </div>
             </div>
-            <p className="text-xs text-slate-600 mb-2">Add and manage trains on the graph. Dots indicate: <span className="text-blue-400">●</span> notes &nbsp;<span className="text-amber-400">●</span> special instructions &nbsp;<span className="text-green-400">●</span> crew assigned.</p>
+            <p className="text-xs text-slate-600 mb-2">Add and manage trains on the graph. Badges: <span className="text-blue-300 font-semibold">N</span> notes &nbsp;<span className="text-amber-300 font-semibold">S</span> special instructions &nbsp;and the crew's initials.</p>
             {openSections.trains && (
               <>
                 {timetable.trains.length > 0 && (
@@ -304,24 +307,21 @@ export function Sidebar({
                       />
                       <span className={`flex-1 text-sm truncate ${hidden ? 'text-slate-600' : 'text-slate-300'}`}>{train.name}</span>
                       {(hasNotes || hasSpecialInstructions || assignedCrew) && (
-                        <span className="flex items-center gap-0.5 shrink-0">
+                        <span className="flex items-center gap-1 shrink-0">
                           {hasNotes && (
-                            <span
-                              className="w-1.5 h-1.5 rounded-full bg-blue-400"
-                              title="Has train notes"
-                            />
+                            <span className={BADGE_CLS + ' border-blue-500/60 text-blue-300'} title="Has train notes">N</span>
                           )}
                           {hasSpecialInstructions && (
-                            <span
-                              className="w-1.5 h-1.5 rounded-full bg-amber-400"
-                              title="Has special instructions"
-                            />
+                            <span className={BADGE_CLS + ' border-amber-500/60 text-amber-300'} title="Has special instructions">S</span>
                           )}
                           {assignedCrew && (
                             <span
-                              className="w-1.5 h-1.5 rounded-full bg-green-400"
+                              className={BADGE_CLS}
+                              style={{ color: assignedCrew.color, borderColor: assignedCrew.color }}
                               title={`Crew: ${assignedCrew.name}`}
-                            />
+                            >
+                              {crewInitials(assignedCrew.name)}
+                            </span>
                           )}
                         </span>
                       )}
@@ -595,6 +595,19 @@ export function Sidebar({
                           </span>
                           <span className="w-3 h-3 rounded-full shrink-0 ring-1 ring-black/20" style={{ background: crew!.color }} />
                           <span className="flex-1 text-sm font-medium text-slate-200 truncate">{crew!.name}</span>
+                          <label
+                            className="flex items-center gap-1 text-[11px] text-slate-400 shrink-0 cursor-pointer select-none"
+                            title="Offer this crew in the guard panel's crew picker"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={crew!.guard_visible === true}
+                              onChange={(e) => onUpdateCrew(crew!.id, { name: crew!.name, color: crew!.color, guardVisible: e.target.checked })}
+                              className="accent-blue-500"
+                            />
+                            Guard
+                          </label>
                           {overlaps.size > 0 && (
                             <span
                               className="text-xs font-semibold text-red-400 shrink-0"

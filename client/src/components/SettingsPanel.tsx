@@ -12,6 +12,7 @@ interface Props {
   clockStatus: ClockStatus;
   clockError: string | null;
   onClose: () => void;
+  onOpenLayoutSettings: () => void;
   timetableId?: string;
   firstStationName?: string;
 }
@@ -22,7 +23,7 @@ const API_BASE = APP_BASE + '/api';
 export function SettingsPanel({
   labelMode, onLabelModeChange, distanceUnit, onDistanceUnitChange,
   settings, onSettingsSave, clockStatus, clockError, onClose,
-  timetableId, firstStationName,
+  onOpenLayoutSettings, timetableId, firstStationName,
 }: Props) {
   const [local, setLocal] = useState<TimetableSettings>(settings);
   const [saving, setSaving] = useState(false);
@@ -204,6 +205,15 @@ export function SettingsPanel({
           className="w-full py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-500 transition-colors"
         >
           {saving ? 'Saving...' : dirty ? 'Save changes' : 'Saved'}
+        </button>
+      </div>
+
+      <div className="px-4 py-3 border-t border-slate-800">
+        <button
+          onClick={() => { onClose(); onOpenLayoutSettings(); }}
+          className="w-full py-1.5 rounded-lg text-xs font-medium bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 transition-colors"
+        >
+          Layout settings…
         </button>
       </div>
 
