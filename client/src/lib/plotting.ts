@@ -69,6 +69,10 @@ export function plotWarnings(
   planWarnings: string[],
 ): string[] {
   const out = [...planWarnings];
+  const name = train.name.trim();
+  if (name && timetable.trains.some((o) => o.id !== train.id && o.name.trim().toLowerCase() === name.toLowerCase())) {
+    out.push(`${name} is already used by another train`);
+  }
   const span = runSpan(train);
   if (!span) return out;
   if (typeof clockMinutes === 'number' && Number.isFinite(clockMinutes)) {

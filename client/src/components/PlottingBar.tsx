@@ -21,6 +21,7 @@ interface Props {
 export function PlottingBar({ plotting, crews, otherMoved, onChange, onEditStops, onCancel, onAccept }: Props) {
   const [note, setNote] = useState('');
   const { train, requesterName, withdrawn, warnings, busy } = plotting;
+  const unnamed = !train.name.trim();
 
   function changeCrew(crewId: string) {
     const crew = crews.find((c) => c.id === crewId);
@@ -35,6 +36,17 @@ export function PlottingBar({ plotting, crews, otherMoved, onChange, onEditStops
         <span className="text-amber-300">
           {otherMoved === 0 ? 'No other trains moved' : `${otherMoved} other train${otherMoved === 1 ? '' : 's'} moved`}
         </span>
+        <label className="flex items-center gap-1" title="Train number / name the accepted train gets">
+          <span className="text-slate-500">Train</span>
+          <input
+            value={train.name}
+            onChange={(e) => onChange({ ...train, name: e.target.value.slice(0, 60) })}
+            maxLength={60}
+            disabled={busy}
+            aria-label="Train number"
+            className={`w-24 bg-slate-800 border rounded px-1.5 py-0.5 font-mono text-slate-100 ${unnamed ? 'border-red-500' : 'border-slate-600'}`}
+          />
+        </label>
         <label className="flex items-center gap-1">
           <span className="text-slate-500">Crew</span>
           <select
@@ -70,8 +82,8 @@ export function PlottingBar({ plotting, crews, otherMoved, onChange, onEditStops
         >Cancel</button>
         <button
           onClick={() => onAccept(note)}
-          disabled={busy || withdrawn}
-          title="Save this train and the other moves (one undo step)"
+          disabled={busy || withdrawn || unnamed}
+          title={unnamed ? 'Give the train a number first' : 'Save this train and the other moves (one undo step)'}
           className="px-3 py-0.5 rounded bg-emerald-500/90 text-slate-950 font-semibold hover:bg-emerald-400 disabled:opacity-40"
         >{busy ? 'Accepting…' : 'Accept'}</button>
       </div>

@@ -61,6 +61,7 @@ The graph switches to edit mode and the **plotting bar** appears above it:
 |---------|------|
 | **Plotting PR1 for Local Operator 2** | The draft train's name (from [Settings](#settings)) and the crew that asked |
 | **No other trains moved** / **n other trains moved** | Counts other trains you've dragged while plotting, for example to make room |
+| **Train** | The train number the accepted train gets. It starts as the next free **Train name prefix** number (PR1, PR2, …); type the real one, e.g. **8982**. **Accept** needs one, and a warning appears if another train already has it |
 | **Crew ▾** | Who the train goes to. It starts as the crew that asked; **Unassigned** is allowed. The train keeps its colour |
 | **Edit stops** | Opens the train editor on the draft, to change stops, times, notes or the train's name |
 | **Note to crew (optional)** | A note the crew sees on their request card, up to 300 characters |

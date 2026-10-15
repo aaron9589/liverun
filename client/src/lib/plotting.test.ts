@@ -103,3 +103,12 @@ describe('pickRequestColor', () => {
     expect(a).not.toBe(b);
   });
 });
+
+describe('plotWarnings: train number', () => {
+  const draft = (name: string): Train => ({ ...prev, name, stops: [] });
+  const tt = { trains: [{ ...prev, id: 'x', name: '8982' }], crews: [] };
+  it('warns when another train already has the number (case and spaces ignored)', () => {
+    expect(plotWarnings(draft(' 8982 '), tt, null, [])).toEqual(['8982 is already used by another train']);
+    expect(plotWarnings(draft('PR1'), tt, null, [])).toEqual([]);
+  });
+});

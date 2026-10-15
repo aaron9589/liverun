@@ -358,7 +358,7 @@ If inferred routes would put a station in the train twice, that leg falls back t
 - Drag-to-shift and dwell handles work on it exactly as on a draft (`shiftStops`, `changeDwell`, midnight-safe). Running times stay as planned, matching today's rule that graph edits never change running times. To change a leg's running time, Control uses **Edit stops**.
 - Other trains can be moved in the same session as normal drafts, to clear the path.
 - While a pending train is shown, the edit bar becomes:
-  `Plotting PR3 for Crew 2 · 1 other train moved` · Crew ▾ · **Edit stops** · Note to crew … · **Cancel** · **Accept**
+  `Plotting PR3 for Crew 2 · 1 other train moved` · **Train** (number, editable; required; duplicate warned) · Crew ▾ · **Edit stops** · Note to crew … · **Cancel** · **Accept**
   - **Crew ▾**: assign to any crew (P12). Defaults to the requester; changing it keeps the draft's colour.
   - **Edit stops**: opens `TrainEditor` on the draft (name, crew, loco, stops, times, special instructions) without saving. On close, the edited train replaces the draft.
   - **Note to crew**: optional `control_note` (P16).
