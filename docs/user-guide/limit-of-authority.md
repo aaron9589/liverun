@@ -132,4 +132,4 @@ See also [Troubleshooting → Limit of authority](troubleshooting.md#limit-of-au
 
 ---
 
-Last checked against v2.0.0.
+Last checked against v2.1.0.

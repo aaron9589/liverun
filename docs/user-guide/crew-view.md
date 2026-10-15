@@ -60,4 +60,4 @@ If the dot isn't green, you're reconnecting. The screen catches up on everything
 
 ---
 
-Last checked against v2.0.0.
+Last checked against v2.1.0.

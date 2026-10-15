@@ -2,7 +2,7 @@
 
 Notable changes to LiveRun. The [user guide](docs/user-guide/README.md) describes the current behaviour in full.
 
-## Unreleased
+## 2.1.0 (2026-10-15)
 
 ### Fixed
 - **Layout settings previews follow running order.** The Limit of Authority preview showed Up trains' sections reversed (e.g. *Kiama → Berry* for a train running Nowra → Kiama), and the Boarding preview swapped their origin and terminus. Both now match the guard panel.

@@ -79,4 +79,4 @@
 
 ---
 
-Last checked against v2.0.0.
+Last checked against v2.1.0.

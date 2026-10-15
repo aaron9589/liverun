@@ -168,4 +168,4 @@ The `>_` icon on a timetable (**Export timetable as CATS XML**) downloads two fi
 
 ---
 
-Last checked against v2.0.0.
+Last checked against v2.1.0.
