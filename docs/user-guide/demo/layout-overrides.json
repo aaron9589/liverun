@@ -1,0 +1,87 @@
+{
+  "guard": { "event_alert_sound": "bell_alert_3.mp3" },
+  "train_profiles": [
+    {
+      "id": "tangara-endeavour",
+      "name": "Tangara / Endeavour",
+      "match": ["CityRail 4T*", "CityRail 2E*"],
+      "sounds": { "door_open": "t-door-open.mp3", "door_close": "t-door-close.mp3", "bell": "bell.mp3" },
+      "functions": {
+        "door_open": { "key": { "label": "Door Open/Close" }, "mode": "on" },
+        "door_close": { "key": { "label": "Door Open/Close" }, "mode": "off" },
+        "bell": { "key": { "fn": 1 }, "mode": "pulse", "pulse_ms": 500 },
+        "brake_squeal": { "key": { "label": "Brake Squeal" }, "mode": "on_for", "duration_s": 4 }
+      }
+    },
+    {
+      "id": "s-v-sets",
+      "name": "S / V sets",
+      "match": ["CityRail *L*", "CityRail *V*"],
+      "sounds": { "door_open": "s-door-open.mp3", "door_close": "s-door-close.mp3", "bell": "bell.mp3" },
+      "functions": {
+        "door_open": { "key": { "fn": 6 }, "mode": "on" },
+        "door_close": { "key": { "fn": 6 }, "mode": "off" }
+      }
+    },
+    {
+      "id": "fallback",
+      "name": "Everything else",
+      "match": [],
+      "sounds": { "door_open": "", "door_close": "", "bell": "bell.mp3" },
+      "functions": {}
+    }
+  ],
+  "stats": {
+    "enabled": true,
+    "topic": "trains/stats/{train}/{station}",
+    "payload": "json",
+    "publish_on": "door_close"
+  },
+  "events": {
+    "publish_topic": "trains/guard/events",
+    "library": [
+      {
+        "id": "late-passenger",
+        "name": "Late passenger",
+        "kind": "station",
+        "messages": [
+          "A passenger is running down the platform. Hold the doors for them.",
+          "Someone is sprinting for the train. Give them a moment."
+        ],
+        "sound": ""
+      },
+      {
+        "id": "door-fault",
+        "name": "Door fault",
+        "kind": "station",
+        "messages": ["Door 3 won't close. Check it and close again."],
+        "sound": ""
+      },
+      {
+        "id": "brake-check",
+        "name": "Brake check",
+        "kind": "enroute",
+        "messages": ["Driver reports a brake check. Run at caution to the next station."],
+        "sound": "",
+        "action": "brake_squeal"
+      },
+      {
+        "id": "stock-on-line",
+        "name": "Stock on the line",
+        "kind": "enroute",
+        "messages": ["Cattle reported near the line. Sound the horn and proceed with caution."],
+        "sound": ""
+      }
+    ]
+  },
+  "placements": {
+    "KN-6": {
+      "Berry": [
+        { "id": "kn6-berry-late", "event": "late-passenger", "probability": 1, "trigger": "door_open", "delay_s": [3, 6] }
+      ],
+      "Nowra": [
+        { "id": "kn6-nowra-brake", "event": "brake-check", "probability": 0.5, "at": [0.3, 0.6] }
+      ]
+    }
+  }
+}

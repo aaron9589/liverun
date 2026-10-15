@@ -1,0 +1,47 @@
+[
+  { "name": "CityRail 2E-2", "address": "2002", "road": "CityRail", "number": "E2",
+    "functionKeys": [
+      { "name": "F0", "label": "Headlight", "lockable": true },
+      { "name": "F1", "label": "Bell", "lockable": false },
+      { "name": "F2", "label": "Horn", "lockable": false },
+      { "name": "F6", "label": "Door Open/Close", "lockable": true },
+      { "name": "F8", "label": "Brake Squeal", "lockable": true }
+    ] },
+  { "name": "CityRail 4T", "address": "3004", "road": "CityRail", "number": "T4",
+    "functionKeys": [
+      { "name": "F0", "label": "Headlight", "lockable": true },
+      { "name": "F2", "label": "Horn", "lockable": false },
+      { "name": "F9", "label": "Door Open/Close", "lockable": true },
+      { "name": "F10", "label": "Door Buzzer", "lockable": false }
+    ] },
+  { "name": "CityRail 2L", "address": "2012", "road": "CityRail", "number": "L2",
+    "functionKeys": [
+      { "name": "F0", "label": "Headlight", "lockable": true },
+      { "name": "F1", "label": "Bell", "lockable": false },
+      { "name": "F6", "label": "Door Open/Close", "lockable": true }
+    ] },
+  { "name": "CityRail 3L", "address": "2013", "road": "CityRail", "number": "L3",
+    "functionKeys": [
+      { "name": "F0", "label": "Headlight", "lockable": true },
+      { "name": "F1", "label": "Bell", "lockable": false },
+      { "name": "F6", "label": "Door Open/Close", "lockable": true }
+    ] },
+  { "name": "CityRail 6V", "address": "3006", "road": "CityRail", "number": "V6",
+    "functionKeys": [
+      { "name": "F0", "label": "Headlight", "lockable": true },
+      { "name": "F1", "label": "Bell", "lockable": false },
+      { "name": "F6", "label": "Door Open/Close", "lockable": true }
+    ] },
+  { "name": "CityRail 4V-1", "address": "3001", "road": "CityRail", "number": "V1",
+    "functionKeys": [
+      { "name": "F0", "label": "Headlight", "lockable": true },
+      { "name": "F1", "label": "Bell", "lockable": false },
+      { "name": "F6", "label": "Door Open/Close", "lockable": true }
+    ] },
+  { "name": "CityRail 4V-2", "address": "3002", "road": "CityRail", "number": "V2",
+    "functionKeys": [
+      { "name": "F0", "label": "Headlight", "lockable": true },
+      { "name": "F1", "label": "Bell", "lockable": false },
+      { "name": "F6", "label": "Door Open/Close", "lockable": true }
+    ] }
+]

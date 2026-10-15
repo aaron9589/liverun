@@ -143,7 +143,7 @@ Symptom → likely cause → fix, grouped by screen. Seeded from real issues met
 ## 7. Screenshots and diagrams
 
 - Stored in `docs/user-guide/images/`, PNG, light compression, named `<page>-<topic>.png`.
-- **Reproducible**: extend `docs/screenshots/take-screenshots.js` (or a sibling script) to seed a demo timetable + layout, drive the planner, crew view and guard panel with Playwright, and publish a local MQTT broker's LOA/clock values, so every image can be regenerated after UI changes.
+- **Reproducible**: `npm run docs:screenshots` (`scripts/docs/screenshots.js`) starts a throwaway stack (in-process aedes broker, mock JMRI, server on a temp DB, Vite dev), seeds it from `docs/user-guide/demo/`, publishes clock and LOA values, and drives the planner, crew view and guard panel with Playwright, so every image can be regenerated after UI changes. `--serve` keeps the seeded stack up for exploring.
 - Data: a neutral demo timetable (§9 Q2), not live session data.
 - Planned set (~30): mode picker; planner overview; train editor; crew list with Guard tick; badges; graph edit (drafts + ghost, dwell handle, Done/Cancel); layout settings pages (profiles, boarding preview, guard events, LOA editor); guard panel (overview, header, stop list with alias/pin, doors disabled reasons, boarding with runner, event banner, LOA AWAIT/GRANTED, lost-train banner); crew view (cards, NEW ring, toasts).
 - Diagrams (Mermaid, rendered by GitHub): Control → server → tablets live-change flow; LOA section states; boarding timeline.

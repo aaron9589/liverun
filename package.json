@@ -11,9 +11,12 @@
     "build": "npm run build --workspace=client",
     "start": "npm run start --workspace=server",
     "test": "npm test --workspace=server && npm test --workspace=client",
-    "mock:jmri": "node scripts/dev/mock-jmri.js"
+    "mock:jmri": "node scripts/dev/mock-jmri.js",
+    "docs:screenshots": "node scripts/docs/screenshots.js"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "aedes": "^1.2.0",
+    "concurrently": "^8.2.2",
+    "playwright": "1.64.0"
   }
 }
