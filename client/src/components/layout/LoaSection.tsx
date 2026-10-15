@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { LayoutConfig, LoaCondition, LoaConfig, LoaElement, LoaSection as LoaSectionDef, LoaSelector, LoaValue } from '../../types';
 import { api } from '../../api';
 import { conditionState, evaluateElement, hasGrant, hasRevoke, sectionsForTrain, type ElementState } from '../../lib/loa';
+import { inRunningOrder } from '../../lib/stops';
 import { FIELD_CLS, type LayoutSectionProps } from './shared';
 
 // ── Validation (mirrors server/loa.js; the server is authoritative) ─────────
@@ -460,7 +461,8 @@ function SectionCard({ section, index, count, stations, values, open, onToggle, 
 function Preview({ loa, timetable, values }: { loa: LoaConfig; timetable: LayoutSectionProps['timetable']; values: Record<string, LoaValue> }) {
   const [trainId, setTrainId] = useState('');
   const train = timetable?.trains.find((t) => t.id === trainId);
-  const matches = train && timetable ? sectionsForTrain(train, timetable.stations, loa) : [];
+  // Running order, as the guard panel matches sections (stored stops are in station order, so Up trains are backwards).
+  const matches = train && timetable ? sectionsForTrain(inRunningOrder(train), timetable.stations, loa) : [];
   return (
     <div className="rounded-lg border border-slate-800 p-3 space-y-2" data-testid="loa-preview">
       <h4 className="text-sm font-semibold text-white">Preview</h4>

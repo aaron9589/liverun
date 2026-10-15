@@ -149,6 +149,10 @@ function trainAllowed(section: LoaSection, train: Train): boolean {
  * "Not yet used": the `from` must come after the previous pair's `to`, so
  * occurrences of one section never overlap. Sections whose `from` and `to`
  * name the same station are ignored. Ties (same `from` stop) keep config order.
+ *
+ * `train.stops` must be in running order (`inRunningOrder(train)`): stored
+ * stops are in station order, so an Up train would match its sections
+ * backwards. fromIndex / toIndex index the stops as given.
  */
 export function sectionsForTrain(train: Train, stations: Station[], config: LoaConfig): SectionMatch[] {
   const nameById = new Map(stations.map((s) => [s.id, norm(s.name)]));

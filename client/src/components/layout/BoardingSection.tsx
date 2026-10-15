@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { BoardingConfig, BoardingModel, BoardingRule } from '../../types';
-import { demandAt, parseHHMM, type StopPosition } from '../../lib/boarding';
+import { demandAt, parseHHMM } from '../../lib/boarding';
+import { previewStops } from '../../lib/boardingContext';
 import { BOARDING_EXAMPLE, previewBoarding, validateBoardingConfig } from '../../lib/boardingSettings';
 import { FIELD_CLS, type LayoutSectionProps } from './shared';
 
@@ -249,7 +250,10 @@ function Preview({ b, timetable }: { b: BoardingConfig; timetable: LayoutSection
   const [stopIdx, setStopIdx] = useState(0);
   const [time, setTime] = useState('');
   const train = trains.find((t) => t.id === trainId) ?? trains[0];
-  const stop = train?.stops[Math.min(stopIdx, (train?.stops.length ?? 1) - 1)];
+  // Running order with positions, as the guard panel sees the train (stored stops are in station order).
+  const stops = useMemo(() => (train ? previewStops(train) : []), [train]);
+  const picked = stops[Math.min(stopIdx, stops.length - 1)];
+  const stop = picked?.stop;
   const station = timetable?.stations.find((s) => s.id === stop?.station_id);
 
   // Default the clock to the chosen stop's own time until the user types one.
@@ -259,10 +263,10 @@ function Preview({ b, timetable }: { b: BoardingConfig; timetable: LayoutSection
 
   const result = useMemo(() => {
     if (!train || !stop || clockMin === null || validateBoardingConfig(b)) return null;
-    const position: StopPosition = train.stops[0] === stop ? 'origin' : train.stops[train.stops.length - 1] === stop ? 'terminus' : 'intermediate';
+    const position = picked.position;
     const ctx = { clockMinutes: clockMin, direction: train.direction, trainId: train.train_id, trainName: train.name, stationWeight: station?.boarding_weight, position };
     return { position, boarding: previewBoarding(b, ctx), alighting: b.show_alighting ? previewBoarding(b.alighting, ctx) : null };
-  }, [b, train, stop, station, clockMin]);
+  }, [b, train, picked, stop, station, clockMin]);
 
   if (!timetable || trains.length === 0) {
     return <p className="text-xs text-slate-500 italic">Open a timetable with trains to preview what would board.</p>;
@@ -278,7 +282,7 @@ function Preview({ b, timetable }: { b: BoardingConfig; timetable: LayoutSection
           {trains.map((t) => <option key={t.id} value={t.id}>{t.name}{t.direction ? ` (${t.direction})` : ''}</option>)}
         </select>
         <select aria-label="Preview stop" value={stopIdx} onChange={(e) => { setStopIdx(Number(e.target.value)); setTime(''); }} className={`${FIELD_CLS} max-w-[14rem]`}>
-          {train?.stops.map((s, i) => <option key={s.id} value={i}>{stationName(s.station_id)}</option>)}
+          {stops.map(({ stop: s }, i) => <option key={s.id} value={i}>{stationName(s.station_id)}</option>)}
         </select>
         <input aria-label="Preview time" value={clock} onChange={(e) => setTime(e.target.value)} placeholder="HH:MM" className={`${FIELD_CLS} w-20 font-mono ${clockMin === null ? 'border-red-700' : ''}`} />
         {time && <button type="button" className={BTN_CLS} onClick={() => setTime('')}>Use stop time ({minutesToHHMM(parseHHMM(stopTime) ?? 0)})</button>}

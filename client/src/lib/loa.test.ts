@@ -5,6 +5,7 @@ import {
   currentSection, applyLoaValues, hasGrant, hasRevoke,
   type LoaTrainState, type SectionMatch,
 } from './loa';
+import { inRunningOrder } from './stops';
 
 const station = (id: string, name: string): Station =>
   ({ id, timetable_id: 'x', name, short_code: id, distance: null, graph_pos: 0, sort_order: 0, branch_name: null });
@@ -82,6 +83,13 @@ describe('evaluateElement', () => {
 describe('sectionsForTrain', () => {
   const cfg = config(section('kb', 'Kiama', 'Berry'), section('bk', 'berry', 'KIAMA'), section('bn', 'Berry', 'Nowra'));
 
+  it('an Up train stored in station order matches only once put in running order', () => {
+    // As the planner stores it: Kiama 13:18 arr … Nowra 12:10 dep (runs Nowra → Berry → Kiama).
+    const stored = train([st('kia', '13:18'), st('bry', '12:32', '12:50'), st('now', null, '12:10')]);
+    const cfgUp = config(section('kb', 'Kiama', 'Berry'), section('nb', 'Nowra', 'Berry'), section('bk', 'Berry', 'Kiama'));
+    expect(spans(sectionsForTrain(stored, STATIONS, cfgUp))).toEqual([['kb#0', 0, 1]]);
+    expect(spans(sectionsForTrain(inRunningOrder(stored), STATIONS, cfgUp))).toEqual([['nb#0', 0, 1], ['bk#0', 1, 2]]);
+  });
   it('matches with intermediate stations, in route order', () => {
     const t = train([st('kia'), st('gw'), st('bry'), st('now')]);
     expect(spans(sectionsForTrain(t, STATIONS, cfg))).toEqual([['kb#0', 0, 2], ['bn#0', 2, 3]]);
