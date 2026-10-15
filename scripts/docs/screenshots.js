@@ -394,7 +394,6 @@ const SHOTS = [
     ['JMRI', 'layout-jmri'],
     ['Guard panel', 'layout-guard'],
     ['Train profiles', 'layout-train-profiles'],
-    ['Boarding', 'layout-boarding'],
     ['Guard events', 'layout-guard-events'],
     ['Stats', 'layout-stats'],
     ['Limit of authority', 'layout-loa'],
