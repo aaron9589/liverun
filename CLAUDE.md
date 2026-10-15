@@ -62,7 +62,7 @@ A web app for planning and running model railway operating sessions. Features: v
 | `server/trains.js` | `newTrain()`: train construction shared by `POST /trains` and accept, so both apply the same normalisation and terminal-stop rules |
 | `server/request-settings.js` | Validation for the path-request keys of `PUT /api/timetables/:id/settings` |
 | `client/src/lib/pathRequests.ts` | Pure helpers for the Crew jobs request form and request cards: submit body, status text, labels |
-| `client/src/lib/pathPlan.ts` | Draft train for a request, timed from path templates: `planDraft()` uses a path covering the request, else `planRoute()` infers it from chained legs; `describeSource()` for the "times from" line (Vitest) |
+| `client/src/lib/pathPlan.ts` | Draft train for a request: one path covering it, else chained path legs (median), else path legs + timetabled trains' consecutive-stop running times for pairs no path has (fewest train legs; request-made trains ignored), else `request_default_leg_min`; `describeSource()` for the "times from" line (Vitest) |
 | `client/src/lib/plotting.ts` | Plotting helpers: `draftFromRequest()`, `retimeFromDrafts()`, `plotRequestState()`, `plotWarnings()`; `pendingTrainId()` (in pathPlan.ts) gives the draft's id |
 | `client/src/lib/requestQueue.ts` | Planner-side helpers for the request queue: request summaries and toast text |
 | `client/src/lib/auditView.ts` | Audit log view model: filters and row labels; reads the server's `detail` defensively |
@@ -167,7 +167,7 @@ All mutation endpoints return the full updated Timetable.
 - **Path requests are logged; the log is not the DB:** every request action, accepted or refused, is appended to `<data>/audit.jsonl` (rotated at 5 MB). Identity is IP + `X-LiveRun-Device` + User-Agent + the claimed crew. The crew is self-declared (no auth), so the log shows which browser acted, not who. Only Control reads it (Requests drawer, `GET /api/audit`).
 - **Mobile views:** `…/mobile` shows Crew jobs or the Running board (`CrewMobile`). The choice is saved per device in `localStorage['liverun.mobileView']`; `?view=jobs|board` deep-links and saves. The Running board's ☰ "View" clears it and returns to the picker.
 - **Crew jobs is read-only for run state:** it never shows run/complete controls, never renders `guard_events`, and shows only the picked crew's trains. Only the Running board and Control change run state.
-- **Request drafts are built from path templates:** `pathPlan.ts` times the draft (a path covering the request, else inferred from chained legs). Stops are stored in station order, like every train (see the stop-order bullet above).
+- **Request drafts are built from path templates, then timetabled trains:** `pathPlan.ts` times the draft from a path covering the request, else chained path legs; only where no path reaches does it use timetabled trains' running times (train edges cost a large penalty so they only bridge gaps). Stops are stored in station order, like every train (see the stop-order bullet above).
 - **Approve cancel has no undo step:** Approve (cancel-approve) deletes the train on the server and is not pushed onto the undo stack. Accept does push one undo step, and undoing it removes the train, but the request stays `accepted` (shown as "train no longer exists", with Reopen).
 - **`train_type` removed in v2:** A startup migration (`stripTrainType` in `server/migrations.js`) deletes the field from all trains; the `?trainType=` station-board filter is gone. Don't reintroduce either.
 

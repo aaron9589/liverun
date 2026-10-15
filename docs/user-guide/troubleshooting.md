@@ -91,7 +91,8 @@ Crew jobs is the phone view at `…/mobile`; see [Crew jobs](crew-jobs.md). The 
 | Accept fails and says a train changed | Someone edited a train you moved while you were plotting | Your drafts are kept: **Accept** again, or **Cancel** and redo the move |
 | After a reload the draft is gone | Drafts live in the browser page only | The request is still **Plotting**: **Resume plotting** in the drawer |
 | **Accepted — train no longer exists** | The train was deleted or the accept was undone | **Reopen** to plot it again |
-| **times from** says **No path data** | No path template links those stations | Add paths ([Paths](planner.md#paths-route-templates)), or accept the **Default leg time** and adjust on the graph |
+| **times from** says **No path or timetable data** | No path template and no timetabled train links those stations | Add paths ([Paths](planner.md#paths-route-templates)), or accept the **Default leg time** and adjust on the graph |
+| A leg is timed **from timetabled trains** and looks wrong | No path template reaches that station, so the trains' median running time was used | Add a path covering it, or drag the draft / use **Edit stops** |
 | Plotted times look wrong | The route was timed from the wrong path, or the default leg time | Check the **times from** line; drag the draft or use **Edit stops** |
 | The audit log is empty | New install, or the data folder was changed | The log is `audit.jsonl` in the server's data folder |
 

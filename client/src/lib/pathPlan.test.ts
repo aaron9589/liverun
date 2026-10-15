@@ -106,7 +106,7 @@ describe('inferred', () => {
 
   it('chains paths across a junction', () => {
     const r = planDraft(req([pt('a'), pt('k')]), tt([MAIN, branch]), null);
-    expect(r.source).toEqual({ kind: 'inferred', pathNames: ['Alpha–Echo', 'Branch'] });
+    expect(r.source).toEqual({ kind: 'inferred', pathNames: ['Alpha–Echo', 'Branch'], trainNames: [] });
     expect(r.legs).toEqual([{ fromStationId: 'a', toStationId: 'k', viaStationIds: ['b', 'c', 'j'], minutes: 15, source: 'inferred' }]);
     expect(times(r.train)).toEqual([
       ['a', null, '10:00'], ['b', '10:04', '10:04'], ['c', '10:10', '10:10'], ['j', '10:13', '10:13'], ['k', '10:15', null],
@@ -118,7 +118,7 @@ describe('inferred', () => {
     const r = planRoute(req([pt('a'), pt('k')]), tt([MAIN, branch, slow]));
     // a–b: median(4, 8) = 6 → 6 + 6 + 3 + 2 = 17
     expect(r.legs[0].minutes).toBe(17);
-    expect(r.source).toEqual({ kind: 'inferred', pathNames: ['Alpha–Echo', 'Branch', 'Slow'] });
+    expect(r.source).toEqual({ kind: 'inferred', pathNames: ['Alpha–Echo', 'Branch', 'Slow'], trainNames: [] });
   });
 
   it('takes the median of an odd count and rounds the leg total', () => {
@@ -134,7 +134,7 @@ describe('inferred', () => {
     const shortcut = path('p-sc', 'Shortcut', [['a', 0], ['j', 4]]);
     const r = planRoute(req([pt('a'), pt('k')]), tt([MAIN, branch, shortcut]));
     expect(r.legs[0]).toMatchObject({ viaStationIds: ['j'], minutes: 6 });
-    expect(r.source).toEqual({ kind: 'inferred', pathNames: ['Branch', 'Shortcut'] });
+    expect(r.source).toEqual({ kind: 'inferred', pathNames: ['Branch', 'Shortcut'], trainNames: [] });
   });
 
   it('splits a leg across vias in proportion to the medians, whole and monotonic, total exact', () => {
@@ -152,13 +152,13 @@ describe('inferred', () => {
 
   it('mixes inferred and no-data legs, with a warning', () => {
     const r = planDraft(req([pt('a'), pt('c'), pt('k')]), tt([path('p-ab', 'AB', [['a', 0], ['b', 4]]), path('p-bc', 'BC', [['b', 0], ['c', 6]])]), null);
-    expect(r.source).toEqual({ kind: 'inferred', pathNames: ['AB', 'BC'] });
+    expect(r.source).toEqual({ kind: 'inferred', pathNames: ['AB', 'BC'], trainNames: [] });
     expect(r.legs.map((l) => [l.source, l.minutes, l.viaStationIds])).toEqual([['inferred', 10, ['b']], ['none', 5, []]]);
-    expect(r.warnings).toEqual(['Charlie → Kilo: no path data, 5 min used']);
+    expect(r.warnings).toEqual(['Charlie → Kilo: no path or timetable data, 5 min used']);
     expect(times(r.train)).toEqual([
       ['a', null, '10:00'], ['b', '10:04', '10:04'], ['c', '10:10', '10:11'], ['k', '10:16', null],
     ]);
-    expect(describeSource(r.source, r.legs, nameOf)).toBe('Inferred from 2 paths · ⚠ Charlie → Kilo: no path data');
+    expect(describeSource(r.source, r.legs, nameOf)).toBe('Inferred from 2 paths · ⚠ Charlie → Kilo: no path or timetable data');
   });
 
   it('falls back when a route would pass a station already in the train', () => {
@@ -199,9 +199,9 @@ describe('no path data', () => {
     const r = planDraft(req([pt('a'), pt('e')]), tt([], {}, { request_default_leg_min: 7 }), null);
     expect(r.source).toEqual({ kind: 'none' });
     expect(r.legs).toEqual([{ fromStationId: 'a', toStationId: 'e', viaStationIds: [], minutes: 7, source: 'none' }]);
-    expect(r.warnings).toEqual(['Alpha → Echo: no path data, 7 min used']);
+    expect(r.warnings).toEqual(['Alpha → Echo: no path or timetable data, 7 min used']);
     expect(times(r.train)).toEqual([['a', null, '10:00'], ['e', '10:07', null]]);
-    expect(describeSource(r.source, r.legs, nameOf)).toBe('No path data');
+    expect(describeSource(r.source, r.legs, nameOf)).toBe('No path or timetable data');
   });
 
   it('guards duplicate requested stations', () => {
@@ -324,7 +324,65 @@ describe('train fields', () => {
 describe('describeSource', () => {
   it('describes each kind', () => {
     expect(describeSource({ kind: 'path', pathId: 'p', pathName: 'Kiama–Bombo' }, [], nameOf)).toBe('Path Kiama–Bombo');
-    expect(describeSource({ kind: 'inferred', pathNames: ['One'] }, [], nameOf)).toBe('Inferred from 1 path');
-    expect(describeSource({ kind: 'none' }, [], nameOf)).toBe('No path data');
+    expect(describeSource({ kind: 'inferred', pathNames: ['One'], trainNames: [] }, [], nameOf)).toBe('Inferred from 1 path');
+    expect(describeSource({ kind: 'inferred', pathNames: ['One', 'Two'], trainNames: ['8982'] }, [], nameOf)).toBe('Inferred from 2 paths + 1 timetabled train');
+    expect(describeSource({ kind: 'inferred', pathNames: [], trainNames: ['8982', '1953'] }, [], nameOf)).toBe('From 2 timetabled trains');
+    expect(describeSource({ kind: 'none' }, [], nameOf)).toBe('No path or timetable data');
+  });
+});
+
+describe('timetabled trains fallback', () => {
+  /** A timetabled train from [station, arrival, departure] in running order. */
+  const run = (id: string, name: string, stops: [string, string | null, string | null][], over: Partial<Train> = {}): Train => ({
+    ...train(id, name),
+    stops: stops.map(([station_id, arrival, departure], i) => ({ id: `${id}-${i}`, train_id: id, station_id, arrival, departure })),
+    ...over,
+  });
+  // No path reaches Kilo; trains run Charlie → Kilo in 7 and 9 min (median 8), and Kilo → Charlie in 11.
+  const TRAINS = [
+    run('t1', '8982', [['b', null, '10:00'], ['c', '10:06', '10:06'], ['k', '10:13', null]]),
+    run('t2', '1953', [['c', null, '11:00'], ['k', '11:09', null]]),
+    run('t3', '9382', [['k', null, '12:00'], ['c', '12:11', null]]),
+  ];
+
+  it('routes over path legs plus the median train running time where no path reaches', () => {
+    const r = planRoute(req([pt('a'), pt('k')]), tt([MAIN], { trains: TRAINS }));
+    expect(r.legs).toEqual([{ fromStationId: 'a', toStationId: 'k', viaStationIds: ['b', 'c'], minutes: 19, source: 'timetable' }]);
+    expect(r.source).toEqual({ kind: 'inferred', pathNames: ['Alpha–Echo'], trainNames: ['1953', '8982', '9382'] });
+    expect(r.warnings).toEqual(['Charlie → Kilo: no path template, 9 min from 3 timetabled trains']);
+    expect(describeSource(r.source, r.legs, nameOf)).toBe('Inferred from 1 path + 3 timetabled trains');
+  });
+
+  it('prefers path data: train times never override a pair a path has', () => {
+    const fast = run('t4', 'Fast', [['a', null, '09:00'], ['b', '09:01', null]]);
+    const r = planRoute(req([pt('a'), pt('c')]), tt([MAIN], { trains: [fast] }));
+    expect(r.legs[0]).toMatchObject({ minutes: 10, source: 'path' });
+    const viaTrains = planRoute(req([pt('a'), pt('k')]), tt([MAIN], { trains: [...TRAINS, fast] }));
+    expect(viaTrains.legs[0].minutes).toBe(19); // a→b still 4 from the path, not 1
+  });
+
+  it('uses as few train legs as possible: a non-stop train never shortcuts the path network', () => {
+    // A train runs Alpha → Charlie non-stop in 8 (path: 4 + 6 = 10 via Bravo).
+    const express = run('t7', 'Express', [['a', null, '09:00'], ['c', '09:08', null]]);
+    const r = planRoute(req([pt('a'), pt('k')]), tt([MAIN], { trains: [...TRAINS, express] }));
+    expect(r.legs[0]).toMatchObject({ viaStationIds: ['b', 'c'], minutes: 19, source: 'timetable' });
+    expect(r.warnings).toEqual(['Charlie → Kilo: no path template, 9 min from 3 timetabled trains']);
+  });
+
+  it('times passing stations from the mixed legs and stores station order', () => {
+    const r = planDraft(req([pt('a'), pt('k')]), tt([MAIN], { trains: TRAINS }), null);
+    expect(times(r.train)).toEqual([['a', null, '10:00'], ['b', '10:04', '10:04'], ['c', '10:10', '10:10'], ['k', '10:19', null]]);
+  });
+
+  it('ignores trains made from path requests and unusable times', () => {
+    const fromRequest = run('t5', 'PR1', [['c', null, '10:00'], ['k', '10:05', null]], { request_id: 'r0' });
+    const r = planRoute(req([pt('c'), pt('k')]), tt([MAIN], { trains: [fromRequest] }));
+    expect(r.legs[0]).toMatchObject({ source: 'none', minutes: 5 });
+    expect(r.warnings).toEqual(['Charlie → Kilo: no path or timetable data, 5 min used']);
+  });
+
+  it('handles a train running past midnight', () => {
+    const late = run('t6', 'Late', [['c', null, '23:58'], ['k', '00:04', null]]);
+    expect(planRoute(req([pt('c'), pt('k')]), tt([MAIN], { trains: [late] })).legs[0]).toMatchObject({ minutes: 6, source: 'timetable' });
   });
 });

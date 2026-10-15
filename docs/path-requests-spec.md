@@ -30,7 +30,7 @@ New job card ◀─ timetable- accepted + train created ◀── Accept (+ note
 | P3a | Running board (today's crew view) | **Unchanged in function.** It stays the owner's situational-awareness view with run/complete marking. Train crews never get run/complete controls; managing run state is Control's or the owner's job |
 | P4 | Locations | Timetable **stations** only, because the graph can only plot stations. A station with `alias_enabled` also gets a free-text siding/road field (→ `location_alias`) |
 | P5 | Work at intermediate stops | Per stop: kind (**Shunt** / **Work** / **Stop**), minutes, optional note. Minutes become the dwell. The note goes into `special_instructions` |
-| P6 | Running times | From **path templates** (`Timetable.paths`): a single path covering the request if one exists, otherwise inferred by chaining other paths' legs (§5.2). No layout-specific rules (D13) |
+| P6 | Running times | From **path templates** (`Timetable.paths`): a single path covering the request if one exists, otherwise inferred by chaining other paths' legs; where no path reaches, **timetabled trains'** running times fill the gap (§5.2 step 3, added after testing on the B session: no template reaches Shoalhaven Starches). No layout-specific rules (D13) |
 | P7 | Conflict detection | **None in code.** LiveRun has no track/occupancy model. Control judges the graph and moves things by hand |
 | P8 | Committing | **Accept** saves the new train *and* any other trains moved while plotting, in **one mutation** (one rev bump, one undo step) |
 | P9 | Notification | Planner: top-right toast via the existing `useToasts`, plus a **Requests** badge in the header. Crew jobs app: status on their request and a NEW job toast (reusing `diffJobs`) |
@@ -325,9 +325,10 @@ The draft is built by a new pure module, **`client/src/lib/pathPlan.ts`** (Vites
 
 1. **Single path.** Find a path containing every requested station in the requested order, forwards or reversed. If more than one fits, use the one with the fewest stations between origin and destination, then the first by name. The route is that path's stations from origin to destination. Running times are its leg times.
 2. **Inferred from other paths.** Build a graph from every path's legs, with undirected edges. Where several paths share a leg, the edge time is their median. For each consecutive pair of requested points, take the fastest route through the graph (Dijkstra on minutes). This chains paths across junctions and branches.
-3. **No path data.** If no route exists for a leg, use just the two requested points for that leg, with the timetable setting `request_default_leg_min` (default 5). The leg is flagged on the edit bar and in the drawer.
+3. **Timetabled trains.** If the path graph has no route for a leg, add an edge for every station pair that existing trains run between consecutive stops and no path has (minutes = median of arrival − previous departure, midnight-safe; trains made from requests are ignored). Route with train edges as a last resort (large cost penalty, so the fewest are used and path data always wins). Each train-timed edge is noted on the edit bar ("Berry → Shoalhaven Starches: no path template, 22 min from 5 timetabled trains").
+4. **No data.** If no route exists for a leg, use just the two requested points for that leg, with the timetable setting `request_default_leg_min` (default 5). The leg is flagged on the edit bar and in the drawer.
 
-If inferred routes would put a station in the train twice, that leg falls back to step 3 and is flagged. A train's stations must be unique.
+If inferred routes would put a station in the train twice, that leg falls back to step 4 and is flagged. A train's stations must be unique.
 
 **Stops**
 - **Requested points**: dwell = requested minutes (at least 1 for kind `stop`). The siding goes into `location_alias`. Shunt/work stops get `special_instructions` = `"<Shunt|Work> <n> min"`, plus `": <note>"` if there is one.
@@ -378,7 +379,7 @@ Per timetable (`TimetableSettings`, edited with the existing auto-assign setting
 |-----|---------|---------|
 | `requests_enabled` | `true` | Hides **Request a path** in Crew jobs and rejects submits when off (the jobs list still works) |
 | `request_train_prefix` | `"PR"` | Name prefix for accepted trains |
-| `request_default_leg_min` | `5` | Leg running time when no path data exists (§5.2 step 3) |
+| `request_default_leg_min` | `5` | Leg running time when no path or timetable data exists (§5.2 step 4) |
 | `request_lead_min` | `2` | Lead time from the fast clock for ASAP requests |
 
 ## 8. Out of scope

@@ -1,7 +1,9 @@
 // Draft train for a path request, timed from the layout's path templates
-// (docs/path-requests-spec.md §5.2). Pure: no React, no API.
+// (docs/path-requests-spec.md §5.2), falling back to timetabled trains' running
+// times where no template reaches. Pure: no React, no API.
 import type { PathRequest, PathRequestStop, Path, Station, Timetable, Train, TrainStop } from '../types';
 import { minutesToTime, timeToMinutes } from '../utils';
+import { sequenceStops } from './stops';
 
 /** Where one leg (consecutive pair of requested points) got its running time. */
 export type LegSource =
@@ -9,7 +11,12 @@ export type LegSource =
   | 'path'
   /** Fastest route through the graph of every path's legs (median minutes where paths share a leg). */
   | 'inferred'
-  /** No route in the path data, or it would visit a station twice: the two points only, request_default_leg_min. */
+  /**
+   * No path route: the same graph plus running times of timetabled trains between their
+   * consecutive stops, for station pairs no path has (median over the trains).
+   */
+  | 'timetable'
+  /** No route in the path or train data, or it would visit a station twice: the two points only, request_default_leg_min. */
   | 'none';
 
 export interface PlanLeg {
@@ -25,8 +32,11 @@ export interface PlanLeg {
 /** Summary for the drawer's "times from" line and the edit bar. */
 export type PlanSource =
   | { kind: 'path'; pathId: string; pathName: string }
-  /** Legs chained from these paths (deduplicated, sorted by name). Some legs may still be 'none'. */
-  | { kind: 'inferred'; pathNames: string[] }
+  /**
+   * Legs chained from these paths and, where no path reaches, these timetabled trains
+   * (each deduplicated, sorted by name). Some legs may still be 'none'.
+   */
+  | { kind: 'inferred'; pathNames: string[]; trainNames: string[] }
   /** No leg had path data. */
   | { kind: 'none' };
 
@@ -51,7 +61,7 @@ export interface PlanResult {
   train: Train;
   source: PlanSource;
   legs: PlanLeg[];
-  /** Non-blocking, human-readable, e.g. "Bombo → Dunmore: no path data, 5 min used". */
+  /** Non-blocking, human-readable, e.g. "Bombo → Dunmore: no path or timetable data, 5 min used". */
   warnings: string[];
   /** Minutes (may be ≥ 1440 past midnight) the first stop departs. */
   startMinutes: number;
@@ -173,7 +183,8 @@ function singlePath(seqs: PathSeq[], points: string[]): Route | null {
   return { source: { kind: 'path', pathId: best.seq.path.id, pathName: best.seq.path.name }, legs: out, warnings: [] };
 }
 
-interface Edge { minutes: number; pathNames: Set<string> }
+/** pathNames for an edge from path templates; trainNames for one from timetabled trains (never both). */
+interface Edge { minutes: number; pathNames: Set<string>; trainNames: Set<string> }
 type Graph = Map<string, Map<string, Edge>>;
 
 function median(values: number[]): number {
@@ -205,7 +216,45 @@ function buildGraph(seqs: PathSeq[]): Graph {
     g.get(from)!.set(to, edge);
   };
   for (const e of raw.values()) {
-    const edge = { minutes: median(e.values), pathNames: e.names };
+    const edge = { minutes: median(e.values), pathNames: e.names, trainNames: new Set<string>() };
+    link(e.a, e.b, edge);
+    link(e.b, e.a, edge);
+  }
+  return g;
+}
+
+/**
+ * The path graph plus an edge for every station pair that timetabled trains run
+ * between consecutive stops and no path has: minutes = median of (arrival at the
+ * next stop − departure from the previous), midnight-safe. Trains made from path
+ * requests are skipped, so a guessed default leg time never feeds back in.
+ */
+function withTrainEdges(paths: Graph, trains: Train[], known: Set<string>): Graph {
+  const raw = new Map<string, { a: string; b: string; values: number[]; names: Set<string> }>();
+  for (const t of trains) {
+    if (t.request_id) continue;
+    const seq = sequenceStops(t);
+    for (let i = 1; i < seq.length; i++) {
+      const a = seq[i - 1].stop.station_id;
+      const b = seq[i].stop.station_id;
+      const m = seq[i].arr - seq[i - 1].dep;
+      if (a === b || !known.has(a) || !known.has(b) || !(m >= 0)) continue;
+      if (paths.get(a)?.has(b)) continue; // path data wins
+      const [x, y] = a < b ? [a, b] : [b, a];
+      const key = `${x}\u0000${y}`;
+      const e = raw.get(key) ?? { a: x, b: y, values: [], names: new Set<string>() };
+      e.values.push(m);
+      e.names.add(t.name);
+      raw.set(key, e);
+    }
+  }
+  const g: Graph = new Map([...paths].map(([k, v]) => [k, new Map(v)]));
+  const link = (from: string, to: string, edge: Edge) => {
+    if (!g.has(from)) g.set(from, new Map());
+    g.get(from)!.set(to, edge);
+  };
+  for (const e of raw.values()) {
+    const edge = { minutes: median(e.values), pathNames: new Set<string>(), trainNames: e.names };
     link(e.a, e.b, edge);
     link(e.b, e.a, edge);
   }
@@ -213,6 +262,14 @@ function buildGraph(seqs: PathSeq[]): Graph {
 }
 
 interface Label { cost: number; path: string[] }
+
+/**
+ * Routing cost of an edge. A timetabled-train edge costs far more than any path route, so
+ * routes use as few as possible and trains only bridge what the path templates can't reach
+ * (e.g. a train running Kembla Jn → Kiama non-stop must not shortcut the paths via Bombo).
+ */
+const TRAIN_EDGE_PENALTY = 100_000;
+const routeCost = (e: Edge): number => e.minutes + (e.trainNames.size > 0 ? TRAIN_EDGE_PENALTY : 0);
 
 /** Lower cost, then fewer hops, then lexicographic station-id path. */
 function better(a: Label, b: Label): boolean {
@@ -224,7 +281,7 @@ function better(a: Label, b: Label): boolean {
   return false;
 }
 
-/** Dijkstra on edge minutes; deterministic ties (see better). Null when unreachable. */
+/** Dijkstra on routeCost (edge minutes; train edges last resort); deterministic ties (see better). Null when unreachable. */
 function shortest(g: Graph, from: string, to: string): string[] | null {
   if (!g.has(from) || !g.has(to)) return null;
   const labels = new Map<string, Label>([[from, { cost: 0, path: [from] }]]);
@@ -241,7 +298,7 @@ function shortest(g: Graph, from: string, to: string): string[] | null {
     const base = labels.get(cur)!;
     for (const [next, edge] of g.get(cur)!) {
       if (done.has(next)) continue;
-      const cand = { cost: base.cost + edge.minutes, path: [...base.path, next] };
+      const cand = { cost: base.cost + routeCost(edge), path: [...base.path, next] };
       const old = labels.get(next);
       if (!old || better(cand, old)) labels.set(next, cand);
     }
@@ -280,10 +337,12 @@ function route(request: PathRequest, timetable: Timetable): Route & { points: Pa
   if (single) return { ...single, warnings: [...warnings, ...single.warnings], points };
 
   const g = buildGraph(seqs);
+  let gt: Graph | null = null; // with timetabled trains; built only if a leg needs it
   const fallback = nonNeg(timetable.settings?.request_default_leg_min, DEFAULT_LEG_MIN);
   const fallbackMin = Math.round(fallback);
   const inTrain = new Set(ids);
   const used = new Set<string>();
+  const usedTrains = new Set<string>();
   const legs: RouteLeg[] = [];
   for (let k = 1; k < ids.length; k++) {
     const from = ids[k - 1];
@@ -292,26 +351,38 @@ function route(request: PathRequest, timetable: Timetable): Route & { points: Pa
       warnings.push(`${name(from)} → ${name(to)}: ${why}, ${fallbackMin} min used`);
       return { fromStationId: from, toStationId: to, viaStationIds: [], minutes: fallbackMin, source: 'none', sub: [fallbackMin] };
     };
-    const p = shortest(g, from, to);
-    if (!p) { legs.push(none('no path data')); continue; }
+    let graph = g;
+    let p = shortest(g, from, to);
+    if (!p) {
+      gt ??= withTrainEdges(g, timetable.trains ?? [], known);
+      graph = gt;
+      p = shortest(gt, from, to);
+    }
+    if (!p) { legs.push(none('no path or timetable data')); continue; }
     const vias = p.slice(1, -1);
     const dup = vias.find((v) => inTrain.has(v));
     if (dup !== undefined) { legs.push(none(`route would pass ${name(dup)} twice`)); continue; }
     const sub: number[] = [];
     for (let i = 1; i < p.length; i++) {
-      const edge = g.get(p[i - 1])!.get(p[i])!;
+      const edge = graph.get(p[i - 1])!.get(p[i])!;
       sub.push(edge.minutes);
       for (const n of edge.pathNames) used.add(n);
+      for (const n of edge.trainNames) usedTrains.add(n);
+      if (edge.trainNames.size > 0) {
+        const count = edge.trainNames.size;
+        warnings.push(`${name(p[i - 1])} → ${name(p[i])}: no path template, ${Math.round(edge.minutes)} min from ${count} timetabled train${count === 1 ? '' : 's'}`);
+      }
     }
     vias.forEach((v) => inTrain.add(v));
     legs.push({
       fromStationId: from, toStationId: to, viaStationIds: vias,
       minutes: Math.max(0, Math.round(sub.reduce((x, y) => x + y, 0))),
-      source: 'inferred', sub,
+      source: graph === g ? 'inferred' : 'timetable', sub,
     });
   }
-  const source: PlanSource = legs.some((l) => l.source === 'inferred')
-    ? { kind: 'inferred', pathNames: [...used].sort((a, b) => a.localeCompare(b)) }
+  const byName = (a: string, b: string) => a.localeCompare(b);
+  const source: PlanSource = legs.some((l) => l.source === 'inferred' || l.source === 'timetable')
+    ? { kind: 'inferred', pathNames: [...used].sort(byName), trainNames: [...usedTrains].sort(byName) }
     : { kind: 'none' };
   return { source, legs, warnings, points };
 }
@@ -450,16 +521,20 @@ export function planRoute(request: PathRequest, timetable: Timetable): { source:
 }
 
 /**
- * Drawer line: "Path Kiama–Bombo", "Inferred from 2 paths", "No path data", plus
- * " · ⚠ Bombo → Dunmore: no path data" per 'none' leg when the source isn't 'none'.
+ * Drawer line: "Path Kiama–Bombo", "Inferred from 2 paths", "Inferred from 2 paths + 3 timetabled
+ * trains", "From 3 timetabled trains", "No path or timetable data", plus " · ⚠ Bombo → Dunmore: no path or timetable data"
+ * per 'none' leg when the source isn't 'none'.
  */
 export function describeSource(source: PlanSource, legs: PlanLeg[], stationName: (id: string) => string): string {
-  if (source.kind === 'none') return 'No path data';
+  if (source.kind === 'none') return 'No path or timetable data';
+  const count = (n: number, what: string) => `${n} ${what}${n === 1 ? '' : 's'}`;
   const head = source.kind === 'path'
     ? `Path ${source.pathName}`
-    : `Inferred from ${source.pathNames.length} path${source.pathNames.length === 1 ? '' : 's'}`;
+    : source.pathNames.length === 0
+      ? `From ${count(source.trainNames.length, 'timetabled train')}`
+      : `Inferred from ${count(source.pathNames.length, 'path')}${source.trainNames.length ? ` + ${count(source.trainNames.length, 'timetabled train')}` : ''}`;
   const flags = legs
     .filter((l) => l.source === 'none')
-    .map((l) => ` · ⚠ ${stationName(l.fromStationId)} → ${stationName(l.toStationId)}: no path data`);
+    .map((l) => ` · ⚠ ${stationName(l.fromStationId)} → ${stationName(l.toStationId)}: no path or timetable data`);
   return head + flags.join('');
 }

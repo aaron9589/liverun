@@ -71,7 +71,8 @@ Drag the draft train, or one of its dwell handles, as you would any train in [gr
 
 Warnings appear under the bar, in amber. They don't stop you accepting:
 
-- A leg with no path data: **Bombo → Dunmore: no path data, 5 min used**.
+- A leg timed from timetabled trains: **Berry → Shoalhaven Starches: no path template, 22 min from 5 timetabled trains**. Check it looks right.
+- A leg with no data at all: **Bombo → Dunmore: no path or timetable data, 5 min used**.
 - **starts n min before the fast clock**: the draft begins in the past.
 - **Local Operator 2 has another job overlapping 12:10–13:00**: the chosen crew is already busy.
 
@@ -81,14 +82,16 @@ If the crew **withdraws** while you're plotting, the bar says **Local Operator 2
 
 ## Where the times come from
 
-The draft is timed from the timetable's [path templates](planner.md#paths-route-templates), so it's only as good as that data. The drawer's **times from** line says what plotting will use:
+The draft is timed from the timetable's [path templates](planner.md#paths-route-templates). Where no template reaches a station, it falls back to the running times of the timetable's own trains between their consecutive stops. The drawer's **times from** line says what plotting will use:
 
 | Line | Meaning |
 |------|---------|
 | **Path Kiama–Bombo** | Every requested station lies in order on one path template, forwards or in reverse. Its running times are used |
 | **Inferred from 2 paths** | No single path covers the route, so the fastest chain of path legs between the stations is used (where paths overlap, their median time) |
-| **No path data** | None of the requested stations are linked by any path. Each leg uses the **Default leg time** from [Settings](#settings) |
-| a line ending **⚠ Bombo → Dunmore: no path data** | Some legs of an inferred route had no data and used the default leg time |
+| **Inferred from 10 paths + 5 timetabled trains** | No chain of paths reaches every requested station, so the gaps are filled from timetabled trains: the median time of the trains that run between those two stops, in either direction. Path data always wins where it exists, and the route uses as few train-timed legs as it can. Trains made from path requests are never used |
+| **From 8 timetabled trains** | No path reaches the stations at all; every leg is timed from timetabled trains |
+| **No path or timetable data** | No path and no timetabled train links the requested stations. Each leg uses the **Default leg time** from [Settings](#settings) |
+| a line ending **⚠ Bombo → Dunmore: no path or timetable data** | Some legs had no data at all and used the default leg time |
 
 Stations the train passes between the requested stops are included as timing points with no dwell. The start time is the **Ready** time if it hasn't already passed on the fast clock; otherwise the fast clock plus the **Lead time** setting; with no fast clock, the timetable's start time. A **Stop** with minutes on site becomes a dwell (at least a minute); **Shunt** and **Work** stops become a dwell plus a special instruction.
 
