@@ -1,0 +1,3433 @@
+{
+  "id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+  "name": "Base MTP - B Session",
+  "description": "Base Session for the B MTP with all Passenger Paths.\n\nRequires 3 Road Crew, 2x Yardmaster\n\n1901 Runs as an Extra when required.",
+  "start_time": "00:01",
+  "end_time": "23:59",
+  "created_at": "2026-10-14T22:21:40.622Z",
+  "updated_at": "2026-10-15T01:36:02.554Z",
+  "settings": {
+    "clock_enabled": false,
+    "clock_broker_url": "",
+    "clock_topic": "trains/jmri/memory/currentTime",
+    "auto_assign_min_break": 0,
+    "graph_scale": null
+  },
+  "stations": [
+    {
+      "id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Staging (Up)",
+      "short_code": "STA-Up",
+      "distance": null,
+      "graph_pos": 0,
+      "sort_order": 0,
+      "branch_name": null,
+      "alias_enabled": false,
+      "bold_name": false,
+      "italic_name": false,
+      "underline_name": false
+    },
+    {
+      "id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Staging (Down)",
+      "short_code": "STA-DW",
+      "distance": null,
+      "graph_pos": 10,
+      "sort_order": 1,
+      "branch_name": null,
+      "alias_enabled": false,
+      "bold_name": false,
+      "italic_name": false,
+      "underline_name": false
+    },
+    {
+      "id": "876f4779-5fd1-401f-b720-7eb38191999a",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Kembla Heights",
+      "short_code": "KHTS",
+      "distance": null,
+      "graph_pos": 60,
+      "sort_order": 2,
+      "branch_name": "Kembla Heights",
+      "alias_enabled": false,
+      "bold_name": false,
+      "italic_name": false,
+      "underline_name": false
+    },
+    {
+      "id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Kembla Junction",
+      "short_code": "KJN",
+      "distance": null,
+      "graph_pos": 72,
+      "sort_order": 3,
+      "branch_name": null,
+      "alias_enabled": false,
+      "bold_name": false,
+      "italic_name": false,
+      "underline_name": false
+    },
+    {
+      "id": "44673d22-912d-4108-b0ac-451459749273",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Bombo",
+      "short_code": "BOM",
+      "distance": null,
+      "graph_pos": 108,
+      "sort_order": 4,
+      "branch_name": null,
+      "alias_enabled": false,
+      "bold_name": false,
+      "italic_name": false,
+      "underline_name": false
+    },
+    {
+      "id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Kiama",
+      "short_code": "KIA",
+      "distance": null,
+      "graph_pos": 128,
+      "sort_order": 5,
+      "branch_name": null,
+      "alias_enabled": false,
+      "bold_name": false,
+      "italic_name": false,
+      "underline_name": false
+    },
+    {
+      "id": "b7d7dc41-aa65-4159-8dc8-9bb2a6fc5cf8",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Kiama Down Siding",
+      "short_code": "KIA-DS",
+      "distance": null,
+      "graph_pos": 140,
+      "sort_order": 9,
+      "branch_name": null,
+      "alias_enabled": false,
+      "bold_name": false,
+      "italic_name": false,
+      "underline_name": false
+    },
+    {
+      "id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Berry",
+      "short_code": "BER",
+      "distance": null,
+      "graph_pos": 212,
+      "sort_order": 6,
+      "branch_name": null,
+      "alias_enabled": false,
+      "bold_name": false,
+      "italic_name": false,
+      "underline_name": false
+    },
+    {
+      "id": "e513c998-3249-4127-b03b-0c9826284fa5",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Nowra",
+      "short_code": "NOW",
+      "distance": null,
+      "graph_pos": 280,
+      "sort_order": 7,
+      "branch_name": null,
+      "alias_enabled": false,
+      "bold_name": false,
+      "italic_name": false,
+      "underline_name": false
+    },
+    {
+      "id": "d341441f-06db-4bc9-bd37-1bbcb042a0c6",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Shoalhaven Starches",
+      "short_code": "SHST",
+      "distance": null,
+      "graph_pos": 290,
+      "sort_order": 8,
+      "branch_name": null,
+      "alias_enabled": false,
+      "bold_name": false,
+      "italic_name": false,
+      "underline_name": false
+    }
+  ],
+  "trains": [
+    {
+      "id": "d1dc0b2b-f8ea-4e36-bcec-ddbb058d58e9",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K353",
+      "color": "#3b82f6",
+      "notes": "",
+      "train_id": "CityRail 2L",
+      "direction": "FWD",
+      "crew_id": null,
+      "stops": [
+        {
+          "id": "503c2b83-2a38-41d8-b0d5-07bb58c8f801",
+          "train_id": "d1dc0b2b-f8ea-4e36-bcec-ddbb058d58e9",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": "05:56",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "42a3e651-2c1e-4b22-9c4a-7577d2c91b61",
+          "train_id": "d1dc0b2b-f8ea-4e36-bcec-ddbb058d58e9",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "05:49",
+          "departure": "05:49",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "b188c17b-98ff-4e6e-a538-d29275007cd6",
+          "train_id": "d1dc0b2b-f8ea-4e36-bcec-ddbb058d58e9",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "05:37",
+          "departure": "05:37",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "54024c8a-fd4c-4696-85b9-652835c36195",
+          "train_id": "d1dc0b2b-f8ea-4e36-bcec-ddbb058d58e9",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "05:30",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "f504b8e7-8ef5-4d22-9864-12eee7cf60b4",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "C402",
+      "color": "#14b8a6",
+      "notes": "You are driving a sound equipped V-Set! Ensure the functions with an asterisk (*) are enabled to give the best experience to the crews onsite",
+      "train_id": "CityRail 6V",
+      "direction": "REV",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "a70938e0-daf8-45df-bb76-486735afc151",
+          "train_id": "f504b8e7-8ef5-4d22-9864-12eee7cf60b4",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "06:03",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": "Sydney Terminal"
+        },
+        {
+          "id": "d4929940-08b4-445b-a6e1-b44f22ca7431",
+          "train_id": "f504b8e7-8ef5-4d22-9864-12eee7cf60b4",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "05:38",
+          "departure": "05:38",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "ee02e71a-587d-4940-a4e2-c82677943cbe",
+          "train_id": "f504b8e7-8ef5-4d22-9864-12eee7cf60b4",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "05:19",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "cadc23b1-0486-48c1-b5ca-7f5a14c73458",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K421",
+      "color": "#ef4444",
+      "notes": "",
+      "train_id": "CityRail 3L",
+      "direction": "FWD",
+      "crew_id": null,
+      "stops": [
+        {
+          "id": "e411c8eb-e7e4-46a8-8923-73cc8e2247f7",
+          "train_id": "cadc23b1-0486-48c1-b5ca-7f5a14c73458",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "07:45",
+          "special_instructions": null,
+          "location_alias": "Wollongong"
+        },
+        {
+          "id": "478e0570-3bda-4715-b54a-4646b1e7c3a6",
+          "train_id": "cadc23b1-0486-48c1-b5ca-7f5a14c73458",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "08:10",
+          "departure": "08:10",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "7dc31196-35ee-4993-a526-53bf35f64fa6",
+          "train_id": "cadc23b1-0486-48c1-b5ca-7f5a14c73458",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "08:22",
+          "departure": "08:22",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "ef0ee6ba-9315-4a70-81b1-31f4814031ef",
+          "train_id": "cadc23b1-0486-48c1-b5ca-7f5a14c73458",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "08:29",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "11e4b3d2-e168-4aea-8821-0cb992ddbcbd",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K439",
+      "color": "#ef4444",
+      "notes": "",
+      "train_id": "CityRail 4T",
+      "direction": "REV",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "34a9a1dd-d6ff-4540-afd6-ad75a953f924",
+          "train_id": "11e4b3d2-e168-4aea-8821-0cb992ddbcbd",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "12:17",
+          "special_instructions": null,
+          "location_alias": "Port Kembla"
+        },
+        {
+          "id": "b421cd77-c522-4d8b-a01c-7116c3acb1b5",
+          "train_id": "11e4b3d2-e168-4aea-8821-0cb992ddbcbd",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "12:42",
+          "departure": "12:42",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "1bff4e48-0ab0-4d5f-9a09-1ddac9431d59",
+          "train_id": "11e4b3d2-e168-4aea-8821-0cb992ddbcbd",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "12:54",
+          "departure": "12:54",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "274c1a38-83aa-4e92-9b7c-eb96fdffb776",
+          "train_id": "11e4b3d2-e168-4aea-8821-0cb992ddbcbd",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "13:01",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "d13f40d1-1c5a-4a99-8be4-9a56c1dcf920",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K444",
+      "color": "#06b6d4",
+      "notes": "",
+      "train_id": "CityRail 4T",
+      "direction": "FWD",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "f8802cb2-d0c7-4f4c-918e-d9255d4139b5",
+          "train_id": "d13f40d1-1c5a-4a99-8be4-9a56c1dcf920",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "14:24",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": "Port Kembla"
+        },
+        {
+          "id": "52f77bdb-cd54-4eb5-a839-91179c703336",
+          "train_id": "d13f40d1-1c5a-4a99-8be4-9a56c1dcf920",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "13:59",
+          "departure": "13:59",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "0a00caa2-0f34-47cf-8f26-842c5a1fd3b3",
+          "train_id": "d13f40d1-1c5a-4a99-8be4-9a56c1dcf920",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "13:47",
+          "departure": "13:47",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "d092d5a2-47b7-4bc1-b906-c119ee4d4c9c",
+          "train_id": "d13f40d1-1c5a-4a99-8be4-9a56c1dcf920",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "13:40",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "865d06be-bf4b-4fdb-a9dd-23664215ec4f",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-4",
+      "color": "#14b8a6",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "REV",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "38742192-ea74-421e-a602-486489c286ac",
+          "train_id": "865d06be-bf4b-4fdb-a9dd-23664215ec4f",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "08:43",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "ff1367a6-2fbb-4124-a2d9-5ead857531b3",
+          "train_id": "865d06be-bf4b-4fdb-a9dd-23664215ec4f",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "07:57",
+          "departure": "08:15",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "efdb9c51-9f8a-4159-bbbc-f61687d3b5f7",
+          "train_id": "865d06be-bf4b-4fdb-a9dd-23664215ec4f",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": null,
+          "departure": "07:35",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "a4186fc2-95b8-4db5-bbef-5fcabb143a2a",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-5",
+      "color": "#fb923c",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "FWD",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "a16d3024-e8aa-4578-bb05-2912424da617",
+          "train_id": "a4186fc2-95b8-4db5-bbef-5fcabb143a2a",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "08:59",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "eb699f8d-3f43-4ac2-b1a7-a7a9e15a045e",
+          "train_id": "a4186fc2-95b8-4db5-bbef-5fcabb143a2a",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "09:27",
+          "departure": "09:27",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "857a2f13-6232-4553-9ee6-3145aa0f78f3",
+          "train_id": "a4186fc2-95b8-4db5-bbef-5fcabb143a2a",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": "09:49",
+          "departure": null,
+          "special_instructions": "Stable in the endeavour siding at Nowra just past the station until the next Up service.",
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "9b66fdee-4d27-40a6-a6f4-fad9280dd4bc",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-10",
+      "color": "#a855f7",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "FWD",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "da341601-eb39-4c74-b14d-4615943f94ea",
+          "train_id": "9b66fdee-4d27-40a6-a6f4-fad9280dd4bc",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "18:40",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "024f1813-da5a-4080-92ef-c5d9b20e63b2",
+          "train_id": "9b66fdee-4d27-40a6-a6f4-fad9280dd4bc",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "18:12",
+          "departure": "18:12",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "ac471eb6-0177-4739-8505-62eead2000f1",
+          "train_id": "9b66fdee-4d27-40a6-a6f4-fad9280dd4bc",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": null,
+          "departure": "17:50",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "3ac41aef-c942-4219-b1c4-04752bd4e513",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-1",
+      "color": "#f59e0b",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "FWD",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "869e4bc9-236d-46a3-adb4-0d7777f31962",
+          "train_id": "3ac41aef-c942-4219-b1c4-04752bd4e513",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "02:00",
+          "special_instructions": null,
+          "location_alias": "Wollongong"
+        },
+        {
+          "id": "26a906e8-c54a-4ccb-9453-74d785cfee17",
+          "train_id": "3ac41aef-c942-4219-b1c4-04752bd4e513",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "02:19",
+          "departure": "02:19",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "bf757902-a2ec-4de9-bd68-e7533b57d123",
+          "train_id": "3ac41aef-c942-4219-b1c4-04752bd4e513",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "02:27",
+          "departure": "02:27",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "c78c7412-8caf-4fac-ba21-780b69450385",
+          "train_id": "3ac41aef-c942-4219-b1c4-04752bd4e513",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "02:33",
+          "departure": "02:33",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "20b61c50-1a73-423c-ba8d-e4c403243905",
+          "train_id": "3ac41aef-c942-4219-b1c4-04752bd4e513",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "03:01",
+          "departure": "03:01",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "e54e4a52-8a7d-4840-9edd-564e8ef1597e",
+          "train_id": "3ac41aef-c942-4219-b1c4-04752bd4e513",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": "03:23",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "76b8ba66-c5c0-4ad6-90b5-7bd65d51e2af",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "C401",
+      "color": "#3b82f6",
+      "notes": "You are driving a sound equipped V-Set! Ensure the functions with an asterisk (*) are enabled to give the best experience to the crews onsite",
+      "train_id": "CityRail 6V",
+      "direction": "FWD",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "e2100557-d104-4004-8f69-bc43acc25ea2",
+          "train_id": "76b8ba66-c5c0-4ad6-90b5-7bd65d51e2af",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "04:15",
+          "special_instructions": null,
+          "location_alias": "Sydney Terminal"
+        },
+        {
+          "id": "ac160bf9-bfcf-4327-baaa-a99d203dec8f",
+          "train_id": "76b8ba66-c5c0-4ad6-90b5-7bd65d51e2af",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "04:40",
+          "departure": "04:40",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "42c564ad-6901-49f6-a4cf-0eb169a904b0",
+          "train_id": "76b8ba66-c5c0-4ad6-90b5-7bd65d51e2af",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "04:59",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "2dce902c-98e9-44e8-a2d6-75141223c788",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K424",
+      "color": "#06b6d4",
+      "notes": "",
+      "train_id": "CityRail 3L",
+      "direction": "REV",
+      "crew_id": null,
+      "stops": [
+        {
+          "id": "67a3a0b0-bdd8-4c8b-aeab-b21cd636d241",
+          "train_id": "2dce902c-98e9-44e8-a2d6-75141223c788",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "09:54",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": "Wollongong"
+        },
+        {
+          "id": "626467be-3513-47a8-a75a-c7982f3d07a5",
+          "train_id": "2dce902c-98e9-44e8-a2d6-75141223c788",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "09:29",
+          "departure": "09:29",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "970ce823-9f86-49fb-bcee-d24ea2183443",
+          "train_id": "2dce902c-98e9-44e8-a2d6-75141223c788",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "09:17",
+          "departure": "09:17",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "25080c95-bf82-44ef-9453-d1c091a3deed",
+          "train_id": "2dce902c-98e9-44e8-a2d6-75141223c788",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "09:10",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "6c006337-8f2f-4f4c-899d-0b0e5d8cf14d",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "9923",
+      "color": "#ec4899",
+      "notes": "Down PN Pickup Goods from KH",
+      "train_id": "48142 + 48149",
+      "direction": "",
+      "crew_id": "b6768c52-2750-407e-8036-112fb0f86ef0",
+      "stops": [
+        {
+          "id": "7ac5dfcd-01d2-4c64-93eb-30c1e9703546",
+          "train_id": "6c006337-8f2f-4f4c-899d-0b0e5d8cf14d",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": null,
+          "departure": "12:00",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "4bfea501-3696-40c7-b9a1-188c39e6c572",
+          "train_id": "6c006337-8f2f-4f4c-899d-0b0e5d8cf14d",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "12:06",
+          "departure": "12:06",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "e6dbc954-aaae-4aa1-906b-5c32674fc258",
+          "train_id": "6c006337-8f2f-4f4c-899d-0b0e5d8cf14d",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "12:14",
+          "departure": "12:14",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "440de849-59b3-4724-87d1-302053abb6c3",
+          "train_id": "6c006337-8f2f-4f4c-899d-0b0e5d8cf14d",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "12:20",
+          "departure": "12:20",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "44f9f76b-eb99-4f32-bdf0-41da4ebbe4ae",
+          "train_id": "6c006337-8f2f-4f4c-899d-0b0e5d8cf14d",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "12:48",
+          "departure": "12:48",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "39e959a4-825f-45e7-a912-32414fd2ffaf",
+          "train_id": "6c006337-8f2f-4f4c-899d-0b0e5d8cf14d",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": "13:10",
+          "departure": null,
+          "special_instructions": "Run around the train, form 9952",
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "6c4cab6d-c7dc-468f-b2d7-7d90752f03c4",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "9122",
+      "color": "#14b8a6",
+      "notes": "Up PN Pickup Goods to Clyde Ex. Nowra\nRefuel before depature",
+      "train_id": "8235, 8176",
+      "direction": "",
+      "crew_id": "99428af7-c6d4-4266-b1d8-8c4f806aed52",
+      "stops": [
+        {
+          "id": "f3a79a8e-6572-47a7-88f1-5bc71f4b02d1",
+          "train_id": "6c4cab6d-c7dc-468f-b2d7-7d90752f03c4",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "15:34",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "56afe51d-5b08-4d6a-a6c5-61ad98e1577a",
+          "train_id": "6c4cab6d-c7dc-468f-b2d7-7d90752f03c4",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "14:49",
+          "departure": "15:15",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "3b85925e-2aca-4578-8f04-6678326d4fe0",
+          "train_id": "6c4cab6d-c7dc-468f-b2d7-7d90752f03c4",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "14:41",
+          "departure": "14:41",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "3ea777f1-60e3-483b-b3dc-fcd2cd06660e",
+          "train_id": "6c4cab6d-c7dc-468f-b2d7-7d90752f03c4",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "14:35",
+          "departure": "14:35",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "c26c1e3e-4b41-4066-ab4b-857e4eab0920",
+          "train_id": "6c4cab6d-c7dc-468f-b2d7-7d90752f03c4",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "14:07",
+          "departure": "14:07",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "468d0562-8964-46b8-bb59-033df8a2e6a7",
+          "train_id": "6c4cab6d-c7dc-468f-b2d7-7d90752f03c4",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": null,
+          "departure": "13:45",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "7b3daf0e-db5d-4713-a909-5697c8b6d98a",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "8L01",
+      "color": "#f59e0b",
+      "notes": "Down LVR Heritage Pass to Kiama\nSTN 2026-001, TOC Waiver xyz",
+      "train_id": "2103(F)",
+      "direction": "",
+      "crew_id": "99428af7-c6d4-4266-b1d8-8c4f806aed52",
+      "stops": [
+        {
+          "id": "a35e60df-dfc7-4fa5-9da9-f501685cc454",
+          "train_id": "7b3daf0e-db5d-4713-a909-5697c8b6d98a",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "08:35",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "1a9138ec-1475-45d0-a4bd-e4fe46bedb08",
+          "train_id": "7b3daf0e-db5d-4713-a909-5697c8b6d98a",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "08:45",
+          "departure": "08:45",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "b752a4f0-d673-4e5a-baec-478c833d3c87",
+          "train_id": "7b3daf0e-db5d-4713-a909-5697c8b6d98a",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "08:53",
+          "departure": "09:30",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "13f42c41-d2f1-4d9b-ae77-bb44660efe2e",
+          "train_id": "7b3daf0e-db5d-4713-a909-5697c8b6d98a",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "09:37",
+          "departure": "09:50",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "dd0d7297-ce6f-4aed-8162-5627c6aec271",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "8L04",
+      "color": "#14b8a6",
+      "notes": "Hold at Kembla Junction",
+      "train_id": "",
+      "direction": "",
+      "crew_id": "b6768c52-2750-407e-8036-112fb0f86ef0",
+      "stops": [
+        {
+          "id": "2b08b746-afa5-4cd6-afb7-1cd3dc44e095",
+          "train_id": "dd0d7297-ce6f-4aed-8162-5627c6aec271",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "19:30",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "d5c50934-6558-4356-89ac-1ca47041da26",
+          "train_id": "dd0d7297-ce6f-4aed-8162-5627c6aec271",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "18:19",
+          "departure": "19:05",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "35e69550-294e-4876-b149-02e090d78fd8",
+          "train_id": "dd0d7297-ce6f-4aed-8162-5627c6aec271",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "18:07",
+          "departure": "18:07",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "faec2cd7-f63b-41cc-9eaa-09576b9756a9",
+          "train_id": "dd0d7297-ce6f-4aed-8162-5627c6aec271",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "18:00",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "6228b460-a706-475b-8f41-5491a7cf6575",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "1901",
+      "color": "#8b5cf6",
+      "notes": "Second Down Ballast",
+      "train_id": "C503 (F)",
+      "direction": "",
+      "crew_id": "b6768c52-2750-407e-8036-112fb0f86ef0",
+      "stops": [
+        {
+          "id": "f40a4e23-0a1b-4895-ae24-a5a0ef989989",
+          "train_id": "6228b460-a706-475b-8f41-5491a7cf6575",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "01:20",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "5fc776e6-3266-4d1c-9db3-c48cb74e91a1",
+          "train_id": "6228b460-a706-475b-8f41-5491a7cf6575",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "01:39",
+          "departure": "03:00",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "43caedf9-4e07-4d55-bd37-d305fec03bad",
+          "train_id": "6228b460-a706-475b-8f41-5491a7cf6575",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "03:08",
+          "departure": "04:08",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "b66960ee-f330-49c0-919e-1d4465269e2f",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K303",
+      "color": "#84cc16",
+      "notes": "",
+      "train_id": "CityRail 4V-1",
+      "direction": "FWD",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "d36fa1fc-50c3-4e3f-b6a1-bb6f6743e536",
+          "train_id": "b66960ee-f330-49c0-919e-1d4465269e2f",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "00:30",
+          "special_instructions": null,
+          "location_alias": "Wollongong"
+        },
+        {
+          "id": "84bd54df-fe85-4bfb-aa6d-48a07717dea3",
+          "train_id": "b66960ee-f330-49c0-919e-1d4465269e2f",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": null,
+          "departure": "00:55",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "4083225e-581c-4baa-8fb1-55fbb55c6d0b",
+          "train_id": "b66960ee-f330-49c0-919e-1d4465269e2f",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": null,
+          "departure": "01:07",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "73533822-7870-4e4b-96fb-00369214eda6",
+          "train_id": "b66960ee-f330-49c0-919e-1d4465269e2f",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "01:14",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "a51a3b0d-fa68-4b9d-89ba-da9b7ca0f754",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K351",
+      "color": "#ef4444",
+      "notes": "",
+      "train_id": "CityRail 2L",
+      "direction": "FWD",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "07b72d95-7c93-4d98-a603-b3f94ff58383",
+          "train_id": "a51a3b0d-fa68-4b9d-89ba-da9b7ca0f754",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": "01:59",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "2c070b59-f20f-4864-b286-234cbf0ce56d",
+          "train_id": "a51a3b0d-fa68-4b9d-89ba-da9b7ca0f754",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "01:52",
+          "departure": "01:52",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "7f75cc2b-d6a9-4c65-9384-54f8c9d0a0d2",
+          "train_id": "a51a3b0d-fa68-4b9d-89ba-da9b7ca0f754",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "01:32",
+          "departure": "01:40",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "53a33819-23ab-4399-b3cf-e33018c667ba",
+          "train_id": "a51a3b0d-fa68-4b9d-89ba-da9b7ca0f754",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "01:25",
+          "departure": "01:25",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "b262be06-138f-48fc-adf0-9f910982a7fb",
+          "train_id": "a51a3b0d-fa68-4b9d-89ba-da9b7ca0f754",
+          "station_id": "b7d7dc41-aa65-4159-8dc8-9bb2a6fc5cf8",
+          "arrival": null,
+          "departure": "01:15",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "27fe3bce-9878-4370-87ab-ee3a6ecb5009",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "C404",
+      "color": "#f59e0b",
+      "notes": "",
+      "train_id": "CityRail 4V-1",
+      "direction": "REV",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "c20f292b-01b1-4c83-80a6-611749a44dcd",
+          "train_id": "27fe3bce-9878-4370-87ab-ee3a6ecb5009",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "03:07",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": "Sydney Terminal"
+        },
+        {
+          "id": "b23c34e4-bfe4-4ee8-8277-117605e0a873",
+          "train_id": "27fe3bce-9878-4370-87ab-ee3a6ecb5009",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "02:42",
+          "departure": "02:42",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "40294b87-c1e4-4fc0-9969-3e036470ca7d",
+          "train_id": "27fe3bce-9878-4370-87ab-ee3a6ecb5009",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "02:22",
+          "departure": "02:30",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "c095c48f-dc6b-4f3c-aebd-bb90d89ddf4a",
+          "train_id": "27fe3bce-9878-4370-87ab-ee3a6ecb5009",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "02:15",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "801a5a49-b55a-4e1a-8004-a7f4c235793e",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-2",
+      "color": "#a855f7",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "REV",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "f1b6d795-f52e-4adb-b0f9-f5f7a9a732a6",
+          "train_id": "801a5a49-b55a-4e1a-8004-a7f4c235793e",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "05:28",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "e9af2a6c-5c18-405e-88b8-5509fa2fecc4",
+          "train_id": "801a5a49-b55a-4e1a-8004-a7f4c235793e",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "04:37",
+          "departure": "05:00",
+          "special_instructions": "You are crossing a train at Berry. Work with Berry Signaller to move into the refuge and setup for the cross.",
+          "location_alias": null
+        },
+        {
+          "id": "ef22c4ab-5661-49eb-adc2-9dfc0a94e5f7",
+          "train_id": "801a5a49-b55a-4e1a-8004-a7f4c235793e",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": null,
+          "departure": "04:15",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "ba5ecdb8-5733-4c95-b14f-a7cd70ed8f7b",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K352",
+      "color": "#3b82f6",
+      "notes": "",
+      "train_id": "CityRail 2L",
+      "direction": "REV",
+      "crew_id": null,
+      "stops": [
+        {
+          "id": "1462e182-5a08-443b-ac42-794f678ba331",
+          "train_id": "ba5ecdb8-5733-4c95-b14f-a7cd70ed8f7b",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": null,
+          "departure": "04:15",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "0bef3c10-13b3-4793-b33e-47881ad1b7a5",
+          "train_id": "ba5ecdb8-5733-4c95-b14f-a7cd70ed8f7b",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "04:22",
+          "departure": "04:22",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "90fe2e25-8756-442b-8609-222c98675f4b",
+          "train_id": "ba5ecdb8-5733-4c95-b14f-a7cd70ed8f7b",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "04:34",
+          "departure": "04:34",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "2c4562e7-52e9-4787-9a67-a00f40c538cb",
+          "train_id": "ba5ecdb8-5733-4c95-b14f-a7cd70ed8f7b",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "04:41",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "5c95f740-a74e-4420-945b-29336b588d70",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-3",
+      "color": "#8b5cf6",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "FWD",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "53d0a5c0-fbcf-418c-a94a-18177d45d8ae",
+          "train_id": "5c95f740-a74e-4420-945b-29336b588d70",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "05:47",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "0e8ca7fa-2ea0-4b4c-a575-6488d5abbb9c",
+          "train_id": "5c95f740-a74e-4420-945b-29336b588d70",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "06:15",
+          "departure": "06:30",
+          "special_instructions": "You are crossing a train at Berry. Work with Berry Signaller to move into the refuge and setup for the cross.",
+          "location_alias": null
+        },
+        {
+          "id": "644fa3ae-df06-462d-82b1-beaf1acae4a1",
+          "train_id": "5c95f740-a74e-4420-945b-29336b588d70",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": "06:52",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "93ff676c-e08c-487c-937c-29d4f406f048",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K354",
+      "color": "#ec4899",
+      "notes": "",
+      "train_id": "CityRail 2L",
+      "direction": "REV",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "7308ed3c-2b47-48bf-a803-293ded27bf00",
+          "train_id": "93ff676c-e08c-487c-937c-29d4f406f048",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": null,
+          "departure": "07:30",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "86877a6c-053f-4b3f-bfc2-6c39d1b0b6ee",
+          "train_id": "93ff676c-e08c-487c-937c-29d4f406f048",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "07:37",
+          "departure": "07:37",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "1098579c-3e2d-4459-9727-db627b024d7a",
+          "train_id": "93ff676c-e08c-487c-937c-29d4f406f048",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "07:49",
+          "departure": "08:00",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "66efd11f-1db3-41a8-aa50-40ae06774e5f",
+          "train_id": "93ff676c-e08c-487c-937c-29d4f406f048",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "08:07",
+          "departure": "08:07",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "eba3feef-4d39-412e-990a-37141655e270",
+          "train_id": "93ff676c-e08c-487c-937c-29d4f406f048",
+          "station_id": "b7d7dc41-aa65-4159-8dc8-9bb2a6fc5cf8",
+          "arrival": "08:17",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "38f96a72-b648-496c-ac59-f2d1900a112f",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "1921",
+      "color": "#ec4899",
+      "notes": "Down PN Goods Ex. Clyde",
+      "train_id": "8133(R) + 8235(R)",
+      "direction": "",
+      "crew_id": "024cf64a-923b-4290-a15b-2a7582a32ef2",
+      "stops": [
+        {
+          "id": "c2f135b0-9482-415e-8614-92613ff6a724",
+          "train_id": "38f96a72-b648-496c-ac59-f2d1900a112f",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "03:00",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "54fe4605-5b95-4d7d-9a38-e6bde89b5a74",
+          "train_id": "38f96a72-b648-496c-ac59-f2d1900a112f",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "03:19",
+          "departure": "04:10",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "11cb4976-cf2d-44f7-885c-7a75023372f0",
+          "train_id": "38f96a72-b648-496c-ac59-f2d1900a112f",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "04:18",
+          "departure": "04:18",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "f1ae7108-05e9-428d-b9fa-55f2d75f2854",
+          "train_id": "38f96a72-b648-496c-ac59-f2d1900a112f",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "04:24",
+          "departure": "04:24",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "3103a89a-1974-4ba2-93a9-5cd53d5fb613",
+          "train_id": "38f96a72-b648-496c-ac59-f2d1900a112f",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "04:52",
+          "departure": "04:52",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "61fa4dfd-b7f5-4f46-a15e-58f694628c44",
+          "train_id": "38f96a72-b648-496c-ac59-f2d1900a112f",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": "05:14",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "c9ca57b3-77fe-4f7c-990e-d71df52710d4",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "C429",
+      "color": "#8b5cf6",
+      "notes": "",
+      "train_id": "CityRail 4V-2",
+      "direction": "FWD",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "708c5d14-15b0-4ac0-99c2-b09f58ac8129",
+          "train_id": "c9ca57b3-77fe-4f7c-990e-d71df52710d4",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "10:15",
+          "special_instructions": null,
+          "location_alias": "Sydney Terminal"
+        },
+        {
+          "id": "714fae96-feb0-4def-bd5a-2718b3f2720b",
+          "train_id": "c9ca57b3-77fe-4f7c-990e-d71df52710d4",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "10:40",
+          "departure": "10:40",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "fc884224-d7f8-493e-b3cd-db1616de7d38",
+          "train_id": "c9ca57b3-77fe-4f7c-990e-d71df52710d4",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "10:52",
+          "departure": "10:52",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "84981d06-9459-4dba-aba6-19c1b1a0521e",
+          "train_id": "c9ca57b3-77fe-4f7c-990e-d71df52710d4",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "10:59",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "35602cc4-b82c-4c67-ba95-39d0a3e5b948",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K357",
+      "color": "#14b8a6",
+      "notes": "",
+      "train_id": "CityRail 2L",
+      "direction": "FWD",
+      "crew_id": null,
+      "stops": [
+        {
+          "id": "fb41c327-60a4-46eb-a09b-a75097df5c0a",
+          "train_id": "35602cc4-b82c-4c67-ba95-39d0a3e5b948",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": "14:16",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "09f50f42-5ccd-4712-aeb8-bae4cbdae4e1",
+          "train_id": "35602cc4-b82c-4c67-ba95-39d0a3e5b948",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "14:09",
+          "departure": "14:09",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "03d6cd40-f9b3-4b02-82a2-a2d38a389c59",
+          "train_id": "35602cc4-b82c-4c67-ba95-39d0a3e5b948",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "13:57",
+          "departure": "13:57",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "62f93c26-ff2e-48ff-ae6f-2e22c7388ee9",
+          "train_id": "35602cc4-b82c-4c67-ba95-39d0a3e5b948",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "13:50",
+          "departure": "13:50",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "38b3ec16-16f5-44a0-bd85-22d7f5cbf6c8",
+          "train_id": "35602cc4-b82c-4c67-ba95-39d0a3e5b948",
+          "station_id": "b7d7dc41-aa65-4159-8dc8-9bb2a6fc5cf8",
+          "arrival": null,
+          "departure": "13:40",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "dbb9568b-c1c8-406c-a3b2-336f5ddda004",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "8L02",
+      "color": "#22c55e",
+      "notes": "Stables in Bombo, Forms 8L03",
+      "train_id": "",
+      "direction": "",
+      "crew_id": "99428af7-c6d4-4266-b1d8-8c4f806aed52",
+      "stops": [
+        {
+          "id": "bfae24e3-f4dc-4ecf-b6c3-4dd5891802f7",
+          "train_id": "dbb9568b-c1c8-406c-a3b2-336f5ddda004",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "09:57",
+          "departure": "10:10",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "9f698bc5-3a78-43ac-bab1-d286b62d1ae7",
+          "train_id": "dbb9568b-c1c8-406c-a3b2-336f5ddda004",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "09:50",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "99249d2c-686a-468d-bbf4-56130948078b",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "9922",
+      "color": "#ef4444",
+      "notes": "Local PN Goods to KH.",
+      "train_id": "48142 + 48149",
+      "direction": "",
+      "crew_id": "b6768c52-2750-407e-8036-112fb0f86ef0",
+      "stops": [
+        {
+          "id": "c7c388d2-5f91-4188-9cdc-20700ed57c91",
+          "train_id": "99249d2c-686a-468d-bbf4-56130948078b",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": "07:12",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "39a5e7e7-af68-4dc1-bf8f-026a1a3e7cf6",
+          "train_id": "99249d2c-686a-468d-bbf4-56130948078b",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "07:02",
+          "departure": "07:02",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "9e7c95cc-8696-4c92-987c-ba3472969c02",
+          "train_id": "99249d2c-686a-468d-bbf4-56130948078b",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "06:54",
+          "departure": "06:54",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "27ae172b-af5e-4934-b43c-be9cf811c02d",
+          "train_id": "99249d2c-686a-468d-bbf4-56130948078b",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "06:48",
+          "departure": "06:48",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "fa614853-7503-4831-9add-c9f7dc2c4762",
+          "train_id": "99249d2c-686a-468d-bbf4-56130948078b",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "06:20",
+          "departure": "06:20",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "44c70dbf-4ff9-45f7-a43b-6b061d12815a",
+          "train_id": "99249d2c-686a-468d-bbf4-56130948078b",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": null,
+          "departure": "05:58",
+          "special_instructions": "Assemble this train for depature by 0700",
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "d8dcf96b-8622-407f-b0d6-d81ae8b1ddb5",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "C432",
+      "color": "#ec4899",
+      "notes": "",
+      "train_id": "CityRail 4V-2",
+      "direction": "REV",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "f4478cc0-efd1-4fe4-ad55-b02a9ba73a67",
+          "train_id": "d8dcf96b-8622-407f-b0d6-d81ae8b1ddb5",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "11:59",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": "Sydney Terminal"
+        },
+        {
+          "id": "63f2549e-5885-4a0c-b83d-c1acb5d6f976",
+          "train_id": "d8dcf96b-8622-407f-b0d6-d81ae8b1ddb5",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "11:34",
+          "departure": "11:34",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "a0718274-87d0-428c-a27e-be6c3103bca1",
+          "train_id": "d8dcf96b-8622-407f-b0d6-d81ae8b1ddb5",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "11:22",
+          "departure": "11:22",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "b749439e-4d5e-4bb4-8c66-6716973dae1d",
+          "train_id": "d8dcf96b-8622-407f-b0d6-d81ae8b1ddb5",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "11:15",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "aba1d83a-9cd6-47fe-b38c-f376c592f067",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K356",
+      "color": "#22c55e",
+      "notes": "",
+      "train_id": "CityRail 2L",
+      "direction": "REV",
+      "crew_id": null,
+      "stops": [
+        {
+          "id": "cb67e97e-5a85-42c2-a234-f1b0f324ff4c",
+          "train_id": "aba1d83a-9cd6-47fe-b38c-f376c592f067",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": null,
+          "departure": "12:25",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "dde907e6-9937-4ad8-bb44-4b81bdb9ccca",
+          "train_id": "aba1d83a-9cd6-47fe-b38c-f376c592f067",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "12:32",
+          "departure": "12:32",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "a21d02d9-1eac-45f8-9755-e7b0e886bc4d",
+          "train_id": "aba1d83a-9cd6-47fe-b38c-f376c592f067",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "12:44",
+          "departure": "12:44",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "c1adcadd-15e5-4ea4-8a0f-44a7218be39e",
+          "train_id": "aba1d83a-9cd6-47fe-b38c-f376c592f067",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "12:51",
+          "departure": "12:51",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "b9b67c5f-d8fd-4591-bc10-9a8348f157c2",
+          "train_id": "aba1d83a-9cd6-47fe-b38c-f376c592f067",
+          "station_id": "b7d7dc41-aa65-4159-8dc8-9bb2a6fc5cf8",
+          "arrival": "13:01",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "25b7d75f-6029-4599-a4e2-53fddd61d634",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-6",
+      "color": "#14b8a6",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "FWD",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "c0802614-7820-4e1f-a46a-ea2e4da54324",
+          "train_id": "25b7d75f-6029-4599-a4e2-53fddd61d634",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "13:18",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "8c4983b8-b77a-41a4-bea2-e14632cc3324",
+          "train_id": "25b7d75f-6029-4599-a4e2-53fddd61d634",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "12:32",
+          "departure": "12:50",
+          "special_instructions": "You are crossing a train at Berry. Work with Berry Signaller to move into the refuge and setup for the cross.",
+          "location_alias": null
+        },
+        {
+          "id": "bcc4e15f-44da-4ff0-bed8-dd1167c29504",
+          "train_id": "25b7d75f-6029-4599-a4e2-53fddd61d634",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": null,
+          "departure": "12:10",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "4a1a1cc6-2008-4305-885d-7c68a2d78f8d",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-7",
+      "color": "#fb923c",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "REV",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "4257e7c4-fda6-4039-bdf6-aed87d4319c5",
+          "train_id": "4a1a1cc6-2008-4305-885d-7c68a2d78f8d",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "13:30",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "987a964f-c081-4fbf-8637-7d370713b458",
+          "train_id": "4a1a1cc6-2008-4305-885d-7c68a2d78f8d",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "13:58",
+          "departure": "14:15",
+          "special_instructions": "You are crossing a train at Berry. Work with Berry Signaller to move into the refuge and setup for the cross.",
+          "location_alias": null
+        },
+        {
+          "id": "93a2b992-ee19-41dd-ac15-54f2447d2476",
+          "train_id": "4a1a1cc6-2008-4305-885d-7c68a2d78f8d",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": "14:37",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "0c8e4faf-ccf7-49d9-b906-26276a267247",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-8",
+      "color": "#fb923c",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "FWD",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "9a9ab415-9501-4f74-ad6d-dce6aea2d89e",
+          "train_id": "0c8e4faf-ccf7-49d9-b906-26276a267247",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "16:08",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "d85af498-2275-4ace-b152-2516c10d35e3",
+          "train_id": "0c8e4faf-ccf7-49d9-b906-26276a267247",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "15:22",
+          "departure": "15:40",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "8ff02406-bdef-4876-92f6-dcebdd9c6659",
+          "train_id": "0c8e4faf-ccf7-49d9-b906-26276a267247",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": null,
+          "departure": "15:00",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "5bfc6dc7-f483-4113-9a3c-07471f50bd47",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-9",
+      "color": "#fb923c",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "REV",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "91d67b59-93e4-4536-8737-2c4f9b46bc3e",
+          "train_id": "5bfc6dc7-f483-4113-9a3c-07471f50bd47",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "16:25",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "d4ca1a61-dce7-4e2c-b146-98a6e20d8baf",
+          "train_id": "5bfc6dc7-f483-4113-9a3c-07471f50bd47",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "16:53",
+          "departure": "17:10",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "95c64c16-3311-4302-956e-876690ad032f",
+          "train_id": "5bfc6dc7-f483-4113-9a3c-07471f50bd47",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": "17:32",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "18dc1770-5c4f-453b-9a5a-a69aa0dc5873",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "8L03",
+      "color": "#22c55e",
+      "notes": "",
+      "train_id": "",
+      "direction": "",
+      "crew_id": "b6768c52-2750-407e-8036-112fb0f86ef0",
+      "stops": [
+        {
+          "id": "69503ba0-2050-43fe-8d29-18bcaf1886f4",
+          "train_id": "18dc1770-5c4f-453b-9a5a-a69aa0dc5873",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "16:50",
+          "departure": "17:05",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "6fee9789-db1e-4a34-abb3-d9afaaa47817",
+          "train_id": "18dc1770-5c4f-453b-9a5a-a69aa0dc5873",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "17:10",
+          "departure": "18:00",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "208f1bf8-73fe-43c4-83b9-2aebfd8da200",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "C440",
+      "color": "#22c55e",
+      "notes": "",
+      "train_id": "CityRail 3L",
+      "direction": "REV",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "7d21ab68-110a-42ea-b5ca-8092e47b7c44",
+          "train_id": "208f1bf8-73fe-43c4-83b9-2aebfd8da200",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "16:44",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": "Wollongong"
+        },
+        {
+          "id": "3ff8b23f-eb89-4db1-adf9-e21ea3642c34",
+          "train_id": "208f1bf8-73fe-43c4-83b9-2aebfd8da200",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "16:19",
+          "departure": "16:19",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "1f0754e2-a0f2-4958-ba0c-c222fa9a9069",
+          "train_id": "208f1bf8-73fe-43c4-83b9-2aebfd8da200",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "16:07",
+          "departure": "16:07",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "144234ce-d92b-49ac-9e48-47ff626317d5",
+          "train_id": "208f1bf8-73fe-43c4-83b9-2aebfd8da200",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "16:00",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "cc905c1b-d442-426e-8cf1-53032ca470fe",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "C435",
+      "color": "#f59e0b",
+      "notes": "",
+      "train_id": "CityRail 3L",
+      "direction": "FWD",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "1287be82-4a79-47dc-9f00-afd264219e1f",
+          "train_id": "cc905c1b-d442-426e-8cf1-53032ca470fe",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": null,
+          "departure": "15:00",
+          "special_instructions": null,
+          "location_alias": "Wollongong"
+        },
+        {
+          "id": "02f8f176-e92f-496a-a146-e4564d3cb4aa",
+          "train_id": "cc905c1b-d442-426e-8cf1-53032ca470fe",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "15:25",
+          "departure": "15:25",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "e4a566a8-7818-4f28-908c-b472711456c9",
+          "train_id": "cc905c1b-d442-426e-8cf1-53032ca470fe",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "15:37",
+          "departure": "15:37",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "a97dfb9f-f375-4572-8b4e-18b12c6fd36f",
+          "train_id": "cc905c1b-d442-426e-8cf1-53032ca470fe",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "15:44",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "935bd441-d0f5-42d1-b45a-71a164e38071",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K358",
+      "color": "#fb923c",
+      "notes": "",
+      "train_id": "CityRail 2L",
+      "direction": "REV",
+      "crew_id": null,
+      "stops": [
+        {
+          "id": "b110bb94-4835-46a3-8e63-15b445247698",
+          "train_id": "935bd441-d0f5-42d1-b45a-71a164e38071",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": null,
+          "departure": "16:23",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "0a11efb5-2f46-4d43-845d-9b358546d5ff",
+          "train_id": "935bd441-d0f5-42d1-b45a-71a164e38071",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "16:30",
+          "departure": "16:30",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "31f05492-9aee-483b-9ed8-ca426dced86f",
+          "train_id": "935bd441-d0f5-42d1-b45a-71a164e38071",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "16:42",
+          "departure": "16:42",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "e30db7f7-e20e-4b65-ba2f-a3585ab6ce76",
+          "train_id": "935bd441-d0f5-42d1-b45a-71a164e38071",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "16:49",
+          "departure": "16:49",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "b1d6d771-d93c-4d00-b7a3-bdc0b71ab35e",
+          "train_id": "935bd441-d0f5-42d1-b45a-71a164e38071",
+          "station_id": "b7d7dc41-aa65-4159-8dc8-9bb2a6fc5cf8",
+          "arrival": "17:01",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "88456ef0-b4d7-4364-a503-7aa8cb5a4931",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "C445",
+      "color": "#ef4444",
+      "notes": "You are driving a sound equipped V-Set! Ensure the functions with an asterisk (*) are enabled to give the best experience to the crews onsite",
+      "train_id": "CityRail 6V",
+      "direction": "FWD",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "b7d71d7e-927f-482d-a35c-b70643a9727d",
+          "train_id": "88456ef0-b4d7-4364-a503-7aa8cb5a4931",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": null,
+          "departure": "18:30",
+          "special_instructions": null,
+          "location_alias": "Sydney Terminal"
+        },
+        {
+          "id": "f546b813-0f95-488a-a3f8-71befb1ae7d2",
+          "train_id": "88456ef0-b4d7-4364-a503-7aa8cb5a4931",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "18:55",
+          "departure": "18:55",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "c38856e3-dad0-4de6-862c-a705807f190b",
+          "train_id": "88456ef0-b4d7-4364-a503-7aa8cb5a4931",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "19:14",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "4fc2b3ed-7415-4a2b-a715-a7450fc1e6c5",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-11",
+      "color": "#ef4444",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "REV",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "41f37220-2bf3-46cc-9b8f-c9f8f85e957e",
+          "train_id": "4fc2b3ed-7415-4a2b-a715-a7450fc1e6c5",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "20:00",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "7295dd59-f22d-4020-843e-73389f08c497",
+          "train_id": "4fc2b3ed-7415-4a2b-a715-a7450fc1e6c5",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "20:28",
+          "departure": "20:40",
+          "special_instructions": "You are crossing a freight train at Berry. Set back into the Siding under the direction of the Berry Signaller",
+          "location_alias": null
+        },
+        {
+          "id": "d0146028-7576-403b-b557-36b83f5cc944",
+          "train_id": "4fc2b3ed-7415-4a2b-a715-a7450fc1e6c5",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": "21:02",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "042432cc-de59-4181-ab00-e44653aafb93",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K359",
+      "color": "#06b6d4",
+      "notes": "",
+      "train_id": "CityRail 2L",
+      "direction": "FWD",
+      "crew_id": null,
+      "stops": [
+        {
+          "id": "c8c3925c-1222-4653-9401-dc4c4c02a2a9",
+          "train_id": "042432cc-de59-4181-ab00-e44653aafb93",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": "19:44",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "03ac6cbb-527d-4847-8e5c-6ae9694c5279",
+          "train_id": "042432cc-de59-4181-ab00-e44653aafb93",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "19:37",
+          "departure": "19:37",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "d95f4922-f580-4cca-953d-293018c6fec4",
+          "train_id": "042432cc-de59-4181-ab00-e44653aafb93",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "18:57",
+          "departure": "19:25",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "4390ef39-56f0-48bf-8e58-393f5c78001e",
+          "train_id": "042432cc-de59-4181-ab00-e44653aafb93",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "18:50",
+          "departure": "18:50",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "2c099ad5-a316-4b2e-9de7-e26d2afc3a62",
+          "train_id": "042432cc-de59-4181-ab00-e44653aafb93",
+          "station_id": "b7d7dc41-aa65-4159-8dc8-9bb2a6fc5cf8",
+          "arrival": null,
+          "departure": "18:40",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "fe659c23-b465-4621-92f0-4b83dc905fe9",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K360",
+      "color": "#06b6d4",
+      "notes": "",
+      "train_id": "CityRail 2L",
+      "direction": "REV",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "dc94fe5a-dade-41a9-a977-ad94cda4f607",
+          "train_id": "fe659c23-b465-4621-92f0-4b83dc905fe9",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": null,
+          "departure": "20:30",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "38424394-0b6e-4bcf-9153-a0e6cb4d00a5",
+          "train_id": "fe659c23-b465-4621-92f0-4b83dc905fe9",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "20:37",
+          "departure": "20:37",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "8cea3f65-1f73-4b9d-84fe-602f1e9381c3",
+          "train_id": "fe659c23-b465-4621-92f0-4b83dc905fe9",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "20:49",
+          "departure": "20:49",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "9cc7e160-a9da-48b4-a765-6556d1d98fad",
+          "train_id": "fe659c23-b465-4621-92f0-4b83dc905fe9",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "20:56",
+          "departure": "20:56",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "81a461ca-660e-40bc-8d76-0accced4b961",
+          "train_id": "fe659c23-b465-4621-92f0-4b83dc905fe9",
+          "station_id": "b7d7dc41-aa65-4159-8dc8-9bb2a6fc5cf8",
+          "arrival": "21:06",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "128fc663-6c2f-4199-9620-74f94cbb7408",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KN-12",
+      "color": "#f97316",
+      "notes": "",
+      "train_id": "CityRail 2E-2",
+      "direction": "FWD",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "68cde308-8956-454c-823a-849a81c821ae",
+          "train_id": "128fc663-6c2f-4199-9620-74f94cbb7408",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "23:13",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": "Wollongong"
+        },
+        {
+          "id": "a7b420df-1c65-4206-a166-14654ce12037",
+          "train_id": "128fc663-6c2f-4199-9620-74f94cbb7408",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "22:54",
+          "departure": "22:54",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "3979e6be-53d3-4fe7-b9d1-28bb79ca4630",
+          "train_id": "128fc663-6c2f-4199-9620-74f94cbb7408",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "22:46",
+          "departure": "22:46",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "3f868ad4-44f6-4d9d-9559-ddfa229cd576",
+          "train_id": "128fc663-6c2f-4199-9620-74f94cbb7408",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "22:20",
+          "departure": "22:40",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "108fd5c5-029d-4b48-9e42-a2b6f1c5ba6b",
+          "train_id": "128fc663-6c2f-4199-9620-74f94cbb7408",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "21:52",
+          "departure": "21:52",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "2f41ee39-78fb-43fd-a73d-823b2a23e658",
+          "train_id": "128fc663-6c2f-4199-9620-74f94cbb7408",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": null,
+          "departure": "21:30",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "de474eeb-c411-4cde-a482-dfcd0f4c309f",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "8982",
+      "color": "#a855f7",
+      "notes": "Down ARG Flour ex. Manildra (MHGX Rake)",
+      "train_id": "603(F) + 502(R)",
+      "direction": "",
+      "crew_id": "024cf64a-923b-4290-a15b-2a7582a32ef2",
+      "stops": [
+        {
+          "id": "e6174ff2-aa4b-4acd-8243-932900fd01e6",
+          "train_id": "de474eeb-c411-4cde-a482-dfcd0f4c309f",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "20:45",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "b2e52f11-f373-41b9-b63f-2e524577c07c",
+          "train_id": "de474eeb-c411-4cde-a482-dfcd0f4c309f",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "21:04",
+          "departure": "22:20",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "f1a03b97-2f89-4088-b400-bea141a1ba50",
+          "train_id": "de474eeb-c411-4cde-a482-dfcd0f4c309f",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "22:28",
+          "departure": "22:28",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "2b561121-a92d-4fb0-b023-b81edc07fac0",
+          "train_id": "de474eeb-c411-4cde-a482-dfcd0f4c309f",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "22:34",
+          "departure": "22:34",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "5f1d9436-079a-4974-9393-1619f2b7058b",
+          "train_id": "de474eeb-c411-4cde-a482-dfcd0f4c309f",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "23:02",
+          "departure": "23:02",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "fad60c56-d267-48a0-82ed-1c85b1d19e60",
+          "train_id": "de474eeb-c411-4cde-a482-dfcd0f4c309f",
+          "station_id": "d341441f-06db-4bc9-bd37-1bbcb042a0c6",
+          "arrival": "23:24",
+          "departure": null,
+          "special_instructions": "Stable Train in Yard ready to be unloaded by the next shift.",
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "6e3e6371-54fc-4bd6-bae5-5547e51bed0b",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "C448",
+      "color": "#14b8a6",
+      "notes": "",
+      "train_id": "CityRail 6V",
+      "direction": "REV",
+      "crew_id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "stops": [
+        {
+          "id": "ee154c06-d5a4-49ed-a4d0-584adb6acf02",
+          "train_id": "6e3e6371-54fc-4bd6-bae5-5547e51bed0b",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "22:08",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": "Sydney Terminal"
+        },
+        {
+          "id": "6660d5f3-6027-4723-93f1-92221e727ce6",
+          "train_id": "6e3e6371-54fc-4bd6-bae5-5547e51bed0b",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "21:49",
+          "departure": "21:49",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "8de558ab-b573-4bf2-ab96-1328ccc4a35d",
+          "train_id": "6e3e6371-54fc-4bd6-bae5-5547e51bed0b",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "21:37",
+          "departure": "21:37",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "3c532e22-e1cd-4d36-b88a-baf9e5979e80",
+          "train_id": "6e3e6371-54fc-4bd6-bae5-5547e51bed0b",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": null,
+          "departure": "21:30",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "8bdc4694-9543-4170-8531-de156e5cd3ec",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "9102",
+      "color": "#ec4899",
+      "notes": "Up combined Ballast ex. Bombo",
+      "train_id": "C503, 44204",
+      "direction": "",
+      "crew_id": "b6768c52-2750-407e-8036-112fb0f86ef0",
+      "stops": [
+        {
+          "id": "aaead352-b3dc-4fa0-a03e-8eda825dc955",
+          "train_id": "8bdc4694-9543-4170-8531-de156e5cd3ec",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "21:52",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "843707b9-1c52-42d6-a086-73259cfc7970",
+          "train_id": "8bdc4694-9543-4170-8531-de156e5cd3ec",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "21:27",
+          "departure": "21:27",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "69909f8f-457e-4944-824f-0ff0bd79a196",
+          "train_id": "8bdc4694-9543-4170-8531-de156e5cd3ec",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "20:00",
+          "departure": "21:15",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "3f14196b-b485-4e6a-9988-9568b7a42517",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "9382",
+      "color": "#84cc16",
+      "notes": "Up Empty Grain to Manildra. (MGFH Rake)\nRefuel Engines Before Departure",
+      "train_id": "",
+      "direction": "",
+      "crew_id": "024cf64a-923b-4290-a15b-2a7582a32ef2",
+      "stops": [
+        {
+          "id": "f30f6417-1d7d-4d31-acd3-e73dcf701367",
+          "train_id": "3f14196b-b485-4e6a-9988-9568b7a42517",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "18:03",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "8b6eba09-563f-4a0b-a8db-1a9637e184f1",
+          "train_id": "3f14196b-b485-4e6a-9988-9568b7a42517",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "17:44",
+          "departure": "17:44",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "1d326a3c-88d7-443f-aae3-064afd208ab4",
+          "train_id": "3f14196b-b485-4e6a-9988-9568b7a42517",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "17:36",
+          "departure": "17:36",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "a32241bc-9d60-4777-bdde-14a5e2a2811c",
+          "train_id": "3f14196b-b485-4e6a-9988-9568b7a42517",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "17:30",
+          "departure": "17:30",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "fbc00c8b-73a8-486f-a931-6bbf58676f52",
+          "train_id": "3f14196b-b485-4e6a-9988-9568b7a42517",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "17:02",
+          "departure": "17:02",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "1cc617f8-fe94-46da-96f8-2e6e3a3845b5",
+          "train_id": "3f14196b-b485-4e6a-9988-9568b7a42517",
+          "station_id": "d341441f-06db-4bc9-bd37-1bbcb042a0c6",
+          "arrival": null,
+          "departure": "16:40",
+          "special_instructions": "Run cars through the unloader operators console (tablet) near the ProtoThrottle. Attach to 9881 in STS",
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "c428f925-95b6-41bd-b619-0e1428cffed1",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "9951",
+      "color": "#fb923c",
+      "notes": "Down Perishables - KH\nHold at Berry Home Signal for KH Service.",
+      "train_id": "",
+      "direction": "",
+      "crew_id": "024cf64a-923b-4290-a15b-2a7582a32ef2",
+      "stops": [
+        {
+          "id": "cdab4941-743c-4c76-a2c9-c6a931855593",
+          "train_id": "c428f925-95b6-41bd-b619-0e1428cffed1",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": null,
+          "departure": "07:14",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "e4975443-f8c1-4828-bd29-cc6d25f1112b",
+          "train_id": "c428f925-95b6-41bd-b619-0e1428cffed1",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "07:24",
+          "departure": "07:24",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "11732853-5267-43a6-9803-240f95a7a533",
+          "train_id": "c428f925-95b6-41bd-b619-0e1428cffed1",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "07:32",
+          "departure": "07:32",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "84fe476b-97e0-443f-8101-39730646e9d2",
+          "train_id": "c428f925-95b6-41bd-b619-0e1428cffed1",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "07:38",
+          "departure": "07:38",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "97240cc1-61c6-4592-9916-b2c6d988b5a0",
+          "train_id": "c428f925-95b6-41bd-b619-0e1428cffed1",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "08:06",
+          "departure": "09:06",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "d3131c3a-0ac8-47df-b70c-227a9e58aa42",
+          "train_id": "c428f925-95b6-41bd-b619-0e1428cffed1",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": "09:28",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "9346273e-7314-489a-b61c-8ae08e998a68",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "K355",
+      "color": "#22c55e",
+      "notes": "",
+      "train_id": "CityRail 2L",
+      "direction": "FWD",
+      "crew_id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "stops": [
+        {
+          "id": "d7488aee-6517-4419-9193-66b49fcf8d17",
+          "train_id": "9346273e-7314-489a-b61c-8ae08e998a68",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": "10:31",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "28429151-87ea-4c9b-9471-6ac458b4c3a9",
+          "train_id": "9346273e-7314-489a-b61c-8ae08e998a68",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "10:24",
+          "departure": "10:24",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "edb11a9d-0763-4f48-9b4b-59db8266c9de",
+          "train_id": "9346273e-7314-489a-b61c-8ae08e998a68",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "10:12",
+          "departure": "10:12",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "5329f4a1-a593-4f11-a5d6-5d94a8a3ca9b",
+          "train_id": "9346273e-7314-489a-b61c-8ae08e998a68",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "10:05",
+          "departure": "10:05",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "ffcf107c-1c93-4e76-9a43-9914621f82aa",
+          "train_id": "9346273e-7314-489a-b61c-8ae08e998a68",
+          "station_id": "b7d7dc41-aa65-4159-8dc8-9bb2a6fc5cf8",
+          "arrival": null,
+          "departure": "09:55",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "0e7d6613-c7f4-4569-bce9-67dbf5098447",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "1981",
+      "color": "#ec4899",
+      "notes": "Down Empty Export Containers ex. Rozelle to Shoalhaven Starches",
+      "train_id": "CLP10(F) + 3103(R) + 4814(R)",
+      "direction": "",
+      "crew_id": "99428af7-c6d4-4266-b1d8-8c4f806aed52",
+      "stops": [
+        {
+          "id": "c39a084f-6b77-4464-8e67-5cb62f4a06a8",
+          "train_id": "0e7d6613-c7f4-4569-bce9-67dbf5098447",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "00:20",
+          "departure": "01:20",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "9fc9f511-02a4-46f8-8340-b9a530c77c6f",
+          "train_id": "0e7d6613-c7f4-4569-bce9-67dbf5098447",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "01:35",
+          "departure": "01:35",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "0c1d9ec9-d78e-4e52-85cd-f0e49b8be639",
+          "train_id": "0e7d6613-c7f4-4569-bce9-67dbf5098447",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "01:41",
+          "departure": "01:41",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "335720c6-cd13-494a-843d-9b604c0c9aa1",
+          "train_id": "0e7d6613-c7f4-4569-bce9-67dbf5098447",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "02:09",
+          "departure": "02:09",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "9a0e9038-7bea-4254-a5e5-f88d6da181b8",
+          "train_id": "0e7d6613-c7f4-4569-bce9-67dbf5098447",
+          "station_id": "d341441f-06db-4bc9-bd37-1bbcb042a0c6",
+          "arrival": "02:31",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "da152aa5-22a5-46fd-8791-8c2cffd66f39",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "9152",
+      "color": "#8b5cf6",
+      "notes": "Up Perishables to Leightonfield",
+      "train_id": "",
+      "direction": "",
+      "crew_id": "024cf64a-923b-4290-a15b-2a7582a32ef2",
+      "stops": [
+        {
+          "id": "92e14e6e-c16e-496a-a800-fdff16dd0182",
+          "train_id": "da152aa5-22a5-46fd-8791-8c2cffd66f39",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "13:20",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "6b9c7d5c-6249-4a0d-bc50-e34cf5b477b2",
+          "train_id": "da152aa5-22a5-46fd-8791-8c2cffd66f39",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "12:01",
+          "departure": "13:01",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "05d6f4cb-5034-4031-b7af-4c0adee6afe2",
+          "train_id": "da152aa5-22a5-46fd-8791-8c2cffd66f39",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "11:39",
+          "departure": "11:53",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "4e0e3d81-02b0-40df-8729-3bd8b8925843",
+          "train_id": "da152aa5-22a5-46fd-8791-8c2cffd66f39",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "11:35",
+          "departure": "11:35",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "e051329e-549b-46b2-8f41-d258f5ccf51e",
+          "train_id": "da152aa5-22a5-46fd-8791-8c2cffd66f39",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "11:07",
+          "departure": "11:07",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "056b8304-d8fd-4f68-8c54-38af5bdf2688",
+          "train_id": "da152aa5-22a5-46fd-8791-8c2cffd66f39",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "arrival": null,
+          "departure": "10:45",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "2766b13b-e656-40b2-8551-b07135e4c3d8",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "9182",
+      "color": "#14b8a6",
+      "notes": "Up ARG Containers to Rozelle.",
+      "train_id": "",
+      "direction": "",
+      "crew_id": "99428af7-c6d4-4266-b1d8-8c4f806aed52",
+      "stops": [
+        {
+          "id": "4e4fcbba-3170-4486-8b92-4f23dfcc892f",
+          "train_id": "2766b13b-e656-40b2-8551-b07135e4c3d8",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "arrival": "11:38",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "a06d502b-526f-4d78-9864-b74aa48ced69",
+          "train_id": "2766b13b-e656-40b2-8551-b07135e4c3d8",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "11:19",
+          "departure": "11:19",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "10736a90-f46c-4a0b-ac77-46eadfdbeb5d",
+          "train_id": "2766b13b-e656-40b2-8551-b07135e4c3d8",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "11:11",
+          "departure": "11:11",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "f3a7a0af-f757-4ebc-be40-76f8400ea20c",
+          "train_id": "2766b13b-e656-40b2-8551-b07135e4c3d8",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "11:05",
+          "departure": "11:05",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "b4dcc52d-3b43-4dc3-bf7d-c52dff28e403",
+          "train_id": "2766b13b-e656-40b2-8551-b07135e4c3d8",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "10:37",
+          "departure": "10:37",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "8d6891ed-1482-4921-8744-bdf12cc2ada5",
+          "train_id": "2766b13b-e656-40b2-8551-b07135e4c3d8",
+          "station_id": "d341441f-06db-4bc9-bd37-1bbcb042a0c6",
+          "arrival": null,
+          "departure": "10:15",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "2292068b-c77d-48bc-b453-a6908f9610cc",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "1953",
+      "color": "#c084fc",
+      "notes": "Down SCT Van Train - Stables in Int. Siding for Next Session",
+      "train_id": "SCT008(F) + SCT006(R)",
+      "direction": "",
+      "crew_id": "024cf64a-923b-4290-a15b-2a7582a32ef2",
+      "stops": [
+        {
+          "id": "7a7bcaae-0542-4be3-9120-335ff4a49f2a",
+          "train_id": "2292068b-c77d-48bc-b453-a6908f9610cc",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "14:35",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "04d4757f-2524-40b5-ba7f-7c10153e3168",
+          "train_id": "2292068b-c77d-48bc-b453-a6908f9610cc",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "14:54",
+          "departure": "14:54",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "d1bfff0a-b252-4ce8-aab4-333b917e46b3",
+          "train_id": "2292068b-c77d-48bc-b453-a6908f9610cc",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "15:02",
+          "departure": "15:02",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "2b3aa7b5-1a20-4c55-bc00-458855543097",
+          "train_id": "2292068b-c77d-48bc-b453-a6908f9610cc",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "15:08",
+          "departure": "15:08",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "269ec481-f04a-481b-b439-d3cfe2bc8d05",
+          "train_id": "2292068b-c77d-48bc-b453-a6908f9610cc",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "15:36",
+          "departure": "15:36",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "ba34c1e0-1a1e-4995-909a-384546d5258e",
+          "train_id": "2292068b-c77d-48bc-b453-a6908f9610cc",
+          "station_id": "d341441f-06db-4bc9-bd37-1bbcb042a0c6",
+          "arrival": "15:58",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "8ddff33b-40a2-42b7-8011-c5324242d0e4",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "1903",
+      "color": "#3b82f6",
+      "notes": "",
+      "train_id": "44204 (F)",
+      "direction": "",
+      "crew_id": "99428af7-c6d4-4266-b1d8-8c4f806aed52",
+      "stops": [
+        {
+          "id": "8cd461c3-b9c8-48c4-97be-327972723168",
+          "train_id": "8ddff33b-40a2-42b7-8011-c5324242d0e4",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "arrival": null,
+          "departure": "05:00",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "cb8dcc25-825f-4492-8b97-cb9af857bc5e",
+          "train_id": "8ddff33b-40a2-42b7-8011-c5324242d0e4",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "05:19",
+          "departure": "06:00",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "6c213dad-a68c-468a-826e-3612e16c1374",
+          "train_id": "8ddff33b-40a2-42b7-8011-c5324242d0e4",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "06:08",
+          "departure": "07:15",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    },
+    {
+      "id": "49baa056-1b9f-4cfa-bc77-2c8f6e97d52f",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "9983",
+      "color": "#8b5cf6",
+      "notes": "Refuel Engine before departure",
+      "train_id": "",
+      "direction": "",
+      "crew_id": "99428af7-c6d4-4266-b1d8-8c4f806aed52",
+      "stops": [
+        {
+          "id": "53d7539b-ad01-4827-9fac-7c68003a4abe",
+          "train_id": "49baa056-1b9f-4cfa-bc77-2c8f6e97d52f",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "arrival": "20:04",
+          "departure": null,
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "c872f729-ef54-46f1-9cda-9197db1182f2",
+          "train_id": "49baa056-1b9f-4cfa-bc77-2c8f6e97d52f",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "arrival": "19:54",
+          "departure": "19:54",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "19b9ab53-a260-404a-9c55-c81a3efe3eb3",
+          "train_id": "49baa056-1b9f-4cfa-bc77-2c8f6e97d52f",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "arrival": "19:46",
+          "departure": "19:46",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "328551f3-d22c-4e25-b44d-412b3e63abda",
+          "train_id": "49baa056-1b9f-4cfa-bc77-2c8f6e97d52f",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "arrival": "19:40",
+          "departure": "19:40",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "ade2acb8-eca5-4c3b-aeb1-e09be9595f06",
+          "train_id": "49baa056-1b9f-4cfa-bc77-2c8f6e97d52f",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "arrival": "19:12",
+          "departure": "19:12",
+          "special_instructions": null,
+          "location_alias": null
+        },
+        {
+          "id": "86daefac-e1c2-4658-990e-5628f03fdb4c",
+          "train_id": "49baa056-1b9f-4cfa-bc77-2c8f6e97d52f",
+          "station_id": "d341441f-06db-4bc9-bd37-1bbcb042a0c6",
+          "arrival": null,
+          "departure": "18:50",
+          "special_instructions": null,
+          "location_alias": null
+        }
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "id": "95c9d057-7d4a-455b-bb76-fdfe3d298693",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Staging (Down) -> Nowra",
+      "stops": [
+        {
+          "id": "8d6c52d4-835a-463c-9b16-fa529adf68c6",
+          "path_id": "95c9d057-7d4a-455b-bb76-fdfe3d298693",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "sort_order": 0,
+          "travel_time_from_prev": 0,
+          "dwell_time": 0
+        },
+        {
+          "id": "5c194275-094b-4a1d-9c0b-716334f09e7c",
+          "path_id": "95c9d057-7d4a-455b-bb76-fdfe3d298693",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "sort_order": 1,
+          "travel_time_from_prev": 19,
+          "dwell_time": 0
+        },
+        {
+          "id": "d6b2de66-922f-4f9a-89d2-90d8e7710032",
+          "path_id": "95c9d057-7d4a-455b-bb76-fdfe3d298693",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "sort_order": 2,
+          "travel_time_from_prev": 8,
+          "dwell_time": 0
+        },
+        {
+          "id": "ae65135f-e369-48c0-8627-287540e8355f",
+          "path_id": "95c9d057-7d4a-455b-bb76-fdfe3d298693",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "sort_order": 3,
+          "travel_time_from_prev": 6,
+          "dwell_time": 0
+        },
+        {
+          "id": "967b4bd5-59ca-4aa8-b29a-d9b6bad6eb90",
+          "path_id": "95c9d057-7d4a-455b-bb76-fdfe3d298693",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "sort_order": 4,
+          "travel_time_from_prev": 28,
+          "dwell_time": 0
+        },
+        {
+          "id": "714348bd-51c4-4f33-afe7-f95d48deea21",
+          "path_id": "95c9d057-7d4a-455b-bb76-fdfe3d298693",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "sort_order": 5,
+          "travel_time_from_prev": 22,
+          "dwell_time": 0
+        }
+      ]
+    },
+    {
+      "id": "87c85820-ec61-4bf4-82ed-226f1620b95b",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Nowra -> Staging (Up)",
+      "stops": [
+        {
+          "id": "b79a8023-dbf6-4a73-9377-a8e49423dedb",
+          "path_id": "87c85820-ec61-4bf4-82ed-226f1620b95b",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "sort_order": 0,
+          "travel_time_from_prev": 0,
+          "dwell_time": 0
+        },
+        {
+          "id": "09c58240-5d41-47f3-88e4-384006f8ef71",
+          "path_id": "87c85820-ec61-4bf4-82ed-226f1620b95b",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "sort_order": 1,
+          "travel_time_from_prev": 22,
+          "dwell_time": 0
+        },
+        {
+          "id": "a7dfc67d-8163-4edf-96a4-de88ffbee855",
+          "path_id": "87c85820-ec61-4bf4-82ed-226f1620b95b",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "sort_order": 2,
+          "travel_time_from_prev": 28,
+          "dwell_time": 0
+        },
+        {
+          "id": "b21ff61d-9635-4074-8948-08805fccd143",
+          "path_id": "87c85820-ec61-4bf4-82ed-226f1620b95b",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "sort_order": 3,
+          "travel_time_from_prev": 6,
+          "dwell_time": 0
+        },
+        {
+          "id": "08103c1d-2f39-45de-87a3-8faa02d515e2",
+          "path_id": "87c85820-ec61-4bf4-82ed-226f1620b95b",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "sort_order": 4,
+          "travel_time_from_prev": 8,
+          "dwell_time": 0
+        },
+        {
+          "id": "87a9a172-d38c-49a8-a63d-c57a7e64331f",
+          "path_id": "87c85820-ec61-4bf4-82ed-226f1620b95b",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "sort_order": 5,
+          "travel_time_from_prev": 19,
+          "dwell_time": 0
+        }
+      ]
+    },
+    {
+      "id": "c057c189-ac0b-4d18-a368-321330c2acbd",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Kembla Hts -> Nowra",
+      "stops": [
+        {
+          "id": "8f4b3755-220a-41a2-8bd9-6db76d545f6a",
+          "path_id": "c057c189-ac0b-4d18-a368-321330c2acbd",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "sort_order": 0,
+          "travel_time_from_prev": 0,
+          "dwell_time": 0
+        },
+        {
+          "id": "890cb7de-3795-41da-8f61-6d1d4e2954ba",
+          "path_id": "c057c189-ac0b-4d18-a368-321330c2acbd",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "sort_order": 1,
+          "travel_time_from_prev": 6,
+          "dwell_time": 0
+        },
+        {
+          "id": "91b62d1d-db98-4f5c-a391-bb43762d76cb",
+          "path_id": "c057c189-ac0b-4d18-a368-321330c2acbd",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "sort_order": 2,
+          "travel_time_from_prev": 8,
+          "dwell_time": 0
+        },
+        {
+          "id": "62c81352-fa64-4da2-b73e-5d79d3481f55",
+          "path_id": "c057c189-ac0b-4d18-a368-321330c2acbd",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "sort_order": 3,
+          "travel_time_from_prev": 6,
+          "dwell_time": 0
+        },
+        {
+          "id": "196349e7-c5d7-4d39-90a7-675f25f6a055",
+          "path_id": "c057c189-ac0b-4d18-a368-321330c2acbd",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "sort_order": 4,
+          "travel_time_from_prev": 28,
+          "dwell_time": 0
+        },
+        {
+          "id": "ad8a27e7-b4ae-4c54-a72c-d3039dcc3618",
+          "path_id": "c057c189-ac0b-4d18-a368-321330c2acbd",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "sort_order": 5,
+          "travel_time_from_prev": 22,
+          "dwell_time": 0
+        }
+      ]
+    },
+    {
+      "id": "5f7c1149-5948-454a-9799-571934337cdc",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Kiama -> Kembla Hts",
+      "stops": [
+        {
+          "id": "47f4ad59-1517-4325-a5b4-ef32193c3d53",
+          "path_id": "5f7c1149-5948-454a-9799-571934337cdc",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "sort_order": 0,
+          "travel_time_from_prev": 0,
+          "dwell_time": 0
+        },
+        {
+          "id": "73e1e199-22a6-4960-8b2d-1999ef5a4bc4",
+          "path_id": "5f7c1149-5948-454a-9799-571934337cdc",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "sort_order": 1,
+          "travel_time_from_prev": 7,
+          "dwell_time": 0
+        },
+        {
+          "id": "8af15ffd-4ca8-4adb-868e-3cff2595aa37",
+          "path_id": "5f7c1149-5948-454a-9799-571934337cdc",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "sort_order": 2,
+          "travel_time_from_prev": 12,
+          "dwell_time": 0
+        },
+        {
+          "id": "1e694ab8-57d7-49ca-854f-264d74686a3d",
+          "path_id": "5f7c1149-5948-454a-9799-571934337cdc",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "sort_order": 3,
+          "travel_time_from_prev": 7,
+          "dwell_time": 0
+        }
+      ]
+    },
+    {
+      "id": "ae6421ab-7863-4f86-bfb0-cd9be81e3b97",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Kembla Hts -> Kiama",
+      "stops": [
+        {
+          "id": "14dabfb0-cd5c-4cf1-be63-b8f64ca0299e",
+          "path_id": "ae6421ab-7863-4f86-bfb0-cd9be81e3b97",
+          "station_id": "876f4779-5fd1-401f-b720-7eb38191999a",
+          "sort_order": 0,
+          "travel_time_from_prev": 0,
+          "dwell_time": 0
+        },
+        {
+          "id": "5fb42126-02a4-4d55-aab7-add52dffe0a1",
+          "path_id": "ae6421ab-7863-4f86-bfb0-cd9be81e3b97",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "sort_order": 1,
+          "travel_time_from_prev": 7,
+          "dwell_time": 0
+        },
+        {
+          "id": "b9e6d27c-4e61-4bbc-878b-03ac8461f2e7",
+          "path_id": "ae6421ab-7863-4f86-bfb0-cd9be81e3b97",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "sort_order": 2,
+          "travel_time_from_prev": 12,
+          "dwell_time": 0
+        },
+        {
+          "id": "84ffbae1-8257-4746-a8a3-b369b0e5e5d2",
+          "path_id": "ae6421ab-7863-4f86-bfb0-cd9be81e3b97",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "sort_order": 3,
+          "travel_time_from_prev": 7,
+          "dwell_time": 0
+        }
+      ]
+    },
+    {
+      "id": "af82d11f-3772-4eb6-9dcc-d9c85031c170",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Up Staging -> Kiama",
+      "stops": [
+        {
+          "id": "d6928389-6615-4831-940e-965c5dd1d0e5",
+          "path_id": "af82d11f-3772-4eb6-9dcc-d9c85031c170",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "sort_order": 0,
+          "travel_time_from_prev": 0,
+          "dwell_time": 0
+        },
+        {
+          "id": "24875090-a627-43ff-be70-64aaf31a50dd",
+          "path_id": "af82d11f-3772-4eb6-9dcc-d9c85031c170",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "sort_order": 1,
+          "travel_time_from_prev": 25,
+          "dwell_time": 0
+        },
+        {
+          "id": "680ad3bd-59ce-4e58-8475-e2e6db5c592f",
+          "path_id": "af82d11f-3772-4eb6-9dcc-d9c85031c170",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "sort_order": 2,
+          "travel_time_from_prev": 12,
+          "dwell_time": 0
+        },
+        {
+          "id": "622f296b-c102-4e44-8082-e25411674c30",
+          "path_id": "af82d11f-3772-4eb6-9dcc-d9c85031c170",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "sort_order": 3,
+          "travel_time_from_prev": 7,
+          "dwell_time": 0
+        }
+      ]
+    },
+    {
+      "id": "e8939dc3-78e7-4b3c-b4c3-589a6425a478",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Kiama -> Up Staging",
+      "stops": [
+        {
+          "id": "6a26d33d-610f-454b-a301-f1c063a91723",
+          "path_id": "e8939dc3-78e7-4b3c-b4c3-589a6425a478",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "sort_order": 0,
+          "travel_time_from_prev": 0,
+          "dwell_time": 0
+        },
+        {
+          "id": "c372046f-1616-476b-b7a8-fe704d0aadc8",
+          "path_id": "e8939dc3-78e7-4b3c-b4c3-589a6425a478",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "sort_order": 1,
+          "travel_time_from_prev": 7,
+          "dwell_time": 0
+        },
+        {
+          "id": "4671f664-8531-4769-8157-f22d830daa27",
+          "path_id": "e8939dc3-78e7-4b3c-b4c3-589a6425a478",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "sort_order": 2,
+          "travel_time_from_prev": 12,
+          "dwell_time": 0
+        },
+        {
+          "id": "10ea6043-330b-4aa3-886c-1a43178b5007",
+          "path_id": "e8939dc3-78e7-4b3c-b4c3-589a6425a478",
+          "station_id": "6bd650a2-7584-41e0-afe4-93e8775b4f7b",
+          "sort_order": 3,
+          "travel_time_from_prev": 25,
+          "dwell_time": 0
+        }
+      ]
+    },
+    {
+      "id": "78e69b21-363b-4dba-8d5c-af4fcf82bf4e",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "WOL Down Pass",
+      "stops": [
+        {
+          "id": "ed13168f-b348-4ad1-8bdf-5f7f6256a177",
+          "path_id": "78e69b21-363b-4dba-8d5c-af4fcf82bf4e",
+          "station_id": "eed592b1-e9f5-48e5-bec0-44bdd33fc652",
+          "sort_order": 0,
+          "travel_time_from_prev": 0,
+          "dwell_time": 0
+        },
+        {
+          "id": "e1d3f0dd-7cbb-44d5-99e7-d2979113a888",
+          "path_id": "78e69b21-363b-4dba-8d5c-af4fcf82bf4e",
+          "station_id": "592fd450-13b7-4e76-9d22-743645ebcdb5",
+          "sort_order": 1,
+          "travel_time_from_prev": 25,
+          "dwell_time": 0
+        },
+        {
+          "id": "4783abbe-ccdf-4c2b-8dd2-d58d3357cc88",
+          "path_id": "78e69b21-363b-4dba-8d5c-af4fcf82bf4e",
+          "station_id": "44673d22-912d-4108-b0ac-451459749273",
+          "sort_order": 2,
+          "travel_time_from_prev": 12,
+          "dwell_time": 0
+        },
+        {
+          "id": "c1b654c4-0f49-410c-90b6-6c6a1cfc6b93",
+          "path_id": "78e69b21-363b-4dba-8d5c-af4fcf82bf4e",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "sort_order": 3,
+          "travel_time_from_prev": 7,
+          "dwell_time": 0
+        },
+        {
+          "id": "c5e4b237-3860-4109-85e7-0fcb298ea050",
+          "path_id": "78e69b21-363b-4dba-8d5c-af4fcf82bf4e",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "sort_order": 4,
+          "travel_time_from_prev": 28,
+          "dwell_time": 0
+        },
+        {
+          "id": "03689967-be33-4621-a022-305c35b978e8",
+          "path_id": "78e69b21-363b-4dba-8d5c-af4fcf82bf4e",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "sort_order": 5,
+          "travel_time_from_prev": 22,
+          "dwell_time": 0
+        }
+      ]
+    },
+    {
+      "id": "b844962d-3a99-4530-90e8-856a5574b822",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Up Pass",
+      "stops": [
+        {
+          "id": "ff91d171-7a55-43b4-bd90-d1cf2d952d57",
+          "path_id": "b844962d-3a99-4530-90e8-856a5574b822",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "sort_order": 0,
+          "travel_time_from_prev": 0,
+          "dwell_time": 0
+        },
+        {
+          "id": "d2c80e7e-4fe0-4dd5-9305-9d23b863333b",
+          "path_id": "b844962d-3a99-4530-90e8-856a5574b822",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "sort_order": 1,
+          "travel_time_from_prev": 22,
+          "dwell_time": 0
+        },
+        {
+          "id": "392b9fa4-e070-490f-8ca1-7c39f381334d",
+          "path_id": "b844962d-3a99-4530-90e8-856a5574b822",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "sort_order": 2,
+          "travel_time_from_prev": 28,
+          "dwell_time": 0
+        }
+      ]
+    },
+    {
+      "id": "339778cc-de44-4893-b8d3-302ab07265cf",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "KIA Down Pass",
+      "stops": [
+        {
+          "id": "5bff9588-6a70-4daa-9406-ceab1e504669",
+          "path_id": "339778cc-de44-4893-b8d3-302ab07265cf",
+          "station_id": "762c4d27-45d2-42b5-b753-5106cdaa74cf",
+          "sort_order": 0,
+          "travel_time_from_prev": 0,
+          "dwell_time": 0
+        },
+        {
+          "id": "5cc542e6-ae65-4b16-ac8d-6881104124c3",
+          "path_id": "339778cc-de44-4893-b8d3-302ab07265cf",
+          "station_id": "136d1cc9-0b10-49a6-82b4-12e76a0df832",
+          "sort_order": 1,
+          "travel_time_from_prev": 28,
+          "dwell_time": 0
+        },
+        {
+          "id": "850db898-11b5-43e1-8c99-aaeb7a54a08e",
+          "path_id": "339778cc-de44-4893-b8d3-302ab07265cf",
+          "station_id": "e513c998-3249-4127-b03b-0c9826284fa5",
+          "sort_order": 2,
+          "travel_time_from_prev": 22,
+          "dwell_time": 0
+        }
+      ]
+    }
+  ],
+  "crews": [
+    {
+      "id": "b6768c52-2750-407e-8036-112fb0f86ef0",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Local Operator 1",
+      "color": "#144bb8",
+      "guard_visible": false
+    },
+    {
+      "id": "99428af7-c6d4-4266-b1d8-8c4f806aed52",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Local Operator 2",
+      "color": "#04b821",
+      "guard_visible": false
+    },
+    {
+      "id": "024cf64a-923b-4290-a15b-2a7582a32ef2",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Local Operator 3",
+      "color": "#b8b40e",
+      "guard_visible": false
+    },
+    {
+      "id": "9a836bf6-50c9-4653-b075-32d7bbc3fa3e",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Local Operator 4",
+      "color": "#94a3b8",
+      "guard_visible": true
+    },
+    {
+      "id": "08765ccb-b18a-4cbd-84b9-a4a073b7793e",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Local Operator 5",
+      "color": "#94a3b8",
+      "guard_visible": true
+    },
+    {
+      "id": "e251a5e3-6440-43fa-b050-1164da2aea7a",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "Local Operator 6",
+      "color": "#94a3b8",
+      "guard_visible": true
+    },
+    {
+      "id": "a2682b1f-f0b1-4cd9-95bf-b5af9d28b8b5",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "SSYM",
+      "color": "#94a3b8",
+      "guard_visible": false
+    },
+    {
+      "id": "4184b5cb-5031-4005-90ce-c4c1b22df705",
+      "timetable_id": "02a295d9-911a-41d5-b00a-7b04d23c5d86",
+      "name": "NYM",
+      "color": "#94a3b8",
+      "guard_visible": false
+    }
+  ]
+}

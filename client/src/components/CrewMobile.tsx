@@ -5,6 +5,7 @@ import { useFastClock } from '../hooks/useFastClock';
 import { useLiveTimetable } from '../hooks/useLiveTimetable';
 import { describeJobChange, diffJobs } from '../lib/jobDiff';
 import { switchMode } from '../lib/mode';
+import { helpUrl } from '../lib/help';
 import { timeToMinutes, useLocalStorage } from '../utils';
 import { ChangeToasts, useToasts } from './ChangeToasts';
 
@@ -612,6 +613,14 @@ export function CrewMobile() {
               title="Switch mode (guard panel, crew view, planner)"
               className="text-xs text-slate-400 hover:text-slate-200 border border-slate-700 rounded-md px-2 py-1 shrink-0"
             >Switch</button>
+            <a
+              href={helpUrl('crew-view.md')}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Help (opens on GitHub)"
+              aria-label="Help"
+              className="text-xs text-slate-400 hover:text-slate-200 border border-slate-700 rounded-md px-2 py-1 shrink-0"
+            >?</a>
           </div>
 
           {/* ── Row 2: timetable name / selector ── */}

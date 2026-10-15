@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { modeUrl } from './lib/mode';
 import type { LayoutConfig, Timetable, TimetableSummary, TimetableSettings, Train, TrainStop, ModalState, TrainRequest, Path, PathRequest } from './types';
 import { api } from './api';
+import { helpUrl } from './lib/help';
 import { useLocalStorage, timeToMinutes, exportCatsXml, exportCrewsXml, escapeHtml, stationNameStyle } from './utils';
 import { useFastClock } from './hooks/useFastClock';
 import { Sidebar } from './components/Sidebar';
@@ -971,6 +972,15 @@ export default function App() {
               <LayoutIcon />
               Layout
             </button>
+            <a
+              href={helpUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="User guide (opens on GitHub)"
+              className="flex items-center px-1.5 py-1.5 rounded text-xs transition-colors hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+            >
+              ? Help
+            </a>
           </div>
         </header>
 

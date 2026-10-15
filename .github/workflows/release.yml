@@ -57,7 +57,7 @@ jobs:
             ## Docker image
 
             ```
-            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}
             ```
 
             See [docker-compose.yml](docker-compose.yml) for a ready-to-run example.

@@ -6,6 +6,7 @@ import { requestWakeLock, unlockAudio } from '../../lib/audio';
 import { playSound } from '../../lib/sound';
 import { resolveProfile } from '../../lib/profiles';
 import { switchMode } from '../../lib/mode';
+import { helpUrl } from '../../lib/help';
 import { autoSelectTrain, currentStop, inRunningOrder, sequenceStops, sortByRun } from '../../lib/stops';
 import { describeJobChange, diffJobs } from '../../lib/jobDiff';
 import type { Timetable, Train } from '../../types';
@@ -455,6 +456,7 @@ export function GuardPanel() {
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); setPickingCrew(true); }}>Change crew</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); setHistoryOpen(true); }}>Changes from Control</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => { setMenuOpen(false); resetEvents(); }}>Reset events for this train</button>
+                <a className="w-full min-h-[48px] px-4 flex items-center hover:bg-slate-800" href={helpUrl('guard-panel.md')} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>Help</a>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={switchMode}>Switch mode</button>
                 <button className="w-full min-h-[48px] px-4 text-left hover:bg-slate-800" onClick={() => window.location.reload()}>Reload</button>
               </div>
