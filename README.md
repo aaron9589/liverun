@@ -18,7 +18,7 @@ LiveRun is a web app for model railway clubs and home layouts. Build your sessio
 | **Plan crew workloads** | Assign trains to crews by hand or with auto-assign, spot overlaps, filter the graph by crew |
 | **Speed up train entry** | Reusable route templates (paths) fill in every stop from one departure time |
 | **Print** | Station registers, the working timetable and the train graph |
-| **Follow jobs on a phone** | Crew jobs: your jobs in order, with live changes from Control. The Running board: everything running and when, with run tracking |
+| **Follow jobs on a phone** | Train Crew App: your jobs in order, with live changes from Control. The Crewing Manager: everything running and when, with run tracking |
 | **Request paths** | Crews ask Control for a path from their phone (with shunts and work stops); Control plots it on the graph and accepts or declines it. Every request is logged |
 | **Run trains from a tablet** | The guard panel: doors, DOIL and bell through JMRI, passenger boarding, hidden scripted events, Limit of Authority |
 | **Sync the fast clock** | From JMRI over MQTT, shown on the graph, phones and tablets |

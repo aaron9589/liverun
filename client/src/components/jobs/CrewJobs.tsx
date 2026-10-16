@@ -1,17 +1,17 @@
-// Crew jobs view at …/mobile (docs/path-requests-spec.md §3). Read-only: shows the
-// picked crew's jobs and follows Control's changes live. Never changes run state.
+// Train Crew App (Crew jobs) at …/mobile?view=jobs (docs/path-requests-spec.md §3): shows the picked crew's
+// jobs and follows Control's changes live. Crews can mark their own jobs run/done/reset.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveTimetable } from '../../hooks/useLiveTimetable';
 import { useFastClock } from '../../hooks/useFastClock';
 import { api } from '../../api';
-import { changeMobileView, switchMode } from '../../lib/mode';
+import { switchMode } from '../../lib/mode';
 import { helpUrl } from '../../lib/help';
 import { autoSelectTrain, sequenceStops, sortByRun } from '../../lib/stops';
 import { describeJobChange, diffJobs } from '../../lib/jobDiff';
-import { fmtMins } from '../../lib/crewJobs';
+import { fmtMins, nextOpenJob, parseOpenState } from '../../lib/crewJobs';
 import { setClockHint } from '../../lib/device';
 import { defaultFrom, requestForTrain, requestItems, requestToasts } from '../../lib/pathRequests';
-import type { PathRequestSubmit, Timetable } from '../../types';
+import type { PathRequestSubmit, Timetable, Train } from '../../types';
 import { ChangeToasts, useToasts } from '../ChangeToasts';
 import { CrewPicker } from './CrewPicker';
 import { JobCard } from './JobCard';
@@ -19,6 +19,7 @@ import { RequestCard } from './RequestCard';
 import { RequestForm } from './RequestForm';
 
 const crewKey = (ttId: string) => `jobs:crew:${ttId}`;
+const openKey = (ttId: string) => `jobs:open:${ttId}`;
 
 function readStore(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -106,7 +107,6 @@ export function CrewJobs() {
     writeStore(crewKey(timetable.id), id);
     setPickedCrew({ ttId: timetable.id, crewId: id });
     setPickingCrew(false);
-    setOpen(new Map());
   };
 
   // My jobs: only this crew's trains, in run order.
@@ -114,8 +114,23 @@ export function CrewJobs() {
     () => (timetable && crew ? sortByRun(timetable.trains.filter((t) => t.crew_id === crew.id)) : []),
     [timetable, crew],
   );
-  // The current or next job opens by itself; taps override per card.
-  const [open, setOpen] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+  // Open/closed cards are saved per timetable on this device. A job with no saved state
+  // opens by itself if it's the first not marked done; a request starts closed.
+  const [openState, setOpenState] = useState<{ ttId: string; map: Record<string, boolean> } | null>(null);
+  const open = timetable
+    ? (openState?.ttId === timetable.id ? openState.map : parseOpenState(readStore(openKey(timetable.id))))
+    : {};
+  const nextId = nextOpenJob(trains);
+  const isOpen = (id: string) => open[id] ?? id === nextId;
+  const toggle = (id: string) => {
+    if (!timetable) return;
+    const known = new Set([...timetable.trains.map((t) => t.id), ...(timetable.path_requests ?? []).map((r) => r.id)]);
+    const map = Object.fromEntries(Object.entries(open).filter(([k]) => known.has(k)));
+    map[id] = !isOpen(id);
+    writeStore(openKey(timetable.id), JSON.stringify(map));
+    setOpenState({ ttId: timetable.id, map });
+  };
+  // The current or next job by the clock: its loco starts the request form.
   const autoId = autoSelectTrain(trains, clock)?.id ?? null;
 
   // This crew's requests that aren't a job yet. A 30 s tick lets a declined one drop out after ten minutes.
@@ -139,6 +154,11 @@ export function CrewJobs() {
   const askCancel = async (requestId: string, reason: string) => {
     if (!timetable || !crew) return;
     live.replace(await api.askCancelPathRequest(timetable.id, requestId, crew.id, reason || undefined));
+  };
+
+  const setStatus = async (trainId: string, status: Train['status'] | null) => {
+    if (!timetable) return;
+    live.replace(await api.setTrainStatus(timetable.id, trainId, status ?? null));
   };
 
   // Control's changes: toasts, green ring for new jobs, flashed cells for retimed stops. No sounds.
@@ -165,7 +185,7 @@ export function CrewJobs() {
     <header className="flex items-center gap-3 px-3 py-2 border-b border-slate-800 bg-slate-900 shrink-0">
       <span className="flex items-center gap-2 min-w-0">
         {crew && <span className="w-3 h-3 rounded-full shrink-0" style={{ background: crew.color }} />}
-        <span className="text-lg font-semibold truncate">{crew && !showPicker ? crew.name : 'Crew jobs'}</span>
+        <span className="text-lg font-semibold truncate">{crew && !showPicker ? crew.name : 'Train Crew App'}</span>
       </span>
       <div className="ml-auto flex items-center gap-3">
         {clockConfigured && (
@@ -188,7 +208,6 @@ export function CrewJobs() {
               <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 mt-1 z-30 w-48 rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
                 <button className={menuItem} onClick={() => { setMenuOpen(false); setPickingCrew(true); }}>Change crew</button>
-                <button className={menuItem} onClick={changeMobileView}>Change view</button>
                 <button className={menuItem} onClick={switchMode}>Switch mode</button>
                 <a className={`${menuItem} flex items-center`} href={helpUrl('crew-jobs.md')} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>Help</a>
               </div>
@@ -232,8 +251,8 @@ export function CrewJobs() {
             request={r}
             timetable={timetable}
             crewId={crew!.id}
-            expanded={open.get(r.id) ?? false}
-            onToggle={() => setOpen((prev) => new Map(prev).set(r.id, !(prev.get(r.id) ?? false)))}
+            expanded={isOpen(r.id)}
+            onToggle={() => toggle(r.id)}
             onWithdraw={withdraw}
             onAskCancel={askCancel}
           />
@@ -245,14 +264,15 @@ export function CrewJobs() {
             seq={sequenceStops(t)}
             stations={timetable.stations}
             clock={clock}
-            expanded={open.get(t.id) ?? t.id === autoId}
-            onToggle={() => setOpen((prev) => new Map(prev).set(t.id, !(prev.get(t.id) ?? t.id === autoId)))}
+            expanded={isOpen(t.id)}
+            onToggle={() => toggle(t.id)}
             isNew={newIds.has(t.id)}
             retimedStopIds={retimedIds}
             request={requestForTrain(timetable.path_requests, t.id)}
             trains={timetable.trains}
             onWithdraw={withdraw}
             onAskCancel={askCancel}
+            onSetStatus={setStatus}
           />
         ))}
       </main>

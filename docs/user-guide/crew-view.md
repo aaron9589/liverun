@@ -1,20 +1,20 @@
-# The Running board
+# The Crewing Manager
 
 **What this page is for:** the phone view of everything running in the session: who has what, when, and what's been started or finished.
-**Who it's for:** crews and drivers, and anyone keeping track of the whole session. To see only your own jobs, and to ask Control for a path, use [Crew jobs](crew-jobs.md).
+**Who it's for:** crews and drivers, and anyone keeping track of the whole session. To see only your own jobs, and to ask Control for a path, use the [Train Crew App](crew-jobs.md).
 
 - [Opening it](#opening-it)
 - [The list of jobs](#the-list-of-jobs)
 - [Marking runs](#marking-runs)
 - [When Control changes something](#when-control-changes-something)
 
-![The Running board on a phone, filtered to one crew](images/crew-overview.png)
+![The Crewing Manager on a phone, filtered to one crew](images/crew-overview.png)
 
 ## Opening it
 
-Open LiveRun on your phone and choose **Mobile** in the [mode picker](README.md#choosing-a-screen-on-a-device), then **Running board** in the [mobile view picker](crew-jobs.md#opening-it). To skip the pickers, open `…/mobile?view=board`: the phone remembers that choice. **View** in the top right goes back to the mobile view picker (to switch to [Crew jobs](crew-jobs.md)), **Switch** goes back to the mode picker, and **?** opens this page. Tapping **Running board** in the top left opens the planner.
+Open LiveRun on your phone and choose **Crewing Manager** in the [chooser](README.md#choosing-a-screen-on-a-device). To skip the chooser, open `…/mobile?view=board`, for example from a bookmark. The **☰** menu in the top right has **Switch mode**, back to the chooser (to switch to the [Train Crew App](crew-jobs.md) or the guard panel), and **Help**, which opens this page. Tapping **Crewing Manager** in the top left opens the Train Graph.
 
-The Running board shows the **active timetable** (the one Control has marked active in the planner). If Control switches to another timetable, your screen follows it and tells you. To pin one timetable regardless of what's active, open `…/mobile?view=board&id=<timetable id>`.
+The Crewing Manager shows the **active timetable** (the one Control has marked active in the planner). If Control switches to another timetable, your screen follows it and tells you. To pin one timetable regardless of what's active, open `…/mobile?view=board&id=<timetable id>`.
 
 ## The list of jobs
 
@@ -35,7 +35,7 @@ The button on each card cycles a train's status:
 | **Done** | Marks it **completed** |
 | **Reset** | Clears it |
 
-Statuses are shared: everyone's Running board, the planner's crew list and the train graph show them straight away. Once any train has a status, a reset button appears in the header (**Reset all statuses**). It clears every status in the timetable, for example after a test run.
+Statuses are shared: everyone's Crewing Manager, the planner's crew list and the train graph show them straight away. Once any train has a status, a reset button appears in the header (**Reset all statuses**). It clears every status in the timetable, for example after a test run.
 
 > **Note** Run status is separate from the timetable itself. Undo in the planner never brings it back.
 

@@ -12,7 +12,7 @@
 - [Settings](#settings)
 - [Audit log](#audit-log)
 
-A **path request** is a crew asking for a train to be plotted for them: from where they are, through any stops or shunts, to where they want to go. Crews send it from [Crew jobs](crew-jobs.md#requesting-a-path). Control reviews it in the planner, plots it on the graph and accepts it, and the new train appears in the crew's jobs.
+A **path request** is a crew asking for a train to be plotted for them: from where they are, through any stops or shunts, to where they want to go. Crews send it from the [Train Crew App](crew-jobs.md#requesting-a-path). Control reviews it in the planner, plots it on the graph and accepts it, and the new train appears in the crew's jobs.
 
 Requests go to the **active timetable** only, and only while **Crews can request paths** is on in [Settings](#settings). The timetable holds up to 50 open requests at a time.
 

@@ -7,7 +7,7 @@
 - [Planner](#planner)
 - [Guard panel](#guard-panel)
 - [Limit of authority](#limit-of-authority)
-- [Crew jobs and the Running board](#crew-jobs)
+- [Train Crew App and the Crewing Manager](#train-crew-app)
 - [Path requests](#path-requests)
 - [Integrations](#integrations)
 
@@ -29,7 +29,7 @@
 | A train disappeared from the graph | It's hidden (👁), or the **Filter by crew** is on | Click 👁 in the train list; set the filter to **All operators** |
 | Train ID suggestions don't appear | No JMRI URL, or the roster can't be fetched | Layout → **JMRI** → **Test connection** |
 | Undo brought back old times but not run status | By design: run status isn't part of undo | Mark trains again, or use **✓ Reset jobs** |
-| The Up train's stops look upside down | Stops are listed in station order | That's normal; the guard panel, Crew jobs and the Running board show running order |
+| The Up train's stops look upside down | Stops are listed in station order | That's normal; the guard panel, the Train Crew App and the Crewing Manager show running order |
 
 ## Guard panel
 
@@ -61,26 +61,26 @@
 | The preview gives a train the wrong sections | Station names don't match, or **Only/Except** patterns exclude it | Section **From**/**To** must match station names exactly (case doesn't matter) |
 | Opened the doors and LOA didn't change | By design | LOA follows only the signalling |
 
-## Crew jobs
+## Train Crew App
 
-Crew jobs is the phone view at `…/mobile`; see [Crew jobs](crew-jobs.md). The same dot and timetable behaviour applies to the [Running board](crew-view.md).
+The Train Crew App is the phone view at `…/mobile?view=jobs`; see [Train Crew App](crew-jobs.md). The same dot and timetable behaviour applies to the [Crewing Manager](crew-view.md).
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| A phone asks **Which view on this phone?** every time | The browser isn't keeping its saved choice (private browsing, cleared site data) | Open `…/mobile?view=jobs` (or `?view=board`) from a bookmark or QR code |
+| A phone shows the chooser every time | By design: the chooser is the phone's home page | Open `…/mobile?view=jobs` (or `?view=board`) from a bookmark or QR code |
 | **Who are you?** shows the wrong crews, or none | The timetable has no crews, or this is a different timetable | Check the timetable name with Control; Control adds crews in the planner |
 | My jobs is empty (**No jobs for this crew yet.**) | No trains are assigned to your crew | Ask Control to assign trains, or tap **☰ → Change crew** |
 | **+ Request a path** isn't there | The timetable isn't the active one, or Control has turned off **Crews can request paths** | Ask Control to make the session's timetable active and check ⚙ → **Path requests** |
 | **Send request** is greyed out | The form isn't complete | Read the message above the button |
-| **Requests only go to the running session** (red, on the form) | The timetable stopped being active while you filled the form | Ask Control; reopen Crew jobs to follow the active timetable |
+| **Requests only go to the running session** (red, on the form) | The timetable stopped being active while you filled the form | Ask Control; reopen the Train Crew App to follow the active timetable |
 | **Path requests are turned off for this session** | Control switched requests off | Ask Control |
 | **Too many open requests (50)** | The timetable already has 50 open requests | Tell Control, who can decline or clear some |
 | **Can't withdraw it: the request is …** or **Can't ask to cancel it: …** (409) | Control acted at the same moment, so the card was out of date | The card updates itself; read its new status |
 | **Only the crew that made this request can …** | The phone was switched to another crew | **☰ → Change crew** back to the crew that sent it |
 | A request disappeared from My jobs without becoming a job | Control assigned the train to another crew or left it unassigned, or deleted it | Ask Control |
-| Jobs on the Running board but not in Crew jobs | Running board shows everyone's jobs unless filtered by crew | Use the **Crew** filter on the Running board, or **Change crew** in Crew jobs |
+| Jobs on the Crewing Manager but not in Train Crew App | Crewing Manager shows everyone's jobs unless filtered by crew | Use the **Crew** filter on the Crewing Manager, or **Change crew** in Train Crew App |
 | The dot isn't green | Reconnecting | It catches up by itself when it's back |
-| **Select Timetable** appears (Running board) | No timetable is active and none is chosen | Pick one, or ask Control to make the session's timetable active |
+| **Select Timetable** appears (Crewing Manager) | No timetable is active and none is chosen | Pick one, or ask Control to make the session's timetable active |
 
 ## Path requests
 

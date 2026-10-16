@@ -161,7 +161,7 @@ export function RequestForm({ crew, stations, clock, initialFrom, initialLoco, o
                   value={v.minutes}
                   aria-label="Minutes on site"
                   onChange={(e) => setVia(v.key, { minutes: Math.min(MAX_MINUTES, Math.max(0, Math.round(Number(e.target.value)) || 0)) })}
-                  className="w-20 min-h-[48px] rounded-lg bg-slate-800 border border-slate-600 text-center text-base text-white focus:outline-none focus:border-blue-500"
+                  className="w-20 min-h-[48px] rounded-lg bg-slate-800 border border-slate-600 text-center text-base text-white focus:outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 <button type="button" aria-label="More minutes" className={SMALL_BTN} disabled={v.minutes >= MAX_MINUTES}
                   onClick={() => setVia(v.key, { minutes: Math.min(MAX_MINUTES, Math.floor(v.minutes / 5) * 5 + 5) })}>+</button>

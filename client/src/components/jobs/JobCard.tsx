@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import type { PathRequest, Station, Train } from '../../types';
 import { currentStop, type SeqStop } from '../../lib/stops';
 import { jobSummary } from '../../lib/crewJobs';
-import { cancelAskText, jobBadges } from '../../lib/pathRequests';
+import { apiErrorText, cancelAskText, jobBadges } from '../../lib/pathRequests';
 import { Badge } from './Badge';
 import { RequestActions } from './RequestCard';
 
@@ -21,10 +22,52 @@ interface Props {
   trains?: Train[];
   onWithdraw?: (requestId: string) => Promise<void>;
   onAskCancel?: (requestId: string, reason: string) => Promise<void>;
+  /** Sets the train's run status, as the Running board's button does. */
+  onSetStatus: (trainId: string, status: Train['status'] | null) => Promise<void>;
 }
 
-/** One of the crew's jobs. Run status is shown, never changed here; a requested job can be asked to cancel. */
-export function JobCard({ train, seq, stations, clock, expanded, onToggle, isNew, retimedStopIds, request, trains, onWithdraw, onAskCancel }: Props) {
+const RUN_STEP = {
+  none: { label: 'Run', aria: 'Mark running', next: 'running', cls: 'bg-slate-800 hover:bg-slate-700 text-slate-100' },
+  running: { label: 'Done', aria: 'Mark completed', next: 'completed', cls: 'bg-green-700 hover:bg-green-600 text-white' },
+  completed: { label: 'Reset', aria: 'Clear status', next: null, cls: 'bg-slate-800 hover:bg-slate-700 text-slate-300' },
+} as const;
+
+/** Run → Done → Reset, the same cycle as the Running board's status button. */
+function RunButton({ train, onSetStatus }: { train: Train; onSetStatus: Props['onSetStatus'] }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const step = RUN_STEP[train.status ?? 'none'];
+
+  async function click() {
+    setBusy(true);
+    setError(null);
+    try {
+      await onSetStatus(train.id, step.next);
+    } catch (e) {
+      setError(apiErrorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="shrink-0 flex flex-col gap-1">
+      <button
+        disabled={busy}
+        onClick={click}
+        aria-label={step.aria}
+        title={step.aria}
+        className={`min-h-[48px] w-28 px-4 rounded-lg font-medium disabled:opacity-50 ${step.cls}`}
+      >
+        {step.label}
+      </button>
+      {error && <p role="alert" className="w-28 text-sm text-red-400">{error}</p>}
+    </div>
+  );
+}
+
+/** One of the crew's jobs: Run / Done / Reset sets its run status; a requested job can be asked to cancel. */
+export function JobCard({ train, seq, stations, clock, expanded, onToggle, isNew, retimedStopIds, request, trains, onWithdraw, onAskCancel, onSetStatus }: Props) {
   const askLine = request ? cancelAskText(request) : null;
   const stationName = new Map(stations.map((s) => [s.id, s.name]));
   const done = train.status === 'completed';
@@ -99,11 +142,14 @@ export function JobCard({ train, seq, stations, clock, expanded, onToggle, isNew
               {request.cancel_ask?.status === 'open' ? `Cancel asked: ${askLine}` : askLine}
             </p>
           )}
-          {request && trains && onWithdraw && onAskCancel && (
-            <div className="mt-3 empty:hidden">
-              <RequestActions request={request} trains={trains} onWithdraw={onWithdraw} onAskCancel={onAskCancel} />
-            </div>
-          )}
+          <div className="mt-3 flex items-start gap-2">
+            <RunButton train={train} onSetStatus={onSetStatus} />
+            {request && trains && onWithdraw && onAskCancel && (
+              <div className="flex-1 min-w-0 empty:hidden">
+                <RequestActions request={request} trains={trains} onWithdraw={onWithdraw} onAskCancel={onAskCancel} />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

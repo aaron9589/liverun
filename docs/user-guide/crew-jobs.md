@@ -1,4 +1,4 @@
-# Crew jobs
+# Train Crew App
 
 **What this page is for:** following your own jobs on a phone, and asking Control for a path when you need one.
 **Who it's for:** train crews and drivers.
@@ -8,31 +8,27 @@
 - [Requesting a path](#requesting-a-path)
 - [Your requests in My jobs](#your-requests-in-my-jobs)
 
-![Crew jobs on a phone: the crew's next job open, with a special instruction at Berry](images/jobs-overview.png)
+![Train Crew App on a phone: the crew's next job open, with a special instruction at Berry](images/jobs-overview.png)
 
 ## Opening it
 
-Open LiveRun on your phone and choose **Mobile** in the [mode picker](README.md#choosing-a-screen-on-a-device). On a phone that hasn't been used before, LiveRun then asks which view you want:
+Open LiveRun on your phone and choose **Train Crew App** in the [chooser](README.md#choosing-a-screen-on-a-device):
 
-![The mobile view picker](images/mobile-view-picker.png)
+![The chooser on a phone](images/mobile-view-picker.png)
 
-- **Crew jobs**: your jobs, their timetables and instructions, and a way to request a path from Control. This page.
-- **Running board**: everything running and when, with run buttons. See [The Running board](crew-view.md).
+To skip the chooser, open `…/mobile?view=jobs`, for example from a bookmark or a QR code Control hands out.
 
-The phone remembers your choice. If Control hands out a QR code or link, it can pick the view for you: `…/mobile?view=jobs` opens Crew jobs and `…/mobile?view=board` the Running board, and the phone remembers that choice too.
-
-The first time, Crew jobs asks **Who are you?** Pick your crew. Every crew in the timetable is listed; the choice is remembered on this phone, for this timetable.
+The first time, the Train Crew App asks **Who are you?** Pick your crew. Every crew in the timetable is listed; the choice is remembered on this phone, for this timetable.
 
 The **☰** menu in the top right has:
 
 | Item | Does |
 |------|------|
 | **Change crew** | Back to **Who are you?** |
-| **Change view** | Back to the mobile view picker (Crew jobs or Running board) |
-| **Switch mode** | Back to the mode picker (guard panel, mobile, planner) |
+| **Switch mode** | Back to the chooser (Train Crew App, Crewing Manager, Guard Panel) |
 | **Help** | Opens this page |
 
-Crew jobs shows the **active timetable**, the one Control has marked active in the planner. If Control switches to another one, your screen follows and tells you (**Control switched to …**). If none is active, it says **No session is running**.
+The Train Crew App shows the **active timetable**, the one Control has marked active in the planner. If Control switches to another one, your screen follows and tells you (**Control switched to …**). If none is active, it says **No session is running**.
 
 The header shows your crew's colour and name, the fast clock (grey while it's disconnected), and a dot: green means you're live and Control's changes appear by themselves, amber means connecting, red means reconnecting. The screen catches up on anything it missed as soon as it's back, including after the phone wakes from sleep.
 
@@ -40,14 +36,15 @@ The header shows your crew's colour and name, the fast clock (grey while it's di
 
 **My jobs** is one list of everything for your crew: requests you've sent that aren't a job yet come first (see [below](#your-requests-in-my-jobs)), then the trains assigned to your crew, in the order they run. Each job card shows the train's name, its loco (train ID), and where it runs from and to with the start and end times.
 
-- Tap a card to open or close it. The job you're on, or the next one, opens by itself.
+- Tap a card to open or close it. The phone remembers which cards you left open, even after a reload. A job you haven't opened or closed yet opens by itself if it's the first one not marked **Done**.
 - An open card lists each stop in running order with its **Arr** and **Dep** times. If Control gave a stop a different name for this train (a siding or staging road), it's shown after the station name.
 - A line starting with an amber flag (⚑) is a **special instruction** for that stop. Read these before you start.
 - With the fast clock running, the stop you should be at is highlighted and marked **now** (standing at it) or **next**.
 - **Notes** from Control are shown under the stops.
-- Badges on the right say where a job stands: **Accepted** (made from a path request), **Cancel asked** or **Cancel refused** (see below), and **Running** or **Done** for the train's run status. You can't change run status here; use the [Running board](crew-view.md#marking-runs) to mark runs started and finished.
+- Badges on the right say where a job stands: **Accepted** (made from a path request), **Cancel asked** or **Cancel refused** (see below), and **Running** or **Done** for the train's run status.
+- An open card has a run button: **Run** marks the job running, then **Done** marks it finished, and **Reset** clears its status again. It's the same status as the [Crewing Manager](crew-view.md#marking-runs)'s, so Control and every other screen see it straight away. On a requested job it sits next to **Ask to cancel**.
 
-Crew jobs follows Control's changes live, with no refresh and no sounds. A new job gets a **New job** toast and a green ring for a minute, and retimed stops are highlighted for 10 seconds. The same notices as on the Running board appear when a job is retimed, renamed or taken off your crew, and **Control changed n of your jobs** when there are more than five changes at once. See [When Control changes something](crew-view.md#when-control-changes-something).
+The Train Crew App follows Control's changes live, with no refresh and no sounds. A new job gets a **New job** toast and a green ring for a minute, and retimed stops are highlighted for 10 seconds. The same notices as on the Crewing Manager appear when a job is retimed, renamed or taken off your crew, and **Control changed n of your jobs** when there are more than five changes at once. See [When Control changes something](crew-view.md#when-control-changes-something).
 
 ## Requesting a path
 
@@ -75,7 +72,7 @@ A **Shunt** or **Work** stop becomes a special instruction on the job, such as *
 
 **Send request** stays off until the form is complete, and the message above it says what's missing: pick both ends; From and To must be different; every added stop needs a station; each station can appear only once; and a time must be chosen under **At a time**.
 
-If Control's server refuses the request, the reason appears in red above the button and the form stays open. See [Troubleshooting](troubleshooting.md#crew-jobs).
+If Control's server refuses the request, the reason appears in red above the button and the form stays open. See [Troubleshooting](troubleshooting.md#train-crew-app).
 
 > **Note** The **+ Request a path** button is only there while your timetable is the active one and Control hasn't turned requests off. The whole timetable can hold 50 open requests at once.
 

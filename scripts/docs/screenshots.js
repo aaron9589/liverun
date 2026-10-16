@@ -192,6 +192,7 @@ async function seed(pub) {
 const DESKTOP = { width: 1440, height: 900 };
 const TABLET = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
+const PHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 
 const byName = (list, name) => {
   const found = list.find((x) => x.name === name);
@@ -291,10 +292,18 @@ async function openLayout(page, ctx, label) {
   await page.waitForTimeout(600);
 }
 
-/** Opens Crew jobs (…/mobile?view=jobs) as one crew, with the crew choice stored for this timetable. */
-async function openJobs(page, ctx, { crew, clock }) {
+/**
+ * Opens the Train Crew App (…/mobile?view=jobs) as one crew, with the crew choice stored for
+ * this timetable. `openOnly` saves card state so only that job is open.
+ */
+async function openJobs(page, ctx, { crew, clock, openOnly }) {
   ctx.pub.setClock(clock);
-  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), [`jobs:crew:${ctx.timetable.id}`, crewOf(ctx, crew).id]);
+  const crewId = crewOf(ctx, crew).id;
+  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), [`jobs:crew:${ctx.timetable.id}`, crewId]);
+  if (openOnly) {
+    const open = Object.fromEntries(ctx.timetable.trains.filter((t) => t.crew_id === crewId).map((t) => [t.id, t.name === openOnly]));
+    await page.addInitScript(([k, v]) => localStorage.setItem(k, v), [`jobs:open:${ctx.timetable.id}`, JSON.stringify(open)]);
+  }
   await page.goto(`${ctx.app}mobile?view=jobs`, { waitUntil: 'networkidle' });
   await page.getByRole('heading', { name: 'My jobs' }).waitFor();
   await page.waitForTimeout(1200);
@@ -660,14 +669,15 @@ const SHOTS = [
     },
   },
 
-  // ── Mobile: Crew jobs ──
+  // ── Mobile: Train Crew App ──
   {
     name: 'mobile-view-picker',
     viewport: PHONE,
     scale: 2,
+    userAgent: PHONE_UA, // the chooser leaves out the Train Graph on a phone
     async run(page, ctx) {
-      await page.goto(`${ctx.app}mobile`, { waitUntil: 'networkidle' });
-      await page.getByText('Which view on this phone?').waitFor();
+      await page.goto(ctx.app, { waitUntil: 'networkidle' });
+      await page.getByText('What do you want to open?').waitFor();
       await page.screenshot({ path: ctx.out('mobile-view-picker') });
     },
   },
@@ -676,8 +686,8 @@ const SHOTS = [
     viewport: PHONE,
     scale: 2,
     async run(page, ctx) {
-      await openJobs(page, ctx, { crew: GUARD_CREW, clock: '12:05' });
-      // KN-6 is the next job, so it opens by itself; its Berry stop carries a special instruction.
+      await openJobs(page, ctx, { crew: GUARD_CREW, clock: '12:05', openOnly: GUARD_TRAIN });
+      // KN-6 is the job at 12:05; its Berry stop carries a special instruction.
       await page.getByText('Work with Berry Signaller').first().waitFor();
       await scrollToText(page, 'My jobs');
       await page.getByText('KN-6', { exact: true }).first().evaluate((el) => el.scrollIntoView({ block: 'start' }));
@@ -886,7 +896,11 @@ async function main() {
     out: (name) => path.join(OUT, `${name}.png`) };
   let failed = 0;
   for (const shot of selected) {
-    const context = await browser.newContext({ viewport: shot.viewport || DESKTOP, deviceScaleFactor: shot.scale || 1 });
+    const context = await browser.newContext({
+      viewport: shot.viewport || DESKTOP,
+      deviceScaleFactor: shot.scale || 1,
+      ...(shot.userAgent ? { userAgent: shot.userAgent } : {}),
+    });
     const page = await context.newPage();
     try {
       await shot.run(page, ctx);

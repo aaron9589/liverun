@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtMins, jobSummary } from './crewJobs';
+import { fmtMins, jobSummary, nextOpenJob, parseOpenState } from './crewJobs';
 import type { SeqStop } from './stops';
 import type { TrainStop } from '../types';
 
@@ -27,5 +27,28 @@ describe('jobSummary', () => {
   });
   it('falls back for unknown stations', () => {
     expect(jobSummary([seqStop('x', 0, 0), seqStop('b', 60, 60)], stations)).toBe('? 00:00 → Bombo 01:00');
+  });
+});
+
+describe('nextOpenJob', () => {
+  it('is the first job in run order not marked done', () => {
+    expect(nextOpenJob([{ id: 'a', status: 'completed' }, { id: 'b', status: 'running' }, { id: 'c' }])).toBe('b');
+    expect(nextOpenJob([{ id: 'a', status: 'completed' }, { id: 'b' }])).toBe('b');
+  });
+  it('is null when every job is done or there are none', () => {
+    expect(nextOpenJob([{ id: 'a', status: 'completed' }])).toBeNull();
+    expect(nextOpenJob([])).toBeNull();
+  });
+});
+
+describe('parseOpenState', () => {
+  it('reads saved booleans and drops anything else', () => {
+    expect(parseOpenState('{"a":true,"b":false,"c":1}')).toEqual({ a: true, b: false });
+  });
+  it('treats missing or malformed storage as nothing saved', () => {
+    expect(parseOpenState(null)).toEqual({});
+    expect(parseOpenState('not json')).toEqual({});
+    expect(parseOpenState('[true]')).toEqual({});
+    expect(parseOpenState('null')).toEqual({});
   });
 });
