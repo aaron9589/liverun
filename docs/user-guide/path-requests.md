@@ -149,4 +149,4 @@ Each entry records:
 
 ---
 
-Last checked against v2.1.0.
+Last checked against v2.2.0.

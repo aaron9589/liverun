@@ -73,4 +73,4 @@ See [Troubleshooting](troubleshooting.md). If the data itself is wrong, **undo**
 
 ---
 
-Last checked against v2.1.0.
+Last checked against v2.2.0.

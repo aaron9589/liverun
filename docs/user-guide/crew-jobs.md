@@ -101,4 +101,4 @@ For what Control does with your request, and what is recorded about it, see [Pat
 
 ---
 
-Last checked against v2.1.0.
+Last checked against v2.2.0.

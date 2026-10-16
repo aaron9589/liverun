@@ -4,7 +4,7 @@ const spec = {
   openapi: '3.0.3',
   info: {
     title: 'LiveRun Live API',
-    version: '2.1.0',
+    version: '2.2.0',
     description:
       'Read-only endpoints intended for external systems such as guard panels, ' +
       'operator displays, and JMRI integrations. ' +
