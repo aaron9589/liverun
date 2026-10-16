@@ -110,6 +110,8 @@ export interface Train {
   direction?: string;
   crew_id?: string;
   status?: 'running' | 'completed';
+  /** Set on trains created by accepting a path request (docs/path-requests-spec.md §2). */
+  request_id?: string;
   stops: TrainStop[];
 }
 
@@ -119,6 +121,11 @@ export interface TimetableSettings {
   clock_topic: string;
   auto_assign_min_break: number;
   graph_scale?: number | null;
+  /** Path requests (docs/path-requests-spec.md §7). Server fills defaults. */
+  requests_enabled?: boolean;        // default true
+  request_train_prefix?: string;     // default 'PR'
+  request_default_leg_min?: number;  // default 5
+  request_lead_min?: number;         // default 2
 }
 
 export interface Timetable extends TimetableSummary {
@@ -129,6 +136,120 @@ export interface Timetable extends TimetableSummary {
   paths: Path[];
   crews: Crew[];
   settings: TimetableSettings;
+  /** Path requests, active timetable only; the server always sends an array. Not part of undo (spec P2). */
+  path_requests?: PathRequest[];
+}
+
+// ─── Path requests (docs/path-requests-spec.md §1–2) ──────────────────────────
+
+export type PathRequestStatus = 'pending' | 'in_review' | 'accepted' | 'declined' | 'withdrawn' | 'cancelled';
+export type PathWorkKind = 'stop' | 'shunt' | 'work';
+
+export const PATH_REQUEST_OPEN: readonly PathRequestStatus[] = ['pending', 'in_review'];
+
+export interface PathRequestStop {
+  station_id: string;
+  /** Siding/road; only where the station has alias_enabled. */
+  location_alias?: string | null;
+  /** Origin and destination are always 'stop'. */
+  kind: PathWorkKind;
+  /** Requested time on site, integer 0–240; origin/destination 0. */
+  minutes: number;
+  /** ≤ 200 chars; becomes special_instructions on accept. */
+  note?: string;
+}
+
+export interface PathCancelAsk {
+  at: string;
+  reason?: string;
+  status: 'open' | 'rejected' | 'approved';
+  control_note?: string;
+}
+
+export interface PathRequest {
+  id: string;
+  timetable_id: string;
+  /** Requesting crew; default assignee. */
+  crew_id: string;
+  /** JMRI roster name / free text → Train.train_id. */
+  loco?: string;
+  /** Running order: [current, …intermediate, proposed]; 2–20, unique stations. */
+  stops: PathRequestStop[];
+  /** HH:MM fast-clock time; null = as soon as possible. */
+  ready_at?: string | null;
+  /** ≤ 500 chars, for Control (copied to Train.notes on accept). */
+  notes?: string;
+  status: PathRequestStatus;
+  created_at: string;
+  updated_at: string;
+  /** ≤ 300 chars, Control → crew. Required on decline. */
+  control_note?: string;
+  /** Train.id once accepted. */
+  train_id_created?: string;
+  /** Crew the train was given to (may differ from crew_id). */
+  assigned_crew_id?: string;
+  cancel_ask?: PathCancelAsk;
+}
+
+/** POST /api/timetables/:id/path-requests body (camelCase like other bodies). */
+export interface PathRequestSubmit {
+  crewId: string;
+  loco?: string;
+  stops: { stationId: string; locationAlias?: string | null; kind: PathWorkKind; minutes: number; note?: string }[];
+  readyAt?: string | null;
+  notes?: string;
+}
+
+/**
+ * POST /api/timetables/:id/path-requests/:reqId/accept body (spec §4.2). `train` is the
+ * draft as a normal train body (same rules as POST /trains; the server adds request_id).
+ * `retime`: other trains moved while plotting, same shape as /trains/retime changes.
+ */
+export interface PathAcceptBody {
+  train: Omit<TrainRequest, 'id'>;
+  retime?: { trainId: string; times: { stationId: string; arrival: string | null; departure: string | null }[] }[];
+  note?: string;
+}
+
+// ─── Audit log (docs/path-requests-spec.md §4.4) ──────────────────────────────
+
+export type AuditAction =
+  | 'submit' | 'withdraw' | 'acknowledge' | 'release' | 'decline' | 'accept'
+  | 'cancel-ask' | 'cancel-approve' | 'cancel-reject' | 'clear';
+
+export interface AuditEntry {
+  /** ISO wall-clock time. */
+  at: string;
+  /** Fast-clock HH:MM if the client sent one (X-LiveRun-Clock). */
+  clock?: string | null;
+  ip: string;
+  /** X-LiveRun-Device header ('' if absent). */
+  device: string;
+  /** Shortened user agent, e.g. "Safari iOS 18". */
+  ua: string;
+  actor: 'crew' | 'control';
+  crew_id?: string | null;
+  crew_name?: string | null;
+  action: AuditAction;
+  outcome: 'ok' | 'rejected';
+  error?: string;
+  timetable_id: string;
+  timetable_name?: string | null;
+  request_id?: string | null;
+  detail?: Record<string, unknown>;
+}
+
+export interface AuditQuery {
+  timetableId?: string;
+  requestId?: string;
+  crewId?: string;
+  ip?: string;
+  device?: string;
+  action?: AuditAction;
+  /** ISO time: only entries strictly before it (paging). */
+  before?: string;
+  /** Default 200, max 1000. */
+  limit?: number;
 }
 
 // ─── Layout-wide configuration (GET/PUT /api/layout) ──────────────────────────
@@ -306,7 +427,14 @@ export type SyncMessage =
   | { type: 'timetable-deleted'; timetableId: string }
   | { type: 'active-changed'; activeId: string | null }
   /** LOA topic values from the server cache, sent to every client: full snapshot after hello, then coalesced deltas. */
-  | { type: 'loa-values'; values: Record<string, LoaValue>; full: boolean };
+  | { type: 'loa-values'; values: Record<string, LoaValue>; full: boolean }
+  /**
+   * Full request list of the timetable (docs/path-requests-spec.md §4.3): after hello and on every
+   * request change. Like completions, rev is present only when the mutation changed nothing but
+   * requests (no timetable-updated follows), so a client exactly one rev behind adopts it in place.
+   * Accept / cancel-approve (which also create/delete a train) send it without rev.
+   */
+  | { type: 'path-requests'; timetableId: string; requests: PathRequest[]; rev?: number };
 
 // ─── JMRI roster (fetched by the browser directly from JMRI) ───────────────────
 
@@ -373,7 +501,7 @@ export interface PathStopRequest {
   dwellTime: number;
 }
 
-export interface PathRequest {
+export interface PathSaveRequest {
   id?: string;
   name: string;
   stops: PathStopRequest[];

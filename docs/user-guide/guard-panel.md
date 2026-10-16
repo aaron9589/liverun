@@ -20,7 +20,7 @@
 
 ## Getting started
 
-1. Open LiveRun on the tablet and choose **Guard panel** in the [mode picker](README.md#the-three-screens), or go straight to `…/guard`. With **Remember this choice on this device** ticked, the tablet opens the guard panel every time.
+1. Open LiveRun on the tablet and choose **Guard Panel** in the [chooser](README.md#choosing-a-screen-on-a-device), or go straight to `…/guard` (bookmark it to skip the chooser).
 2. Tap **Tap to start**. This lets the tablet play sounds and keeps the screen awake. Browsers need one tap before they will make a sound.
 
    ![Tap to start](images/guard-tap-to-start.png)
@@ -203,7 +203,7 @@ Control can change the timetable during the session; the panel shows changes wit
 | **Changes from Control** | This session's list of changes |
 | **Reset events for this train** | Forget this train's rolled guard events and roll them again (asks first) |
 | **Help** | Opens this page |
-| **Switch mode** | Back to the mode picker (crew view, planner) |
+| **Switch mode** | Back to the chooser (Train Crew App, Crewing Manager, Guard Panel) |
 | **Reload** | Reload the page |
 
 ---
@@ -220,4 +220,4 @@ See also [Troubleshooting](troubleshooting.md#guard-panel).
 
 ---
 
-Last checked against v2.1.0.
+Last checked against v2.2.0.

@@ -11,12 +11,19 @@ export interface Toast {
   tone: ToastTone;
   /** Epoch ms when pushed. */
   at: number;
+  /** Optional button (e.g. Review); clicking it runs onClick and dismisses the toast. */
+  action?: ToastAction;
+}
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
 }
 
 export interface Toasts {
   /** Currently shown toasts, newest first. */
   toasts: Toast[];
-  push: (message: string, tone?: ToastTone) => number;
+  push: (message: string, tone?: ToastTone, action?: ToastAction) => number;
   dismiss: (id: number) => void;
   /** The most recent toasts (newest first), kept after they hide. */
   history: Toast[];
@@ -35,8 +42,8 @@ export function useToasts({ ttlMs = 8_000, historySize = 10 }: { ttlMs?: number;
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const push = useCallback((message: string, tone: ToastTone = 'info') => {
-    const toast: Toast = { id: nextToastId++, message, tone, at: Date.now() };
+  const push = useCallback((message: string, tone: ToastTone = 'info', action?: ToastAction) => {
+    const toast: Toast = { id: nextToastId++, message, tone, at: Date.now(), ...(action ? { action } : {}) };
     setToasts((prev) => [toast, ...prev]);
     setHistory((prev) => [toast, ...prev].slice(0, historySize));
     timers.current.set(toast.id, setTimeout(() => dismiss(toast.id), ttlMs));
@@ -77,7 +84,21 @@ export function ChangeToasts({
       role="status"
       aria-live="polite"
     >
-      {toasts.slice(0, max).map((t) => (
+      {toasts.slice(0, max).map((t) => t.action ? (
+        <div
+          key={t.id}
+          className={`pointer-events-auto flex items-center gap-2 px-3 py-2.5 rounded-lg bg-slate-800/95 backdrop-blur border border-slate-700 border-l-4 ${TONE_CLASSES[t.tone]} text-sm text-slate-100 shadow-xl`}
+        >
+          <span className="flex-1">{t.message}</span>
+          <button
+            onClick={() => { t.action!.onClick(); onDismiss(t.id); }}
+            className="shrink-0 px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium"
+          >
+            {t.action.label}
+          </button>
+          <button onClick={() => onDismiss(t.id)} className="shrink-0 text-slate-500 hover:text-slate-300" title="Dismiss" aria-label="Dismiss">✕</button>
+        </div>
+      ) : (
         <button
           key={t.id}
           onClick={() => onDismiss(t.id)}

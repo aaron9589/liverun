@@ -10,6 +10,8 @@ const events = require('./events');
 const { readDB, writeDB, getTimetable, mutateTimetable, onTimetableChange, uuidv4, getLayout, setLayout } = require('./db');
 const openApiSpec = require('./openapi');
 const { stripTrainType } = require('./migrations');
+const { parseRequestSettings } = require('./request-settings');
+const { newTrain, buildStops, stripTerminalTimes, withGuardEvents, normTime } = require('./trains');
 const layoutRoutes = require('./layout');
 const { WS_SYNC_PATH, createSync } = require('./sync');
 const loaCacheRoutes = require('./loa-cache');
@@ -82,6 +84,11 @@ const DEFAULT_SETTINGS = {
   clock_topic: 'trains/jmri/memory/currentTime',
   auto_assign_min_break: 0,
   graph_scale: null,
+  // Path requests (docs/path-requests-spec.md §7)
+  requests_enabled: true,
+  request_train_prefix: 'PR',
+  request_default_leg_min: 5,
+  request_lead_min: 2,
 };
 
 app.get('/api/timetables', (_req, res) => {
@@ -167,6 +174,9 @@ layoutRoutes.register(app, { getLayout, setLayout: (layout) => { const saved = s
 require('./sounds').register(app, { dataDir: require('./db').dataDir });
 // Graph editing: times-only, all-or-nothing batch retime (before the /trains/:trainId routes)
 require('./retime').register(app, { getTimetable, mutateTimetable, normalise });
+// Path-request audit log (GET /api/audit) and path requests — docs/path-requests-spec.md §4
+const audit = require('./audit').register(app, { dataDir: require('./db').dataDir });
+require('./path-requests').register(app, { readDB, getTimetable, mutateTimetable, normalise, sync, audit });
 
 // Must be defined before /:id routes to avoid 'import' being matched as an id
 app.post('/api/timetables/import', (req, res) => {
@@ -274,8 +284,9 @@ app.post('/api/timetables/:id/duplicate', (req, res) => {
   (original.paths || []).forEach((p) => { pathIdMap[p.id] = uuidv4(); });
   const crewIdMap = {};
   (original.crews || []).forEach((c) => { crewIdMap[c.id] = uuidv4(); });
+  const { path_requests: _requests, ...originalRest } = original;
   const duplicate = {
-    ...original,
+    ...originalRest,
     id: newId,
     name: original.name + ' (copy)',
     created_at: now,
@@ -286,6 +297,7 @@ app.post('/api/timetables/:id/duplicate', (req, res) => {
       return {
         ...tr, id: trainId, timetable_id: newId,
         status: undefined,
+        request_id: undefined,
         crew_id: tr.crew_id ? (crewIdMap[tr.crew_id] || null) : null,
         stops: (tr.stops || []).map((stop) => ({
           ...stop, id: uuidv4(), train_id: trainId,
@@ -339,6 +351,7 @@ app.post('/api/timetables/:id/restore', (req, res) => {
       direction: String(tr.direction || ''),
       crew_id: tr.crew_id ? String(tr.crew_id) : null,
       ...(VALID_TRAIN_STATUSES.has(tr.status) ? { status: tr.status } : {}),
+      ...(tr.request_id ? { request_id: String(tr.request_id) } : {}),
       stops: (tr.stops || []).map((s) => ({
         id: String(s.id),
         train_id: String(tr.id),
@@ -387,8 +400,11 @@ app.put('/api/timetables/:id/settings', (req, res) => {
       return res.status(400).json({ error: 'clock_broker_url must use ws:// or wss://' });
     }
   }
+  const reqSettings = parseRequestSettings(req.body);
+  if (reqSettings.error) return res.status(400).json({ error: reqSettings.error });
   const updated = mutateTimetable(req.params.id, (tt) => {
     if (!tt.settings) tt.settings = { ...DEFAULT_SETTINGS };
+    Object.assign(tt.settings, reqSettings.values);
     if (clock_enabled !== undefined) tt.settings.clock_enabled = Boolean(clock_enabled);
     if (clock_broker_url !== undefined) tt.settings.clock_broker_url = String(clock_broker_url);
     if (clock_topic !== undefined) tt.settings.clock_topic = String(clock_topic);
@@ -534,19 +550,12 @@ app.delete('/api/timetables/:id/paths/:pathId', (req, res) => {
 });
 
 app.post('/api/timetables/:id/trains', (req, res) => {
-  const { name, color, notes, trainId: trainIdField, direction, crewId, stops } = req.body;
+  const { name, stops } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   const evCheck = events.validateStopsEvents(stops);
   if (evCheck.error) return res.status(400).json({ error: evCheck.error });
-  const trainId = uuidv4();
   const updated = mutateTimetable(req.params.id, (tt) => {
-    tt.trains.push({
-      id: trainId, timetable_id: req.params.id, name: name.trim(),
-      color: color || '#3b82f6', notes: notes || '',
-      train_id: trainIdField || '', direction: direction || '',
-      crew_id: crewId || null,
-      stops: buildStops(trainId, stops || []),
-    });
+    tt.trains.push(newTrain(req.params.id, req.body));
   });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.status(201).json(normalise(updated));
@@ -682,71 +691,12 @@ function buildPathStops(pathId, stops) {
  * Also removes any stops that ended up with both times null (e.g. from a
  * previous buggy migration run).
  */
-function stripTerminalTimes(stops) {
-  if (!stops || stops.length === 0) return stops;
-  function stopMins(s) {
-    const t = s.departure || s.arrival;
-    if (!t) return Infinity;
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
-  }
-  // Only consider stops that actually have a time when finding first/last
-  const timedStops = stops.filter((s) => s.arrival || s.departure);
-  if (timedStops.length === 0) return stops;
-  const sorted = [...timedStops].sort((a, b) => stopMins(a) - stopMins(b));
-  const firstId = sorted[0]?.id ?? sorted[0]?.station_id;
-  const lastId  = sorted[sorted.length - 1]?.id ?? sorted[sorted.length - 1]?.station_id;
-  if (firstId === lastId) return stops; // single-stop train — nothing to strip
-  return stops
-    .map((s) => {
-      const key = s.id ?? s.station_id;
-      if (key === firstId) {
-        // Origin: departure only — unless the stop has a meaningful dwell (arrival ≠ departure).
-        if (s.arrival && s.departure && s.arrival !== s.departure) return s;
-        const dep = s.departure || s.arrival;
-        return { ...s, arrival: null, departure: dep };
-      }
-      if (key === lastId) {
-        // Destination: arrival only — unless the stop has a meaningful dwell (arrival ≠ departure).
-        if (s.arrival && s.departure && s.arrival !== s.departure) return s;
-        const arr = s.arrival || s.departure;
-        return { ...s, arrival: arr, departure: null };
-      }
-      return s;
-    })
-    .filter((s) => s.arrival || s.departure); // drop any null-null stops
-}
-
-function withGuardEvents(list) {
-  const g = events.sanitizePlacements(list);
-  return g ? { guard_events: g } : {};
-}
-
-function buildStops(trainId, stops) {
-  const built = stops
-    .filter((s) => s.arrival || s.departure)
-    .map((s) => ({
-      id: uuidv4(), train_id: trainId, station_id: s.stationId,
-      arrival: s.arrival || null, departure: s.departure || null,
-      special_instructions: s.specialInstructions || null,
-      location_alias: s.locationAlias || null,
-      ...withGuardEvents(s.guardEvents),
-    }));
-  return stripTerminalTimes(built);
-}
-
-function normTime(t) {
-  if (!t || typeof t !== 'string') return t;
-  const parts = t.split(':');
-  if (parts.length < 2) return t;
-  return parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0');
-}
-
 function normalise(tt) {
   return {
     ...tt,
     paths: tt.paths ?? [],
     crews: tt.crews ?? [],
+    path_requests: tt.path_requests ?? [],
     settings: { ...DEFAULT_SETTINGS, ...(tt.settings ?? {}) },
     stations: [...tt.stations].sort(
       (a, b) =>

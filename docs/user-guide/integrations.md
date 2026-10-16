@@ -73,7 +73,7 @@ Send `{"type":"ping"}` to get a `pong`.
 ws://<server>/api/live/sync?id={timetableId}
 ```
 
-What the planner, crew view and guard panel use to hear about changes. The messages are short notices with no timetable data; clients re-fetch when told to:
+What the planner, Train Crew App, Crewing Manager and guard panel use to hear about changes. The messages are short notices with no timetable data; clients re-fetch when told to:
 
 | Message | Means |
 |---------|-------|
@@ -96,7 +96,7 @@ LiveRun uses **one MQTT broker per timetable**: the one in the timetable's fast-
 
 | Who | Direction | Topic | Payload |
 |-----|-----------|-------|---------|
-| Planner, crew view, guard panel, station feed | read | The fast-clock topic, e.g. `trains/jmri/memory/currentTime` | A 24-hour `HH:MM` anywhere in the text (seconds are ignored), or JSON with a `value` field (JMRI memory format) |
+| Planner, Train Crew App, Crewing Manager, guard panel, station feed | read | The fast-clock topic, e.g. `trains/jmri/memory/currentTime` | A 24-hour `HH:MM` anywhere in the text (seconds are ignored), or JSON with a `value` field (JMRI memory format) |
 | Server (LOA topic cache) | read | Every topic in Layout → Limit of authority | Whatever your signalling sends; matched against each element's clear/caution values |
 | Guard panel | write | Stats topic template, e.g. `trains/stats/{train}/{station}` | A count or a JSON record ([Layout settings → Stats](layout-settings.md#stats)) |
 | Guard panel | write | Guard events publish topic | JSON per fired event ([Layout settings → Guard events](layout-settings.md#guard-events)) |
@@ -168,4 +168,4 @@ The `>_` icon on a timetable (**Export timetable as CATS XML**) downloads two fi
 
 ---
 
-Last checked against v2.1.0.
+Last checked against v2.2.0.

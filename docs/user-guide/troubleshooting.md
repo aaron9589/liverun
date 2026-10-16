@@ -7,7 +7,8 @@
 - [Planner](#planner)
 - [Guard panel](#guard-panel)
 - [Limit of authority](#limit-of-authority)
-- [Crew view](#crew-view)
+- [Train Crew App and the Crewing Manager](#train-crew-app)
+- [Path requests](#path-requests)
 - [Integrations](#integrations)
 
 ## Fast clock
@@ -28,7 +29,7 @@
 | A train disappeared from the graph | It's hidden (👁), or the **Filter by crew** is on | Click 👁 in the train list; set the filter to **All operators** |
 | Train ID suggestions don't appear | No JMRI URL, or the roster can't be fetched | Layout → **JMRI** → **Test connection** |
 | Undo brought back old times but not run status | By design: run status isn't part of undo | Mark trains again, or use **✓ Reset jobs** |
-| The Up train's stops look upside down | Stops are listed in station order | That's normal; the guard panel and crew view show running order |
+| The Up train's stops look upside down | Stops are listed in station order | That's normal; the guard panel, the Train Crew App and the Crewing Manager show running order |
 
 ## Guard panel
 
@@ -60,13 +61,39 @@
 | The preview gives a train the wrong sections | Station names don't match, or **Only/Except** patterns exclude it | Section **From**/**To** must match station names exactly (case doesn't matter) |
 | Opened the doors and LOA didn't change | By design | LOA follows only the signalling |
 
-## Crew view
+## Train Crew App
+
+The Train Crew App is the phone view at `…/mobile?view=jobs`; see [Train Crew App](crew-jobs.md). The same dot and timetable behaviour applies to the [Crewing Manager](crew-view.md).
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| My trains aren't listed | The **Crew** filter is set to someone else, or you're looking at a different timetable | Open **Crew** and tick yours; check the timetable name under the title |
-| **Select Timetable** appears | No timetable is active and none is chosen | Pick one, or ask Control to make the session's timetable active |
+| A phone shows the chooser every time | By design: the chooser is the phone's home page | Open `…/mobile?view=jobs` (or `?view=board`) from a bookmark or QR code |
+| **Who are you?** shows the wrong crews, or none | The timetable has no crews, or this is a different timetable | Check the timetable name with Control; Control adds crews in the planner |
+| My jobs is empty (**No jobs for this crew yet.**) | No trains are assigned to your crew | Ask Control to assign trains, or tap **☰ → Change crew** |
+| **+ Request a path** isn't there | The timetable isn't the active one, or Control has turned off **Crews can request paths** | Ask Control to make the session's timetable active and check ⚙ → **Path requests** |
+| **Send request** is greyed out | The form isn't complete | Read the message above the button |
+| **Requests only go to the running session** (red, on the form) | The timetable stopped being active while you filled the form | Ask Control; reopen the Train Crew App to follow the active timetable |
+| **Path requests are turned off for this session** | Control switched requests off | Ask Control |
+| **Too many open requests (50)** | The timetable already has 50 open requests | Tell Control, who can decline or clear some |
+| **Can't withdraw it: the request is …** or **Can't ask to cancel it: …** (409) | Control acted at the same moment, so the card was out of date | The card updates itself; read its new status |
+| **Only the crew that made this request can …** | The phone was switched to another crew | **☰ → Change crew** back to the crew that sent it |
+| A request disappeared from My jobs without becoming a job | Control assigned the train to another crew or left it unassigned, or deleted it | Ask Control |
+| Jobs on the Crewing Manager but not in Train Crew App | Crewing Manager shows everyone's jobs unless filtered by crew | Use the **Crew** filter on the Crewing Manager, or **Change crew** in Train Crew App |
 | The dot isn't green | Reconnecting | It catches up by itself when it's back |
+| **Select Timetable** appears (Crewing Manager) | No timetable is active and none is chosen | Pick one, or ask Control to make the session's timetable active |
+
+## Path requests
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| The **Requests** button is missing | The open timetable isn't the active one and has no requests | Make it active (click its dot) |
+| **Finish or cancel plotting … first** | One request is already being plotted | **Accept** or **Cancel** that one |
+| Accept fails and says a train changed | Someone edited a train you moved while you were plotting | Your drafts are kept: **Accept** again, or **Cancel** and redo the move |
+| After a reload the draft is gone | Drafts live in the browser page only | The request is still **Plotting**: **Resume plotting** in the drawer |
+| **times from** says **No path or timetable data** | No path template and no timetabled train links those stations | Add paths ([Paths](planner.md#paths-route-templates)), or accept the **Default leg time** and adjust on the graph |
+| A leg is timed **from timetabled trains** and looks wrong | No path template reaches that station, so the trains' median running time was used | Add a path covering it, or drag the draft / use **Edit stops** |
+| Plotted times look wrong | The route was timed from the wrong path, or the default leg time | Check the **times from** line; drag the draft or use **Edit stops** |
+| The audit log is empty | New install, or the data folder was changed | The log is `audit.jsonl` in the server's data folder |
 
 ## Integrations
 
@@ -79,4 +106,4 @@
 
 ---
 
-Last checked against v2.1.0.
+Last checked against v2.2.0.

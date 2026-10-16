@@ -12,6 +12,7 @@
 - [Move trains on the graph](#move-trains-on-the-graph)
 - [Undo and redo](#undo-and-redo)
 - [Printing](#printing)
+- [Path requests](#path-requests)
 - [Settings and the fast clock](#settings-and-the-fast-clock)
 
 ![The planner: sidebar on the left, train graph on the right](images/planner-overview.png)
@@ -26,7 +27,7 @@ A timetable is one operating session: its stations, trains, paths and crews, plu
 
 **Create one:** click **+ New** under *Timetables*. Give it a name, an optional description and the **Graph start time** / **Graph end time** (the span of the time axis). Stations and trains are added afterwards.
 
-> **Note** The description is shown under the timetable's name in the crew view's timetable list. Use it as the operating brief for the session (crew numbers, extras, special arrangements).
+> **Note** The description is shown under the timetable's name in the Crewing Manager's timetable list. Use it as the operating brief for the session (crew numbers, extras, special arrangements).
 
 **Open one:** click its name. The open timetable shows a row of icons (hover one for its name):
 
@@ -46,7 +47,8 @@ The dot before each timetable name is its **active** flag. Click it to make that
 
 The active timetable is the one the session runs on:
 
-- the **guard panel** and **crew view** follow it (and tell their users when Control switches to another one);
+- **Train Crew App**, the **Crewing Manager** and the **guard panel** follow it (and tell their users when Control switches to another one);
+- crews' [path requests](path-requests.md) only go to it, and the **Requests** button shows in the header;
 - the **live API**, station boards and the Limit of Authority topic cache use it.
 
 ---
@@ -93,7 +95,7 @@ Under **Trains**, click **+ Add** (or click any train to edit it). The graph pre
 | **Path (optional)** | A route template to pre-fill stops (above) |
 | **Train name** | The train's number or name, e.g. `KN-6` |
 | **Line colour** | Its colour on the graph (12 presets or a custom colour) |
-| **Notes (optional)** | Shown in tooltips, on station reports, in the crew view and the guard panel, and as *Train Notes* in the live API |
+| **Notes (optional)** | Shown in tooltips, on station reports, in the Train Crew App, the Crewing Manager and the guard panel, and as *Train Notes* in the live API |
 | **Train ID** | The loco's **JMRI roster name**. When a JMRI URL is set in [Layout settings](layout-settings.md#jmri), you get suggestions from the roster (an entry that isn't in the roster is marked *not in roster*, but still saves). The guard panel drives this loco, and the matching [train profile](layout-settings.md#train-profiles) is shown as a chip |
 | **Direction** | Free text, e.g. `Up`, `Down`, `FWD`. Shown on the guard panel; [boarding rules](layout-settings.md#boarding) can match it. (The live API's up/down filter works direction out from station order instead) |
 | **Crew** | Who works the train (**— Unassigned —** for nobody) |
@@ -110,7 +112,7 @@ Every station is listed in station order. Leave a station blank to skip it. For 
 - **Alias…** (only at stations that allow it): a different name for this train's stop here. For example, a staging road can stand in for "Sydney Terminal". Reports, tooltips and the guard panel show the alias, with the real station underneath.
 - **Guard events (n)**: hidden, scripted events for the guard panel. See [below](#guard-events-on-a-stop).
 
-> **Note** Stops are stored in station order, so an Up train is listed bottom to top. The guard panel and crew view always show stops in **running order**.
+> **Note** Stops are stored in station order, so an Up train is listed bottom to top. The guard panel, the Train Crew App and the Crewing Manager always show stops in **running order**.
 
 ### Guard events on a stop
 
@@ -193,7 +195,7 @@ You can retime trains by dragging them on the graph. Running times never change;
 4. Moved trains stay on the graph as drafts, with a faint dashed ghost of the original. The bar reads **n trains moved — not saved**.
 5. **Done** saves every move as one undo step. **Cancel** discards them all. **Escape** cancels the drag in progress.
 
-**What others see:** the moves reach the guard panel and crew view as soon as you press **Done** (a "retimed" notice, and changed stops flash).
+**What others see:** the moves reach the guard panel, the Train Crew App and the Crewing Manager as soon as you press **Done** (a "retimed" notice, and changed stops flash).
 
 **If it goes wrong:** Done only changes times, and only on a train's *current* stops. If someone edited a moved train's stops while you were dragging it, the save is refused with a message that its stops were changed after it was moved. Your moves stay on the graph: press **Done** to try again, or **Cancel** and start again.
 
@@ -220,6 +222,10 @@ The 🖨 menu in the header has three print options:
 
 ---
 
+## Path requests
+
+When the timetable is active, crews can ask for paths from their phones ([Train Crew App](crew-jobs.md#requesting-a-path)). The **Requests** button in the header opens a drawer with their requests, and a badge counts those waiting for you. From there you acknowledge a request, plot it on the graph and accept it, and the new train appears in the crew's jobs. The whole flow, including the audit log, is in [Path requests](path-requests.md). Requests aren't part of undo.
+
 ## Settings and the fast clock
 
 ![Settings](images/planner-settings.png)
@@ -229,6 +235,7 @@ The ⚙ button opens settings:
 - **Station labels**: show station **Code**s or **Name**s on the graph. This is saved on this browser.
 - **Distance unit**: whether km labels read km or mi (the numbers aren't converted). This is saved on this browser.
 - **Fast clock**: per timetable. Turn on **Enable**, enter the **Broker URL (ws:// or wss://)** of your MQTT broker's WebSocket listener and the **MQTT topic** your clock publishes to. The status shows **Connected** when it's working, and the header shows a green dot and the topic. The payload can be a 24-hour `HH:MM` or JMRI's JSON with a `value` field.
+- **Path requests**: whether crews can request paths, the name prefix for new trains and the default timings used when plotting. See [Path requests → Settings](path-requests.md#settings).
 - **JMRI integration**: **Download liverun-clock.py**, a Jython script that publishes JMRI's fast clock to the topic above (JMRI 4.17+). **How to use in JMRI** has the steps.
 - **Layout settings…**: shortcut to [Layout settings](layout-settings.md).
 - **Developer tools**: **WS Inspector** (watch the live WebSockets) and **API Schema** (the interactive API reference at `/api/docs`).
@@ -237,4 +244,4 @@ The same broker carries everything else LiveRun does over MQTT: Limit of Authori
 
 ---
 
-Last checked against v2.1.0.
+Last checked against v2.2.0.

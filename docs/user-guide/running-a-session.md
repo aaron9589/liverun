@@ -13,7 +13,7 @@
 **In the planner**
 
 1. **Back up.** Export the timetable as JSON (and **Export layout JSON** in Layout settings). If anything goes wrong, importing it gets you back.
-2. **Make the timetable active**: click its dot so it shows 🟢. The crew view, guard panel, live API and LOA all follow the active timetable.
+2. **Make the timetable active**: click its dot so it shows 🟢. Train Crew App, the Crewing Manager, guard panel, live API and LOA all follow the active timetable. Path requests only go to the active timetable.
 3. **Fast clock**: check the header shows a green dot and the clock topic, and the dashed clock line is moving on the graph. See [Settings and the fast clock](planner.md#settings-and-the-fast-clock).
 4. **Crews**: every train has a crew, there are no **⚠ overlap** warnings, and **Guard** is ticked for each crew that will use the guard panel.
 5. **Layout settings** (if you use the guard panel): the JMRI URL passes **Test connection**; [train profiles](layout-settings.md#train-profiles) cover your locos (check the preview); LOA elements show live dots.
@@ -21,7 +21,7 @@
 
 **On the tablets and phones**
 
-1. Open LiveRun. Choose **Guard panel** or **Crew view** in the mode picker and tick **Remember this choice**.
+1. Open LiveRun and pick a screen in the chooser: **Guard Panel** on tablets, **Train Crew App** (each crew picks itself under **Who are you?**) or **Crewing Manager** on phones. Hand out `…/mobile?view=jobs` or `…/guard` as a QR code or bookmark to skip the chooser.
 2. Guard panel: **Tap to start**, then pick the crew.
 3. Guard panel: open the **first train before Control sets up its authority** ([why](limit-of-authority.md#operating-rules)).
 4. Check the guard panel's **Live**, **JMRI** and **Clock** dots are green.
@@ -32,7 +32,7 @@
 
 You can change the timetable while the session runs. Changes reach crews within a second or two, with nothing to refresh:
 
-| You… | Guard panel | Crew view |
+| You… | Guard panel | Train Crew App and Crewing Manager |
 |------|-------------|-----------|
 | retime a train (editor or [graph](planner.md#move-trains-on-the-graph)) | **KN-6 retimed**; changed stops flash | **KN-6 retimed**; times highlighted |
 | give a crew a train | **New job: …** with the alert sound | **New job: …**; the card is marked **NEW** |
@@ -49,7 +49,13 @@ Turn on **✎ Edit**, drag, then **Done**. Nothing reaches crews until **Done**,
 
 ### Run status
 
-Crews mark trains running and completed from the crew view (**Run** → **Done**). You can do the same from the planner's crew list (▶ / ✓ / ↺). Running trains glow on the graph; completed ones turn grey. Statuses aren't part of undo.
+Crews mark trains running and completed from the Train Crew App (their own jobs) or the Crewing Manager (any train): **Run** → **Done** → **Reset**. You can do the same from the planner's crew list (▶ / ✓ / ↺). Running trains glow on the graph; completed ones turn grey. Statuses aren't part of undo.
+
+### Path requests
+
+Crews can ask for extra paths from Train Crew App. A toast tells you (**… requests a path: …**) and the **Requests** button shows a badge. Open the drawer, **Acknowledge & plot**, adjust on the graph and **Accept**, or **Decline** with a reason. The crew sees every step on their phone. Crews can also withdraw a request, or ask to cancel an accepted one, which you approve or reject. If you'd rather not take requests for a while, switch off ⚙ → **Path requests** → **Crews can request paths**. See [Path requests](path-requests.md).
+
+Settled requests leave the drawer by themselves; the audit log keeps the record.
 
 ### Limit of authority
 
@@ -57,7 +63,7 @@ Watch the guard panel's strip, or the dots in **Layout → Limit of authority**.
 
 ## After the session
 
-1. **Reset run statuses**: **✓ Reset jobs** in the planner header (or **Reset all statuses** in the crew view).
+1. **Reset run statuses**: **✓ Reset jobs** in the planner header (or **Reset all statuses** on the Crewing Manager).
 2. **Back up** again if you changed the timetable during the session.
 3. Leave the timetable active, or clear the flag. Tablets forget their LOA state and rolled guard events by themselves 12 hours after the session.
 
@@ -67,4 +73,4 @@ See [Troubleshooting](troubleshooting.md). If the data itself is wrong, **undo**
 
 ---
 
-Last checked against v2.1.0.
+Last checked against v2.2.0.

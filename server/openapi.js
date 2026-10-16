@@ -4,7 +4,7 @@ const spec = {
   openapi: '3.0.3',
   info: {
     title: 'LiveRun Live API',
-    version: '2.1.0',
+    version: '2.2.0',
     description:
       'Read-only endpoints intended for external systems such as guard panels, ' +
       'operator displays, and JMRI integrations. ' +
@@ -13,14 +13,66 @@ const spec = {
   },
   tags: [
     { name: 'Live API', description: 'Read-only endpoints for external systems' },
+    { name: 'Path requests', description: 'Crews ask Control for a path; Control acknowledges, declines or accepts it. Every call except the list is written to the audit log.' },
   ],
   components: {
+    schemas: {
+      PathRequest: {
+        type: 'object',
+        required: ['id', 'timetable_id', 'crew_id', 'stops', 'status', 'created_at', 'updated_at'],
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          timetable_id: { type: 'string' },
+          crew_id: { type: 'string', description: 'Requesting crew' },
+          loco: { type: 'string', description: 'JMRI roster name or free text' },
+          stops: {
+            type: 'array',
+            description: 'Running order: origin, work stops, destination',
+            items: {
+              type: 'object',
+              properties: {
+                station_id: { type: 'string' },
+                location_alias: { type: 'string', nullable: true, description: 'Siding/road; only where the station has alias_enabled' },
+                kind: { type: 'string', enum: ['stop', 'shunt', 'work'], description: 'Origin and destination are always stop' },
+                minutes: { type: 'integer', minimum: 0, maximum: 240 },
+                note: { type: 'string' },
+              },
+            },
+          },
+          ready_at: { type: 'string', nullable: true, example: '14:20', description: 'Fast-clock HH:MM; null = as soon as possible' },
+          notes: { type: 'string' },
+          status: { type: 'string', enum: ['pending', 'in_review', 'accepted', 'declined', 'withdrawn', 'cancelled'] },
+          created_at: { type: 'string', format: 'date-time' },
+          updated_at: { type: 'string', format: 'date-time' },
+          control_note: { type: 'string', description: 'Control to crew; set on decline' },
+          train_id_created: { type: 'string', description: 'Train.id once accepted' },
+          assigned_crew_id: { type: 'string' },
+          cancel_ask: {
+            type: 'object',
+            properties: {
+              at: { type: 'string', format: 'date-time' },
+              reason: { type: 'string' },
+              status: { type: 'string', enum: ['open', 'rejected', 'approved'] },
+              control_note: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
     responses: {
       NotFound: {
         description: 'Not found',
         content: {
           'application/json': {
             schema: { type: 'object', properties: { error: { type: 'string' } } },
+          },
+        },
+      },
+      WrongState: {
+        description: 'The request is in the wrong state for this action (e.g. the crew withdrew it meanwhile)',
+        content: {
+          'application/json': {
+            schema: { type: 'object', properties: { error: { type: 'string' }, status: { type: 'string', description: 'Current request status', example: 'withdrawn' } } },
           },
         },
       },
@@ -206,6 +258,341 @@ const spec = {
         },
       },
     },
+    '/api/timetables/{id}/settings': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+      ],
+      put: {
+        tags: ['Path requests'],
+        summary: 'Update timetable settings (path-request keys shown)',
+        description:
+          'Only the path-request keys are documented here; the same body also takes the clock keys (`clock_enabled`, `clock_broker_url`, `clock_topic`), `graph_scale` and `auto_assign_min_break`. ' +
+          'Keys that are sent are validated and stored; a bad value is refused with 400 and nothing is saved. Returns the full timetable.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  requests_enabled: { type: 'boolean', description: 'Default true. Off: new submits are refused (400)' },
+                  request_train_prefix: { type: 'string', pattern: '^[A-Za-z0-9-]{1,8}$', default: 'PR', description: 'Prefix for the train IDs created on accept' },
+                  request_default_leg_min: { type: 'integer', minimum: 1, maximum: 120, default: 5, description: 'Minutes per leg when no path template gives a time' },
+                  request_lead_min: { type: 'integer', minimum: 0, maximum: 60, default: 2, description: 'Lead time (minutes) for "as soon as possible" requests' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'The updated timetable' },
+          400: { description: 'A value is out of range or malformed (see error)' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/timetables/{id}/path-requests': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+      ],
+      get: {
+        tags: ['Path requests'],
+        summary: 'List path requests',
+        description: 'Also part of `GET /api/timetables/{id}` (`path_requests`, always an array). Not audited.',
+        responses: {
+          200: { description: 'Requests', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/PathRequest' } } } } },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+      post: {
+        tags: ['Path requests'],
+        summary: 'Submit a path request (crew)',
+        description:
+          'Files a new `pending` request. Only the active timetable takes requests, and only while `settings.requests_enabled` is not false. ' +
+          '2–20 stops in running order, unique stations; origin and destination are stored as kind `stop` with 0 minutes; `locationAlias` is kept only where the station has `alias_enabled`. ' +
+          'Text is trimmed: loco ≤ 60, stop note ≤ 200, siding ≤ 60, notes ≤ 500 characters. At most 50 open (pending/in_review) requests per timetable. ' +
+          'Request-only change: the live sync socket sends `path-requests` with `rev`, not `timetable-updated`. Optional headers `X-LiveRun-Device` and `X-LiveRun-Clock` go to the audit log.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['crewId', 'stops'],
+                properties: {
+                  crewId: { type: 'string' },
+                  loco: { type: 'string', example: '3001' },
+                  stops: {
+                    type: 'array',
+                    minItems: 2,
+                    maxItems: 20,
+                    items: {
+                      type: 'object',
+                      required: ['stationId'],
+                      properties: {
+                        stationId: { type: 'string' },
+                        locationAlias: { type: 'string', nullable: true },
+                        kind: { type: 'string', enum: ['stop', 'shunt', 'work'], description: 'Required on intermediate stops' },
+                        minutes: { type: 'integer', minimum: 0, maximum: 240, description: 'Required on intermediate stops' },
+                        note: { type: 'string', maxLength: 200 },
+                      },
+                    },
+                  },
+                  readyAt: { type: 'string', nullable: true, example: '14:20', description: 'HH:MM, or null / absent for as soon as possible' },
+                  notes: { type: 'string', maxLength: 500 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: { description: 'Full updated timetable' },
+          400: { description: 'Malformed request, not the active timetable, or requests turned off' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { description: 'Too many open requests (50)' },
+        },
+      },
+      delete: {
+        tags: ['Path requests'],
+        summary: 'Clear closed requests (Control)',
+        description: 'Removes declined, withdrawn and cancelled requests, and accepted ones unless a cancel ask is open. The audit entry lists the removed ids.',
+        parameters: [
+          { name: 'closed', in: 'query', required: true, schema: { type: 'string', enum: ['true'] } },
+        ],
+        responses: {
+          200: { description: 'Full updated timetable' },
+          400: { description: '`closed=true` missing' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/timetables/{id}/path-requests/{reqId}/withdraw': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+        { name: 'reqId', in: 'path', required: true, schema: { type: 'string' }, description: 'Path request ID' },
+      ],
+      post: {
+        tags: ['Path requests'],
+        summary: 'Withdraw a request (crew)',
+        description: 'pending or in_review → withdrawn. The audit entry notes whether Control was plotting it.',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['crewId'], properties: { crewId: { type: 'string', description: 'Acting crew; must be the requester' } } } } } },
+        responses: {
+          200: { description: 'Full updated timetable' },
+          403: { description: 'Not the requesting crew' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { $ref: '#/components/responses/WrongState' },
+        },
+      },
+    },
+    '/api/timetables/{id}/path-requests/{reqId}/acknowledge': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+        { name: 'reqId', in: 'path', required: true, schema: { type: 'string' }, description: 'Path request ID' },
+      ],
+      post: {
+        tags: ['Path requests'],
+        summary: 'Acknowledge a request (Control)',
+        description: 'pending → in_review (Control is plotting it).',
+        responses: {
+          200: { description: 'Full updated timetable' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { $ref: '#/components/responses/WrongState' },
+        },
+      },
+    },
+    '/api/timetables/{id}/path-requests/{reqId}/release': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+        { name: 'reqId', in: 'path', required: true, schema: { type: 'string' }, description: 'Path request ID' },
+      ],
+      post: {
+        tags: ['Path requests'],
+        summary: 'Return a request to the queue (Control)',
+        description: 'in_review → pending. Also reopens an accepted request whose train no longer exists (e.g. undone), clearing the train link, assigned crew, note and cancel ask.',
+        responses: {
+          200: { description: 'Full updated timetable' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { $ref: '#/components/responses/WrongState' },
+        },
+      },
+    },
+    '/api/timetables/{id}/path-requests/{reqId}/decline': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+        { name: 'reqId', in: 'path', required: true, schema: { type: 'string' }, description: 'Path request ID' },
+      ],
+      post: {
+        tags: ['Path requests'],
+        summary: 'Decline a request (Control)',
+        description: 'pending or in_review → declined, with a required note to the crew (`control_note`).',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['note'], properties: { note: { type: 'string', maxLength: 300 } } } } } },
+        responses: {
+          200: { description: 'Full updated timetable' },
+          400: { description: 'Note missing or longer than 300 characters' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { $ref: '#/components/responses/WrongState' },
+        },
+      },
+    },
+    '/api/timetables/{id}/path-requests/{reqId}/accept': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+        { name: 'reqId', in: 'path', required: true, schema: { type: 'string' }, description: 'Path request ID' },
+      ],
+      post: {
+        tags: ['Path requests'],
+        summary: 'Accept a request (Control)',
+        description:
+          'in_review → accepted, in one mutation: creates the train (same normalisation and terminal-stop rules as `POST /trains`, plus `request_id`), ' +
+          'applies `retime` (other trains moved while plotting; same shape and all-or-nothing rules as `POST /trains/retime`), and sets ' +
+          '`train_id_created`, `assigned_crew_id` (the train\'s crew, or null) and `control_note`. ' +
+          'The train needs a name (≤ 60), existing and unique stations, HH:MM or null times with at least 2 timed stops, and an existing crew or none. ' +
+          'Notifying change: the live sync socket sends `timetable-updated` and `path-requests` (without `rev`). ' +
+          'The audit entry records the train, the assigned crew if it isn\'t the requester, the note and each moved train (old → new times).',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['train'],
+                properties: {
+                  train: {
+                    type: 'object',
+                    required: ['name', 'stops'],
+                    properties: {
+                      name: { type: 'string', maxLength: 60, example: 'PR3' },
+                      color: { type: 'string', example: '#3b82f6', description: '#hex; default #3b82f6' },
+                      notes: { type: 'string' },
+                      trainId: { type: 'string', example: '3001', description: 'JMRI roster name' },
+                      direction: { type: 'string', example: 'Up' },
+                      crewId: { type: 'string', nullable: true, description: 'Empty or null = unassigned' },
+                      stops: {
+                        type: 'array',
+                        description: 'Station order; stops without a time are dropped',
+                        items: {
+                          type: 'object',
+                          required: ['stationId'],
+                          properties: {
+                            stationId: { type: 'string' },
+                            arrival: { type: 'string', nullable: true, example: '14:20' },
+                            departure: { type: 'string', nullable: true, example: '14:30' },
+                            specialInstructions: { type: 'string' },
+                            locationAlias: { type: 'string', nullable: true },
+                            guardEvents: { type: 'array', items: { type: 'object' } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  retime: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['trainId', 'times'],
+                      properties: {
+                        trainId: { type: 'string' },
+                        times: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            required: ['stationId'],
+                            properties: {
+                              stationId: { type: 'string' },
+                              arrival: { type: 'string', nullable: true },
+                              departure: { type: 'string', nullable: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  note: { type: 'string', maxLength: 300, description: 'Optional note to the crew (`control_note`)' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Full updated timetable' },
+          400: { description: 'Malformed train, retime or note' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: {
+            description: 'Not in review any more (e.g. withdrawn meanwhile), or a moved train changed after it was moved (`conflicts`). Nothing is saved.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    error: { type: 'string' },
+                    status: { type: 'string', example: 'withdrawn' },
+                    conflicts: { type: 'array', items: { type: 'string' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/api/timetables/{id}/path-requests/{reqId}/cancel-ask': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+        { name: 'reqId', in: 'path', required: true, schema: { type: 'string' }, description: 'Path request ID' },
+      ],
+      post: {
+        tags: ['Path requests'],
+        summary: 'Ask to cancel an accepted path (crew)',
+        description: 'Opens `cancel_ask` on an accepted request. One open ask at a time; the crew may ask again after a rejection.',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['crewId'], properties: { crewId: { type: 'string' }, reason: { type: 'string', maxLength: 300 } } } } } },
+        responses: {
+          200: { description: 'Full updated timetable' },
+          400: { description: 'Reason longer than 300 characters' },
+          403: { description: 'Not the requesting crew' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { $ref: '#/components/responses/WrongState' },
+        },
+      },
+    },
+    '/api/timetables/{id}/path-requests/{reqId}/cancel-approve': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+        { name: 'reqId', in: 'path', required: true, schema: { type: 'string' }, description: 'Path request ID' },
+      ],
+      post: {
+        tags: ['Path requests'],
+        summary: 'Approve a crew\'s ask to cancel (Control)',
+        description:
+          'Open cancel ask → approved (optional note as `cancel_ask.control_note`), request → cancelled, and the train it created is deleted ' +
+          '(if it still exists) in the same mutation. Notifying change: the live sync socket sends `timetable-updated` and `path-requests` (without `rev`). ' +
+          'The audit entry records the deleted train (or null) and the note.',
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { note: { type: 'string', maxLength: 300 } } } } } },
+        responses: {
+          200: { description: 'Full updated timetable' },
+          400: { description: 'Note longer than 300 characters' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { $ref: '#/components/responses/WrongState' },
+        },
+      },
+    },
+    '/api/timetables/{id}/path-requests/{reqId}/cancel-reject': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Timetable ID' },
+        { name: 'reqId', in: 'path', required: true, schema: { type: 'string' }, description: 'Path request ID' },
+      ],
+      post: {
+        tags: ['Path requests'],
+        summary: 'Refuse a crew\'s ask to cancel (Control)',
+        description: 'Open cancel ask → rejected, with a required note. The train stays.',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['note'], properties: { note: { type: 'string', maxLength: 300 } } } } } },
+        responses: {
+          200: { description: 'Full updated timetable' },
+          400: { description: 'Note missing or longer than 300 characters' },
+          404: { $ref: '#/components/responses/NotFound' },
+          409: { $ref: '#/components/responses/WrongState' },
+        },
+      },
+    },
     '/api/timetables/{id}/live/trains': {
       parameters: [
         { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' }, description: 'Timetable ID' },
@@ -373,6 +760,33 @@ const spec = {
             },
           },
           404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/api/audit': {
+      get: {
+        tags: ['Path requests'],
+        summary: 'Path-request audit log',
+        description: 'Append-only log of path-request actions (who, from which device, when, what). Newest first; reads the current and the previous rotated file. With `format=csv` it downloads `liverun-audit.csv`.',
+        parameters: [
+          { name: 'timetableId', in: 'query', schema: { type: 'string' } },
+          { name: 'requestId', in: 'query', schema: { type: 'string' } },
+          { name: 'crewId', in: 'query', schema: { type: 'string' } },
+          { name: 'ip', in: 'query', schema: { type: 'string' } },
+          { name: 'device', in: 'query', schema: { type: 'string' } },
+          { name: 'action', in: 'query', schema: { type: 'string', enum: ['submit', 'withdraw', 'acknowledge', 'release', 'decline', 'accept', 'cancel-ask', 'cancel-approve', 'cancel-reject', 'clear'] } },
+          { name: 'before', in: 'query', description: 'ISO time: only entries strictly earlier (paging).', schema: { type: 'string' } },
+          { name: 'limit', in: 'query', description: 'Default 200, max 1000.', schema: { type: 'integer', minimum: 1, maximum: 1000 } },
+          { name: 'format', in: 'query', schema: { type: 'string', enum: ['json', 'csv'] } },
+        ],
+        responses: {
+          200: {
+            description: 'Audit entries, newest first',
+            content: {
+              'application/json': { schema: { type: 'array', items: { type: 'object' } } },
+              'text/csv': { schema: { type: 'string' } },
+            },
+          },
         },
       },
     },

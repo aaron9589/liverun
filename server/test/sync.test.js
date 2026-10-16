@@ -173,8 +173,8 @@ test('sync socket: LOA snapshot after hello, coalesced deltas to every client, f
     const b = connect(port, 'other');
     await a.next((m) => m.type === 'loa-values');
     await b.next((m) => m.type === 'loa-values');
-    assert.deepStrictEqual(a.messages.map((m) => m.type), ['hello', 'completions', 'loa-values']);
-    assert.deepStrictEqual(a.messages[2], { type: 'loa-values', values: { sig: { value: 'THROWN', at: 't0' } }, full: true });
+    assert.deepStrictEqual(a.messages.map((m) => m.type), ['hello', 'completions', 'path-requests', 'loa-values']);
+    assert.deepStrictEqual(a.messages[3], { type: 'loa-values', values: { sig: { value: 'THROWN', at: 't0' } }, full: true });
 
     // A burst of changes → one delta with the latest value per topic, to every timetable's clients
     emit({ values: { sig: { value: 'CLOSED', at: 't1' } }, full: false });
@@ -200,4 +200,47 @@ test('sync socket: LOA snapshot after hello, coalesced deltas to every client, f
     await new Promise((r) => server.close(r));
   }
   assert.strictEqual(listeners.size, 0, 'close unsubscribes');
+});
+
+test('sync socket: path-request list after hello (no rev), requests-only changes carry rev', async () => {
+  const pr = { id: 'r1', timetable_id: 'tt', crew_id: 'c1', status: 'pending', stops: [] };
+  db.writeDB({ timetables: [
+    { id: 'tt', name: 'A', rev: 2, trains: [], path_requests: [pr] },
+    { id: 'other', name: 'B', trains: [] },
+  ] });
+  const sync = createSync({ getTimetable: db.getTimetable, getActiveId: () => 'tt', onTimetableChange: db.onTimetableChange, coalesceMs: 40 });
+  const server = http.createServer();
+  server.on('upgrade', (req, socket, head) => sync.handleUpgrade(req, socket, head));
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address();
+
+  try {
+    const a = connect(port, 'tt');
+    const b = connect(port, 'other');
+    const first = await a.next((m) => m.type === 'path-requests');
+    assert.deepStrictEqual(first, { type: 'path-requests', timetableId: 'tt', requests: [pr] });
+    assert.deepStrictEqual(a.messages.slice(0, 3).map((m) => m.type), ['hello', 'completions', 'path-requests']);
+    const none = await b.next((m) => m.type === 'path-requests');
+    assert.deepStrictEqual(none.requests, [], 'a timetable without requests sends an empty list');
+
+    // Request-only mutation: no update notice; the rev rides on the request list
+    const updated = db.mutateTimetable('tt', (tt) => { tt.path_requests[0].status = 'in_review'; }, { notify: false });
+    sync.broadcastPathRequests('tt', updated, { requestsOnly: true });
+    const msg = await a.next((m) => m.type === 'path-requests' && m.rev === 3);
+    assert.strictEqual(msg.requests[0].status, 'in_review');
+
+    // Without requestsOnly (accept / cancel-approve) there is no rev
+    sync.broadcastPathRequests('tt', updated);
+    await new Promise((r) => setTimeout(r, 80));
+    const lists = a.messages.filter((m) => m.type === 'path-requests');
+    assert.strictEqual(lists.length, 3);
+    assert.ok(!('rev' in lists[2]));
+    assert.ok(!a.messages.some((m) => m.type === 'timetable-updated'));
+    assert.strictEqual(b.messages.filter((m) => m.type === 'path-requests').length, 1, 'other timetables are not told');
+    a.ws.close();
+    b.ws.close();
+  } finally {
+    sync.close();
+    await new Promise((r) => server.close(r));
+  }
 });

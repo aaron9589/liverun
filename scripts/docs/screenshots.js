@@ -192,6 +192,7 @@ async function seed(pub) {
 const DESKTOP = { width: 1440, height: 900 };
 const TABLET = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
+const PHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 
 const byName = (list, name) => {
   const found = list.find((x) => x.name === name);
@@ -253,13 +254,13 @@ async function openGuard(page, ctx, { crew, train, clock, waitThrottle = true })
   await page.waitForTimeout(800);
 }
 
-/** Opens the crew view filtered to one crew. */
+/** Opens the Running board (the mobile view's board) filtered to one crew. */
 async function openCrew(page, ctx, { crew, clock }) {
   ctx.pub.setClock(clock);
   await page.addInitScript((kv) => { for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v); }, {
     'mob:crewFilter': JSON.stringify(crew ? [crewOf(ctx, crew).id] : []),
   });
-  await page.goto(`${ctx.app}mobile`, { waitUntil: 'networkidle' });
+  await page.goto(`${ctx.app}mobile?view=board`, { waitUntil: 'networkidle' });
   const pick = page.getByRole('button', { name: ctx.timetable.name });
   if (await pick.isVisible().catch(() => false)) await pick.click();
   await page.waitForTimeout(1200);
@@ -289,6 +290,94 @@ async function openLayout(page, ctx, label) {
   await page.getByTitle('Layout settings').click();
   await page.getByRole('button', { name: label, exact: true }).first().click();
   await page.waitForTimeout(600);
+}
+
+/**
+ * Opens the Train Crew App (…/mobile?view=jobs) as one crew, with the crew choice stored for
+ * this timetable. `openOnly` saves card state so only that job is open.
+ */
+async function openJobs(page, ctx, { crew, clock, openOnly }) {
+  ctx.pub.setClock(clock);
+  const crewId = crewOf(ctx, crew).id;
+  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), [`jobs:crew:${ctx.timetable.id}`, crewId]);
+  if (openOnly) {
+    const open = Object.fromEntries(ctx.timetable.trains.filter((t) => t.crew_id === crewId).map((t) => [t.id, t.name === openOnly]));
+    await page.addInitScript(([k, v]) => localStorage.setItem(k, v), [`jobs:open:${ctx.timetable.id}`, JSON.stringify(open)]);
+  }
+  await page.goto(`${ctx.app}mobile?view=jobs`, { waitUntil: 'networkidle' });
+  await page.getByRole('heading', { name: 'My jobs' }).waitFor();
+  await page.waitForTimeout(1200);
+}
+
+// ── Path requests: seeding and cleaning up (import drops requests; restore keeps them) ──
+
+const DEVICE_HEADERS = {
+  // What the audit log records for a phone: a device id and a browser.
+  'X-LiveRun-Device': 'f3a91c7e2b64',
+  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1',
+};
+
+/** API call with extra headers (device, fast clock) so audit rows look like they came from a phone. */
+async function apiAs(headers, method, p, body) {
+  const res = await fetch(API + p, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${method} ${p} → ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+/**
+ * A crew submits a request. stops: [[station, kind?, minutes?, note?], …] in route order
+ * (first and last are plain stops). Returns the new request.
+ */
+async function submitRequest(ctx, crewName, { stops, loco, readyAt = null, notes, clock = '12:05' }) {
+  const body = {
+    crewId: crewOf(ctx, crewName).id,
+    ...(loco ? { loco } : {}),
+    stops: stops.map(([station, kind = 'stop', minutes = 0, note]) => ({
+      stationId: stationOf(ctx, station).id, kind, minutes, ...(note ? { note } : {}),
+    })),
+    readyAt,
+    ...(notes ? { notes } : {}),
+  };
+  const tt = await apiAs({ ...DEVICE_HEADERS, 'X-LiveRun-Clock': clock }, 'POST', `/timetables/${ctx.timetable.id}/path-requests`, body);
+  return tt.path_requests[tt.path_requests.length - 1];
+}
+
+const reqUrl = (ctx, r, action) => `/timetables/${ctx.timetable.id}/path-requests/${r.id}/${action}`;
+
+/** Control accepts a request with a two-stop train (times fixed, so the shot is repeatable). */
+function acceptRequest(ctx, r, { name, crew, from, to, dep, arr, note }) {
+  return ctx.api('POST', reqUrl(ctx, r, 'accept'), {
+    train: {
+      name, color: crewOf(ctx, crew).color, crewId: crewOf(ctx, crew).id,
+      stops: [
+        { stationId: stationOf(ctx, from).id, arrival: null, departure: dep },
+        { stationId: stationOf(ctx, to).id, arrival: arr, departure: null },
+      ],
+    },
+    ...(note ? { note } : {}),
+  });
+}
+
+/** Back to no requests and the seeded trains: decline what's open, drop closed rows, restore the trains. */
+async function cleanRequests(ctx) {
+  const tt = await ctx.api('GET', `/timetables/${ctx.timetable.id}`);
+  for (const r of tt.path_requests || []) {
+    if (['pending', 'in_review'].includes(r.status)) await ctx.api('POST', reqUrl(ctx, r, 'decline'), { note: 'cleanup' });
+    else if (r.status === 'accepted' && r.cancel_ask?.status === 'open') await ctx.api('POST', reqUrl(ctx, r, 'cancel-reject'), { note: 'cleanup' });
+  }
+  await restoreTimetable(ctx);
+  await ctx.api('DELETE', `/timetables/${ctx.timetable.id}/path-requests?closed=true`);
+}
+
+/** Opens the Requests drawer in the planner. */
+async function openRequests(page) {
+  await page.getByTitle('Path requests from crews').click();
+  await page.getByLabel('Path requests').waitFor();
+  await page.waitForTimeout(800);
 }
 
 const GUARD_CREW = 'Local Operator 5';
@@ -579,6 +668,160 @@ const SHOTS = [
       await restoreTimetable(ctx);
     },
   },
+
+  // ── Mobile: Train Crew App ──
+  {
+    name: 'mobile-view-picker',
+    viewport: PHONE,
+    scale: 2,
+    userAgent: PHONE_UA, // the chooser leaves out the Train Graph on a phone
+    async run(page, ctx) {
+      await page.goto(ctx.app, { waitUntil: 'networkidle' });
+      await page.getByText('What do you want to open?').waitFor();
+      await page.screenshot({ path: ctx.out('mobile-view-picker') });
+    },
+  },
+  {
+    name: 'jobs-overview',
+    viewport: PHONE,
+    scale: 2,
+    async run(page, ctx) {
+      await openJobs(page, ctx, { crew: GUARD_CREW, clock: '12:05', openOnly: GUARD_TRAIN });
+      // KN-6 is the job at 12:05; its Berry stop carries a special instruction.
+      await page.getByText('Work with Berry Signaller').first().waitFor();
+      await scrollToText(page, 'My jobs');
+      await page.getByText('KN-6', { exact: true }).first().evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: ctx.out('jobs-overview') });
+    },
+  },
+  {
+    name: 'jobs-request-form',
+    viewport: { width: 390, height: 1250 },
+    scale: 2,
+    async run(page, ctx) {
+      await openJobs(page, ctx, { crew: GUARD_CREW, clock: '12:05' });
+      await page.getByRole('button', { name: '+ Request a path' }).click();
+      const form = page.getByRole('dialog', { name: 'Request a path' });
+      await form.getByLabel('From (where you are now)').selectOption({ label: 'Kiama' });
+      await form.getByRole('button', { name: '+ Add stop' }).click();
+      await form.getByLabel('Station', { exact: true }).selectOption({ label: 'Bombo' });
+      await form.getByRole('button', { name: 'Shunt' }).click();
+      await form.getByLabel('Minutes on site').fill('20');
+      await form.getByLabel('Note for this stop').fill('drop 2 wagons');
+      await form.getByLabel('To (where you want to go)').selectOption({ label: 'Kembla Heights' });
+      await form.getByLabel('Notes for Control').fill('Loco needs to be back at Kiama by 13:30.');
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: ctx.out('jobs-request-form') });
+    },
+  },
+  {
+    name: 'jobs-requests',
+    viewport: PHONE,
+    scale: 2,
+    async run(page, ctx) {
+      try {
+        // Oldest first: the accepted one, the declined one, then the one still waiting.
+        const done = await submitRequest(ctx, GUARD_CREW, { stops: [['Nowra'], ['Berry']], loco: 'CityRail 4T' });
+        await ctx.api('POST', reqUrl(ctx, done, 'acknowledge'));
+        await acceptRequest(ctx, done, { name: 'PR1', crew: GUARD_CREW, from: 'Nowra', to: 'Berry', dep: '12:40', arr: '13:02', note: 'Clear to run' });
+        const no = await submitRequest(ctx, GUARD_CREW, { stops: [['Kiama'], ['Staging (Up)']], readyAt: '12:30' });
+        await ctx.api('POST', reqUrl(ctx, no, 'decline'), { note: 'No room at Staging until 13:00' });
+        await submitRequest(ctx, GUARD_CREW, {
+          stops: [['Kiama'], ['Bombo', 'shunt', 20, 'drop 2 wagons'], ['Kembla Heights']],
+          loco: 'CityRail 4T',
+        });
+        await openJobs(page, ctx, { crew: GUARD_CREW, clock: '12:05' });
+        // One list: the requests (collapsed) sit at the top of My jobs, the accepted one is its job below.
+        await page.getByText('My jobs').waitFor();
+        await page.getByText('My jobs').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: ctx.out('jobs-requests') });
+      } finally { await cleanRequests(ctx); }
+    },
+  },
+
+  // ── Planner: path requests ──
+  {
+    name: 'planner-requests-drawer',
+    viewport: DESKTOP,
+    async run(page, ctx) {
+      try {
+        // A shunt on one path template, a run worked out from two paths, a run with no path data, and a crew asking to cancel.
+        await submitRequest(ctx, 'Local Operator 2', {
+          stops: [['Kiama'], ['Bombo', 'shunt', 20, 'drop 2 wagons'], ['Kembla Heights']],
+          loco: 'CityRail 4T', notes: 'Back at Kiama by 13:30 if possible.',
+        });
+        await submitRequest(ctx, 'Local Operator 3', { stops: [['Staging (Down)'], ['Kembla Heights']], readyAt: '12:30' });
+        await submitRequest(ctx, 'Local Operator 1', { stops: [['Berry'], ['Kiama Down Siding']] });
+        const acc = await submitRequest(ctx, GUARD_CREW, { stops: [['Nowra'], ['Berry']], loco: 'CityRail 4T' });
+        await ctx.api('POST', reqUrl(ctx, acc, 'acknowledge'));
+        await acceptRequest(ctx, acc, { name: 'PR1', crew: GUARD_CREW, from: 'Nowra', to: 'Berry', dep: '12:40', arr: '13:02' });
+        await apiAs(DEVICE_HEADERS, 'POST', reqUrl(ctx, acc, 'cancel-ask'), { crewId: crewOf(ctx, GUARD_CREW).id, reason: 'Loco has failed' });
+        await openPlanner(page, ctx);
+        await openRequests(page);
+        await page.screenshot({ path: ctx.out('planner-requests-drawer') });
+      } finally { await cleanRequests(ctx); }
+    },
+  },
+  {
+    name: 'planner-plotting',
+    viewport: DESKTOP,
+    async run(page, ctx) {
+      try {
+        await submitRequest(ctx, 'Local Operator 2', {
+          stops: [['Kiama'], ['Bombo', 'shunt', 20, 'drop 2 wagons'], ['Kembla Heights']],
+          loco: 'CityRail 4T',
+        });
+        await openPlanner(page, ctx, { clock: '12:00' });
+        for (let i = 0; i < 2; i++) { await page.getByTitle('Zoom in', { exact: true }).click(); await page.waitForTimeout(150); }
+        await openRequests(page);
+        await page.getByRole('button', { name: 'Acknowledge & plot' }).click();
+        await page.getByText(/^Plotting PR\d+ for/).waitFor();
+        await page.waitForTimeout(800);
+        await page.screenshot({ path: ctx.out('planner-plotting') });
+        await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+        await page.waitForTimeout(400);
+      } finally { await cleanRequests(ctx); }
+    },
+  },
+  {
+    name: 'planner-audit-log',
+    viewport: DESKTOP,
+    async run(page, ctx) {
+      try {
+        ctx.resetAudit();
+        const r = await submitRequest(ctx, 'Local Operator 2', {
+          stops: [['Kiama'], ['Bombo', 'shunt', 20, 'drop 2 wagons'], ['Kembla Heights']], loco: 'CityRail 4T', clock: '12:03',
+        });
+        await ctx.api('POST', reqUrl(ctx, r, 'acknowledge'));
+        await acceptRequest(ctx, r, { name: 'PR1', crew: 'Local Operator 2', from: 'Kiama', to: 'Kembla Heights', dep: '12:40', arr: '13:22' });
+        // A late withdraw from the crew's phone is refused, and the refusal is logged too.
+        await apiAs({ ...DEVICE_HEADERS, 'X-LiveRun-Clock': '12:09' }, 'POST', reqUrl(ctx, r, 'withdraw'), { crewId: crewOf(ctx, 'Local Operator 2').id }).catch(() => {});
+        await openPlanner(page, ctx);
+        await openRequests(page);
+        await page.getByRole('tab', { name: 'Audit log' }).click();
+        await page.getByText(/shown/).waitFor();
+        await page.waitForTimeout(600);
+        await page.getByRole('button', { name: 'Detail' }).first().click();
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: ctx.out('planner-audit-log') });
+      } finally { await cleanRequests(ctx); }
+    },
+  },
+  {
+    name: 'settings-path-requests',
+    viewport: DESKTOP,
+    async run(page, ctx) {
+      await openPlanner(page, ctx);
+      await page.getByTitle('Settings', { exact: true }).click();
+      await page.waitForTimeout(500);
+      const group = page.getByText('Path requests', { exact: true }).first();
+      await group.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: ctx.out('settings-path-requests') });
+    },
+  },
 ];
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -647,10 +890,17 @@ async function main() {
   const browser = await chromium.launch({ headless: !process.env.HEADED });
   cleanups.push(() => browser.close());
   fs.mkdirSync(OUT, { recursive: true });
-  const ctx = { app: APP, api, pub, ...data, out: (name) => path.join(OUT, `${name}.png`) };
+  const ctx = {
+    app: APP, api, pub, ...data,
+    resetAudit: () => { for (const f of ['audit.jsonl', 'audit.1.jsonl']) fs.rmSync(path.join(tmpDir, f), { force: true }); },
+    out: (name) => path.join(OUT, `${name}.png`) };
   let failed = 0;
   for (const shot of selected) {
-    const context = await browser.newContext({ viewport: shot.viewport || DESKTOP, deviceScaleFactor: shot.scale || 1 });
+    const context = await browser.newContext({
+      viewport: shot.viewport || DESKTOP,
+      deviceScaleFactor: shot.scale || 1,
+      ...(shot.userAgent ? { userAgent: shot.userAgent } : {}),
+    });
     const page = await context.newPage();
     try {
       await shot.run(page, ctx);

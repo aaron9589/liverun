@@ -1,17 +1,24 @@
 import { useState } from 'react';
 import { modeUrl, saveMode, type SavedMode } from '../lib/mode';
 
-const CARDS: { mode: SavedMode; title: string; blurb: string }[] = [
-  { mode: 'guard', title: 'Guard panel', blurb: 'Your train, stops and clock at a glance while you work the service.' },
-  { mode: 'crew', title: 'Crew view', blurb: 'Browse crews and trains, see timetables and mark runs complete.' },
-  { mode: 'planner', title: 'Planner', blurb: 'Build timetables, stations and the stringline graph.' },
+const CARDS: { mode: SavedMode; title: string; blurb: string; desktopOnly?: boolean }[] = [
+  { mode: 'jobs', title: 'Train Crew App', blurb: 'Your jobs, their timetables and instructions. Request a path from Control.' },
+  { mode: 'board', title: 'Crewing Manager', blurb: 'Everything running and when. Mark runs started and complete.' },
+  { mode: 'guard', title: 'Guard Panel', blurb: 'Your train, stops and clock at a glance while you work the service.' },
+  { mode: 'planner', title: 'Train Graph', blurb: 'Build timetables, stations and the stringline graph.', desktopOnly: true },
 ];
 
-export function ModePicker() {
+/**
+ * The chooser. On a phone it is the home page every time, so it offers only the
+ * mobile apps and remembers nothing; on a desktop it adds the Train Graph and can
+ * remember the choice.
+ */
+export function ModePicker({ isMobileUA }: { isMobileUA: boolean }) {
   const [remember, setRemember] = useState(true);
+  const cards = CARDS.filter((c) => !(isMobileUA && c.desktopOnly));
 
   const choose = (mode: SavedMode) => {
-    if (remember) saveMode(mode);
+    if (!isMobileUA && remember) saveMode(mode);
     window.location.assign(modeUrl(mode));
   };
 
@@ -20,9 +27,9 @@ export function ModePicker() {
       <div className="w-full max-w-md flex flex-col gap-4">
         <div className="text-center mb-2">
           <h1 className="text-2xl font-bold">LiveRun</h1>
-          <p className="text-sm text-slate-400 mt-1">How do you want to use it on this device?</p>
+          <p className="text-sm text-slate-400 mt-1">What do you want to open?</p>
         </div>
-        {CARDS.map((c) => (
+        {cards.map((c) => (
           <button
             key={c.mode}
             onClick={() => choose(c.mode)}
@@ -32,15 +39,17 @@ export function ModePicker() {
             <div className="text-sm text-slate-400 mt-1">{c.blurb}</div>
           </button>
         ))}
-        <label className="flex items-center gap-3 min-h-[48px] text-sm text-slate-300 mt-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={(e) => setRemember(e.target.checked)}
-            className="w-5 h-5 accent-blue-500"
-          />
-          Remember this choice on this device
-        </label>
+        {!isMobileUA && (
+          <label className="flex items-center gap-3 min-h-[48px] text-sm text-slate-300 mt-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="w-5 h-5 accent-blue-500"
+            />
+            Remember this choice on this device
+          </label>
+        )}
       </div>
     </div>
   );
